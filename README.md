@@ -10,6 +10,7 @@ local_var_name
 ALWAYS PULL and perform ALL the tests before merging !!!
 
 Commit often, and write useful messages, (bad examples: test1, commit, bug fix,...), this will allow the team to track changes and bugs
+(If you use vscode you can make use of the extension to automatically generate AI messages)
 
 Make sense of you branches and name them like this: making-drone-classes
 
