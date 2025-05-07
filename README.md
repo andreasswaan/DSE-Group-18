@@ -11,6 +11,8 @@ ALWAYS PULL and perform ALL the tests before merging !!!
 
 Commit often, and write useful messages, (bad examples: test1, commit, bug fix,...), this will allow the team to track changes and bugs
 
+Make sense of you branches and name them like this: making-drone-classes
+
 Use object oriented programming, with the use of classes, for example every drone could be a different class.
 
 If you use VScode please use Black Formatter as an extension: https://marketplace.visualstudio.com/items/?itemName=ms-python.black-formatter
