@@ -1,6 +1,6 @@
 Some general rules to write to this repository
 
-Use th following variable and function naming convenions:
+Use the following variable and function naming conventions:
 
 module_name, package_name, ClassName, method_name,
 ExceptionName, function_name, GLOBAL_CONSTANT_NAME,
