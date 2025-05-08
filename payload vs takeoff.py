@@ -31,6 +31,5 @@ plt.text(0.05, 0.95, f"$R^2 = {r_squared:.2f}$", transform=plt.gca().transAxes, 
 plt.xlabel('Payload Weight (kg)')
 plt.ylabel('Takeoff Weights (kg)')
 plt.legend(loc='lower right')  # Move the legend to the bottom-right corner
-
 # Show the plot
 plt.show()
