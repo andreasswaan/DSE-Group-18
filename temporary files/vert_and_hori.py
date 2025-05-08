@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # constants
-V_cruise = 15  # m/s, cruise speed
+g = 9.81  # m/s^2, acceleration due to gravity
+payload_mass = 2.5 * g  # kg, payload mass
+V_cruise = 10  # m/s, cruise speed
 rho = 1.225  # kg/m^3, air density at sea level
 CL_cruise = 0.5  # lift coefficient (placeholder value)
 CLoverCD_cruise = 10  # lift-to-drag ratio (placeholder value)
@@ -28,7 +30,7 @@ def payload_mass_to_mtow(payload_mass):
     Returns:
         float: Maximum takeoff weight (MTOW) in kg.
     """
-    mtow = 3 * payload_mass + 2 # Example conversion factor
+    mtow = 4.27 * payload_mass + 3.8 # Example conversion factor
     return mtow  # Example conversion factor
 
 def calculate_wing_surface_area(mtow):
@@ -80,8 +82,8 @@ def calculate_power_cruise(T, V_cruise):
     Returns:
         float: Power required in W.
     """
-    P = T * V_cruise  # Power = Thrust * Velocity
-    return P
+    P_cruise = T * V_cruise  # Power = Thrust * Velocity
+    return P_cruise
 
 def calculate_evergy_per_mission():
     """Calculate energy required for the entire mission.
@@ -90,3 +92,11 @@ def calculate_evergy_per_mission():
         float: Energy required in Wh.
     """
     pass
+
+mtow = payload_mass_to_mtow(payload_mass)  # kg
+S = calculate_wing_surface_area(mtow)  # m^2
+D = calculate_drag_cruise(S, V_cruise)  # N
+T = calculate_thrust_cruise(D)  # N
+P_cruise = calculate_power_cruise(T, V_cruise)  # W
+
+print(mtow, S, D, T, P_cruise)
