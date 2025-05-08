@@ -14,14 +14,14 @@ Commit often, and write useful messages, (bad examples: test1, commit, bug fix,.
 
 Make sense of you branches and name them like this: making-drone-classes
 
-Use object oriented programming, with the use of classes, for example every drone could be a different class.
+Use object oriented programming, with the use of classes, for example every drone could be a different object of class Drone.
 
 If you use VScode please use Black Formatter as an extension: https://marketplace.visualstudio.com/items/?itemName=ms-python.black-formatter
 
 If you use VScode please use Python Indent as an extension: https://marketplace.visualstudio.com/items/?itemName=KevinRose.vsc-python-indent
 
 When writing functions please specify the type of every entry and the type of the returned value, please specify None if nothing gets returned
-example :
+example:
 
     def my_function(number: int, string:str, number2:float, ) -> int:
         return number \* number
@@ -48,4 +48,6 @@ EX:
 
     assert correct_value_cl != calculated_value_cl_1, "CL calculation is wrong"
 
-UNIT test should be written AT THE SAME time as the function, this will allow the team to test changes before merging to the branch
+UNIT test should be written AT THE SAME time as the function, this will allow the team to test changes before merging to the branch.
+
+All unit tests that intend to remain in the program should be written using pytest in a separate file.
