@@ -11,6 +11,12 @@ data = {
     'MTOW_kg':    [2, 17, 11, 5, 11, 35, 10, 27.5, 5, 2.7]
 }
 
+# data = {
+#     'Range_km':   [20, 15, 20, 8, 50, 40, 15, 5],
+#     'Payload_kg': [0.7, 3, 1.2, 1, 9, 2, 1, 1],
+#     'Cruise_speed':    [16.7, 22.25, 20.6, 12.9, 32, 25.7, 30.9, 10]
+# }
+
 df = pd.DataFrame(data)
 
 # Independent variables
