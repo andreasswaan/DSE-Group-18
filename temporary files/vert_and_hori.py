@@ -85,6 +85,6 @@ D = calculate_drag_cruise(S, V_cruise)  # N
 T = calculate_thrust_cruise(D)  # N
 P_cruise = calculate_power_cruise(T, V_cruise)  # W
 energy_per_mission = calculate_evergy_per_mission(P_cruise, S)  # J
-battery_mass = size_battery(energy_per_mission)  # Wh
+battery_mass = size_battery(energy_per_mission)  # kg
 
 print(mtow, S, D, T, P_cruise, energy_per_mission, battery_mass)
