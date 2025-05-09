@@ -5,7 +5,7 @@ import pandas as pd
 # constants
 g = 9.81  # m/s^2, acceleration due to gravity
 payload_mass = 2.5 * g  # kg, payload mass
-V_cruise = 10  # m/s, cruise speed
+V_cruise = 15  # m/s, cruise speed
 rho = 1.225  # kg/m^3, air density at sea level
 CL_cruise = 0.5  # lift coefficient (placeholder value)
 CLoverCD_cruise = 10  # lift-to-drag ratio (placeholder value)
@@ -20,9 +20,9 @@ eta_vert_props = 0.50  # efficiency of vertical propellers
 V_takeoff = 10  # m/s, vertical takeoff speed
 cruise_height = 150  # metres, height of takeoff or landing
 takeoff_time = cruise_height / V_takeoff  # seconds, time to reach cruise height
-avg_mission_time = 30*60  # seconds, average mission tim
+avg_mission_time = 24*60  # seconds, average mission tim
 max_payload_dimension = 0.5  # metres, maximum payload dimension (side of square)
-battery_energy_density = 150 * 3600  # J/kg, energy density of battery (placeholder value)
+battery_energy_density = 250 * 3600  # J/kg, energy density of battery (placeholder value)
 battery_lowest_limit = 0.1  # lowest limit of battery (10% of capacity)
 
 def payload_mass_to_mtow(payload_mass):
