@@ -56,7 +56,7 @@ plt.plot(W_S, W_P_cruise, color='purple', label='Cruise constraint')
 plt.plot(W_S, W_P_climb, 'g-', label='Climb Constraint')
 
 # Feasible region (shading)
-plt.fill_between(W_S, 0, np.minimum(W_P_takeoff, W_P_cruise, W_P_climb),
+plt.fill_between(W_S, 0, np.minimum(W_P_takeoff, W_P_climb),
                  where=(W_S <= W_S_max_stall),
                  color='lightgreen', alpha=0.3, label='Feasible Region')
 
