@@ -1,5 +1,7 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
+from globals import main_dir
 
 # Constants (everything is not so educated guess!!!)
 rho = 1.225  # Air density at sea level (kg/m³)
@@ -55,12 +57,14 @@ plt.fill_between(W_S, 0, np.minimum(W_P_takeoff, W_P_climb),
                  where=(W_S <= W_S_max_stall),
                  color='lightgreen', alpha=0.3, label='Feasible Region')
 
-# Design point (highest W/S, lowest W/P in feasible region)
+# Design point (highest W/S, highest W/P in feasible region)
 design_W_S = W_S_max_stall * 0.9  # Example: 90% of stall limit
 design_W_P = np.minimum(
     np.interp(design_W_S, W_S, W_P_takeoff),
     np.interp(design_W_S, W_S, W_P_climb)
 )
+plot_path = os.path.join(main_dir, 'fixed_wing_plots\\WP_WS_diagram.png')
+os.makedirs(os.path.dirname(plot_path), exist_ok=True)
 plt.scatter(design_W_S, design_W_P, color='k', s=100, label='Design Point')
 plt.annotate(f'Design Point:\nW/S={design_W_S:.1f} N/m²\nW/P={design_W_P:.1f} N/W',
              (design_W_S, design_W_P), xytext=(10, 10), textcoords='offset points')
@@ -71,6 +75,7 @@ plt.ylabel('Power Loading (W/P) [N/W]')
 plt.title('W/P vs. W/S Diagram for Propeller Aircraft')
 plt.grid(True)
 plt.legend()
-plt.ylim(0, 100)  # Adjust y-axis limit based on your data
-plt.xlim(0, 3000)
-plt.show()
+plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+# plt.ylim(0, 100)  # Adjust y-axis limit based on your data
+# plt.xlim(0, 3000)
+plt.close()
