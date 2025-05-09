@@ -8,7 +8,7 @@ rho = 1.225  # Air density at sea level (kg/m³)
 g = 9.80665     # Gravitational acceleration (m/s²)
 V_s = 10  # Stall speed (m/s)
 C_L_max_landing = 2.0  # Maximum lift coefficient (landing configuration)
-eta_p = 0.8  # Propeller efficiency
+eta_p = 0.85  # Propeller efficiency
 c = 3      # Climb rate (m/s)
 A = 9        # Aspect ratio
 e = 0.7      # Oswald efficiency factor
@@ -23,7 +23,6 @@ W_S = np.linspace(0, 500, 100)
 # --- Constraints Calculation ---
 # 1. Stall Speed Constraint (W/S ≤ 0.5 * ρ * V_s² * C_L_max)
 W_S_max_stall = 0.5 * rho * V_s**2 * C_L_max_landing
-print(W_S_max_stall)
 
 # 2. Take-off Constraint (W/P = (W/S) / (TOP * C_L_TO))
 C_L_TO = 1.8 # Take-off lift coefficient
@@ -67,6 +66,8 @@ design_W_P = np.min([
     np.interp(design_W_S, W_S, W_P_cruise),
     np.interp(design_W_S, W_S, W_P_climb)
 ])
+print(f'Design Point: W/S = {design_W_S:.1f} N/m², W/P = {design_W_P:.1f} N/W')
+
 plot_path = os.path.join(main_dir, 'fixed_wing_plots\\WP_WS_diagram.png')
 os.makedirs(os.path.dirname(plot_path), exist_ok=True)
 plt.scatter(design_W_S, design_W_P, color='k', s=100, label='Design Point')

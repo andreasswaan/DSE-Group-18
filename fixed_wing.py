@@ -1,10 +1,12 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from WP_WS_diagram import V_s
 
 A = 2.616  # Jan regression factor for MTOW calculation
 B = 0.236  # Jan regression factor for MTOW calculation
 C = -0.717  # Jan regression factor for MTOW calculation
+
+V_s = 10  # Stall speed in m/s (example value, adjust as needed)
+W_S = 110.3 # Wing loading in N/m²
+W_P = 0.2 # Power loading in N/W
 
 η_prop = 0.85  # Propeller efficiency
 η_elec = 0.95  # Motor efficiency
@@ -14,13 +16,12 @@ V_cruise = 15.0  # Cruise speed in m/s
 R_maxPL = 5000 # Range at max payload in m
 R_0PL = 10000 # Range at 0 payload in m 
 E_loiter = 300/3600 # Time for loitering in seconds
-e_bat = 250  # Energy density of the battery in Wh/kg
+e_bat = 250*3600  # Energy density of the battery in J/kg
 g = 9.80665 # Acceleration due to gravity in m/s^2
 ρ = 1.225  # Air density in kg/m^3
 stat_miles_to_m = 1609.34  # Conversion factor from statute miles to meters
 η_p = 0.7
 c_p = 0.7
-wing_area = 3.5 # Wing area in m²
 m_s_to_mph = 2.23694 # Conversion factor from m/s to mph
 V_stall = V_s
 FF_startup = 0.999 # (adjusted to 0.999 from 0.998 as it is electric)
@@ -71,30 +72,7 @@ def calc_battery_mass_cruise(R, MTOW):
 
     return W_bat_cruise  # Battery mass in kg
 
-# def calc_energy_per_mission(S, CD_cruise):
-#     """Calculate energy required for the entire mission.
-    
-#     Returns:
-#         float: Energy required in J.
-#     """
-#     E_cruise_max_PL = 0.5 * ρ * V_cruise**2 * S * CD_cruise * R_maxPL / η_prop  # Energy required for cruise
-#     E_cruise_0PL = 0.5 * ρ * V_cruise**2 * S * CD_cruise * R_0PL / η_prop  # Energy required for cruise
-#     E_total = E_cruise_max_PL + E_cruise_0PL  # Total energy required for the mission
-    
-#     return E_total  # Energy in J
 
-# def calc_energy_to_Wbat(energy):
-#     """Convert energy to battery mass.
-    
-#     Args:
-#         energy (float): Energy in J.
-        
-#     Returns:
-#         float: Battery mass in kg.
-#     """
-#     W_bat = energy / (e_bat * 3600)  # Convert energy to battery mass in kg
-    
-#     return W_bat  # Battery mass in kg
 
 def FF_others_to_FF_cruise_ratio_used():
     """Calculate the ratio of cruise fuel flow to total fuel flow.
@@ -123,3 +101,8 @@ print(f"Ratio of cruise fuel flow to total fuel flow: {ratio_FF_others_to_FF_cru
 W_bat_total = (1+ratio_FF_others_to_FF_cruise) * W_bat_cruise  # Total battery mass
 print(f"Total battery mass: {W_bat_total} kg")
 
+S = MTOW * g/ W_S  # Wing area in m²
+print(f"Wing area: {S} m²")
+
+P_max = MTOW * g/ W_P  # Power in W
+print(f"Takeoff Power: {P_max} W")
