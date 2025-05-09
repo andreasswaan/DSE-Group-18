@@ -18,7 +18,7 @@ V_cruise = 15 # Cruise speed (m/s)
 TOP = 100     # Take-off parameter (from Raymer/statistics)
 
 # Wing loading range (N/m²)
-W_S = np.linspace(0, 500, 100)
+W_S = np.linspace(1, 500, 100)
 
 # --- Constraints Calculation ---
 # 1. Stall Speed Constraint (W/S ≤ 0.5 * ρ * V_s² * C_L_max)
@@ -56,7 +56,7 @@ plt.plot(W_S, W_P_cruise, color='purple', label='Cruise constraint')
 plt.plot(W_S, W_P_climb, 'g-', label='Climb Constraint')
 
 # Feasible region (shading)
-plt.fill_between(W_S, 0, np.minimum(W_P_takeoff, W_P_climb),
+plt.fill_between(W_S, 0, np.minimum(W_P_takeoff, W_P_cruise, W_P_climb),
                  where=(W_S <= W_S_max_stall),
                  color='lightgreen', alpha=0.3, label='Feasible Region')
 
