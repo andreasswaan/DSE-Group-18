@@ -23,6 +23,7 @@ takeoff_time = cruise_height / V_takeoff  # seconds, time to reach cruise height
 avg_mission_time = 30*60  # seconds, average mission tim
 max_payload_dimension = 0.5  # metres, maximum payload dimension (side of square)
 battery_energy_density = 150 * 3600  # J/kg, energy density of battery (placeholder value)
+battery_lowest_limit = 0.1  # lowest limit of battery (10% of capacity)
 
 def payload_mass_to_mtow(payload_mass):
 
@@ -79,7 +80,7 @@ def calculate_evergy_per_mission(P_cruise, S):
 
 def size_battery(energy_per_mission):
 
-    battery_mass = energy_per_mission / battery_energy_density  # kg
+    battery_mass = (energy_per_mission / battery_energy_density) / (1 - battery_lowest_limit)  # kg
     return battery_mass
 
 mtow = payload_mass_to_mtow(payload_mass)  # kg
