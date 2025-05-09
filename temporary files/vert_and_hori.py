@@ -11,7 +11,7 @@ CL_cruise = 0.5  # lift coefficient (placeholder value)
 CLoverCD_cruise = 10  # lift-to-drag ratio (placeholder value)
 CD_cruise = CL_cruise / CLoverCD_cruise  # drag coefficient (placeholder value)
 CD_flat_plate = 1.17  # flat plate drag coefficient at 90deg aoa
-ToverDmax_cruise = 1.2  # thrust-to-drag ratio (placeholder value)
+ToverDmax_cruise = 1.0  # thrust-to-drag ratio (placeholder value)
 ToverWmax_takeoff = 2.0  # thrust-to-weight ratio at takeoff (placeholder value)
 n_hori_props = 4  # number of horizontal propellers
 n_vert_props = 4  # number of vertical propellers
@@ -56,7 +56,7 @@ def calculate_power_takeoff(V_takeoff):
 
 def size_vert_props(P_takeoff):
 
-    vert_prop_total_area = ToverWmax_takeoff * mtow / (2 * rho * V_takeoff**2 * eta_vert_props)
+    vert_prop_total_area = (ToverWmax_takeoff * mtow)**3 / (2 * rho * P_takeoff**2)
     vert_prop_area = vert_prop_total_area / n_vert_props
     vert_prop_diameter = 2 * np.sqrt(vert_prop_area / np.pi)  # m, diameter of propellers
     return vert_prop_total_area, vert_prop_diameter
@@ -72,6 +72,9 @@ def calculate_evergy_per_mission(P_cruise, S):
     energy_cruise = P_cruise * avg_mission_time
 
     energy_per_mission = energy_takeoff + energy_cruise
+
+    print(f"Energy for takeoff: {energy_takeoff:.2f} J")
+    print(f"Energy for cruise: {energy_cruise:.2f} J")
     return energy_per_mission
 
 def size_battery(energy_per_mission):
