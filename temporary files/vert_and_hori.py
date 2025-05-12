@@ -5,13 +5,13 @@ import pandas as pd
 # constants
 g = 9.81  # m/s^2, acceleration due to gravity
 payload_mass = 2.5 * g  # kg, payload mass
-V_cruise = 10  # m/s, cruise speed
+V_cruise = 15  # m/s, cruise speed
 rho = 1.225  # kg/m^3, air density at sea level
 CL_cruise = 0.5  # lift coefficient (placeholder value)
 CLoverCD_cruise = 10  # lift-to-drag ratio (placeholder value)
 CD_cruise = CL_cruise / CLoverCD_cruise  # drag coefficient (placeholder value)
 CD_flat_plate = 1.17  # flat plate drag coefficient at 90deg aoa
-ToverDmax_cruise = 1.2  # thrust-to-drag ratio (placeholder value)
+ToverDmax_cruise = 1.0  # thrust-to-drag ratio (placeholder value)
 ToverWmax_takeoff = 2.0  # thrust-to-weight ratio at takeoff (placeholder value)
 n_hori_props = 4  # number of horizontal propellers
 n_vert_props = 4  # number of vertical propellers
@@ -20,9 +20,10 @@ eta_vert_props = 0.50  # efficiency of vertical propellers
 V_takeoff = 10  # m/s, vertical takeoff speed
 cruise_height = 150  # metres, height of takeoff or landing
 takeoff_time = cruise_height / V_takeoff  # seconds, time to reach cruise height
-avg_mission_time = 30*60  # seconds, average mission tim
+avg_mission_time = 24*60  # seconds, average mission tim
 max_payload_dimension = 0.5  # metres, maximum payload dimension (side of square)
-battery_energy_density = 150 * 3600  # J/kg, energy density of battery (placeholder value)
+battery_energy_density = 250 * 3600  # J/kg, energy density of battery (placeholder value)
+battery_lowest_limit = 0.1  # lowest limit of battery (10% of capacity)
 
 def payload_mass_to_mtow(payload_mass):
 
@@ -56,7 +57,7 @@ def calculate_power_takeoff(V_takeoff):
 
 def size_vert_props(P_takeoff):
 
-    vert_prop_total_area = ToverWmax_takeoff * mtow / (2 * rho * V_takeoff**2 * eta_vert_props)
+    vert_prop_total_area = (ToverWmax_takeoff * mtow)**3 / (2 * rho * P_takeoff**2)
     vert_prop_area = vert_prop_total_area / n_vert_props
     vert_prop_diameter = 2 * np.sqrt(vert_prop_area / np.pi)  # m, diameter of propellers
     return vert_prop_total_area, vert_prop_diameter
@@ -72,11 +73,14 @@ def calculate_evergy_per_mission(P_cruise, S):
     energy_cruise = P_cruise * avg_mission_time
 
     energy_per_mission = energy_takeoff + energy_cruise
+
+    print(f"Energy for takeoff: {energy_takeoff:.2f} J")
+    print(f"Energy for cruise: {energy_cruise:.2f} J")
     return energy_per_mission
 
 def size_battery(energy_per_mission):
 
-    battery_mass = energy_per_mission / battery_energy_density  # kg
+    battery_mass = (energy_per_mission / battery_energy_density) / (1 - battery_lowest_limit)  # kg
     return battery_mass
 
 mtow = payload_mass_to_mtow(payload_mass)  # kg
@@ -85,6 +89,6 @@ D = calculate_drag_cruise(S, V_cruise)  # N
 T = calculate_thrust_cruise(D)  # N
 P_cruise = calculate_power_cruise(T, V_cruise)  # W
 energy_per_mission = calculate_evergy_per_mission(P_cruise, S)  # J
-battery_mass = size_battery(energy_per_mission)  # Wh
+battery_mass = size_battery(energy_per_mission)  # kg
 
 print(mtow, S, D, T, P_cruise, energy_per_mission, battery_mass)
