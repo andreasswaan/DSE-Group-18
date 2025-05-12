@@ -1,6 +1,10 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
+from globals import main_dir
 
+plot_path =  os.path.join(main_dir, "tradeoff")
+os.makedirs(plot_path, exist_ok=True)
 # Define the criteria and concepts
 criteria = ["Production cost", "Operational cost", "Safety", "Sustainability", "Payload handling"]
 concepts = ["Multicopter", "Fixed-wing slingshot", "Fixed wing with hor. & ver. propellers", "Tilt-rotor"]
@@ -51,7 +55,7 @@ plt.ylabel("Frequency of Winning")
 plt.title("Sensitivity Study: Frequency of Winning Concepts")
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.tight_layout()
-plt.show()
+plt.savefig(os.path.join(plot_path, "sensitivity_gaussian.png"), dpi=300, bbox_inches='tight')
 
 
 # Calculate standard results (scores with original weights)
@@ -80,8 +84,10 @@ width = 0.2  # Width of each bar (adjusted for multiple designs)
 
 plt.figure(figsize=(14, 8))
 
+# Use a colormap to assign distinct colors to each design
+colors = plt.cm.Set2(np.linspace(0, 1, len(concepts)))  # Use a new colormap (Set2)
+
 # Plot standard results as the first group
-colors = plt.cm.tab10(np.linspace(0, 1, len(concepts)))  # Use distinct colors for each design
 for j, concept in enumerate(concepts):
     plt.bar(
         x[0] + j * width - (width * (len(concepts) - 1) / 2),  # Center the bars for standard results
@@ -89,7 +95,7 @@ for j, concept in enumerate(concepts):
         width,
         label=f"{concept} (Standard)",
         color=colors[j],
-        alpha=0.5  # Make standard bars slightly transparent
+        alpha=0.7  # Slight transparency for standard bars
     )
 
 # Plot perturbed results for each criterion
@@ -110,4 +116,4 @@ plt.xticks(x, ["Standard"] + criteria)  # Add "Standard" as the first label
 plt.legend(title="Designs")
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.tight_layout()
-plt.show()
+plt.savefig(os.path.join(plot_path, "sensitivity_linear.png"), dpi=300, bbox_inches='tight')
