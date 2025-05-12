@@ -9,9 +9,9 @@ g = 9.80665     # Gravitational acceleration (m/s²)
 V_s = 10  # Stall speed (m/s)
 C_L_max_landing = 2.0  # Maximum lift coefficient (landing configuration)
 eta_p = 0.85  # Propeller efficiency
-c = 3      # Climb rate (m/s)
+c = 4      # Climb rate (m/s)
 A = 6        # Aspect ratio
-e = 0.7      # Oswald efficiency factor
+e = 0.9      # Oswald efficiency factor
 C_D0 = 0.0335  # Zero-lift drag coefficient
 V_climb = 16  # Climb speed (m/s)
 V_cruise = 15 # Cruise speed (m/s)
@@ -66,7 +66,7 @@ design_W_P = np.min([
     np.interp(design_W_S, W_S, W_P_cruise),
     np.interp(design_W_S, W_S, W_P_climb)
 ])
-print(f'Design Point: W/S = {design_W_S:.1f} N/m², W/P = {design_W_P:.1f} N/W')
+print(f'Design Point: W/S = {design_W_S:.2f} N/m², W/P = {design_W_P:.3f} N/W')
 
 plot_path = os.path.join(main_dir, 'fixed_wing_plots\\WP_WS_diagram.png')
 os.makedirs(os.path.dirname(plot_path), exist_ok=True)

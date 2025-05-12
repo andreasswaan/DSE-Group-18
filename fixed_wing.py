@@ -5,8 +5,8 @@ B = 0.236  # Jan regression factor for MTOW calculation
 C = -0.717  # Jan regression factor for MTOW calculation
 
 V_s = 10  # Stall speed in m/s (example value, adjust as needed)
-W_S = 110.3 # Wing loading in N/m²
-W_P = 0.2 # Power loading in N/W
+W_S = 110.25 # Wing loading in N/m²
+W_P = 0.163 # Power loading in N/W
 
 η_prop = 0.85  # Propeller efficiency
 η_elec = 0.95  # Motor efficiency
@@ -28,7 +28,7 @@ FF_startup = 0.999 # (adjusted to 0.999 from 0.998 as it is electric)
 FF_taxi = 1
 std_climb = 4000
 climb_altitude = 500 # Climb altitude in m
-FF_descent = 1-(1-0.995)/(std_climb/climb_altitude)
+FF_descent = 1-(1-0.998)/(std_climb/climb_altitude)
 FF_climb = 1-(1-0.995)/(std_climb/climb_altitude) # Fuel flow during climb
 n_climb = 3
 n_descent = 3
@@ -65,14 +65,11 @@ def calc_loiter_FF():
 
 #     return CD_cruise
 
-
 def calc_battery_mass_cruise(R, MTOW):
     
     W_bat_cruise = (MTOW*R)/(η_prop * η_elec * L_over_D_cruise * e_bat/g)
 
     return W_bat_cruise  # Battery mass in kg
-
-
 
 def FF_others_to_FF_cruise_ratio_used():
     """Calculate the ratio of cruise fuel flow to total fuel flow.
@@ -106,3 +103,45 @@ print(f"Wing area: {S} m²")
 
 P_max = MTOW * g/ W_P  # Power in W
 print(f"Takeoff Power: {P_max} W")
+
+Cl_cruise = MTOW * g / (0.5 * ρ * V_cruise**2 * S)  # Lift coefficient during cruise
+print(f"Lift coefficient during cruise: {Cl_cruise}")
+
+
+
+
+import matplotlib.pyplot as plt
+
+# Calculate the fuel fractions for each phase
+FF_cruise = calc_cruise_FF()
+FF_loiter = calc_loiter_FF()
+FF_others = FF_startup * FF_taxi * FF_climb**n_climb * FF_descent**n_descent * FF_loiter
+# print(f"Fuel flow during cruise: {FF_cruise} kg/s")
+# print(f"Fuel flow during loiter: {FF_loiter} kg/s")
+# print(f"Fuel flow during startup: {FF_startup} kg/s")
+# print(f"Fuel flow during taxi: {FF_taxi} kg/s")
+# print(f"Fuel flow during climb: {FF_climb} kg/s")
+# print(f"Fuel flow during descent: {FF_descent} kg/s")
+# print(f"Fuel flow during others: {FF_others} kg/s")
+# Normalize the fuel fractions to represent their contribution to total energy consumption
+total_FF = FF_cruise * FF_others
+energy_breakdown = {
+    "Startup+Landing+Shutdown": (1-FF_startup) / total_FF,
+    "Taxi": (1-FF_taxi)/FF_others,
+    "Climb": (1-(FF_climb**n_climb)) / total_FF,
+    "Cruise": (1-FF_cruise) / total_FF,
+    "Descent": (1-(FF_descent**n_descent)) / total_FF,
+    "Loiter": (1-FF_loiter) / total_FF
+}
+
+# Create the pie chart
+labels = energy_breakdown.keys()
+sizes = energy_breakdown.values()
+colors = ['gold', 'lightblue', 'lightgreen', 'orange', 'pink', 'purple']
+explode = (0.1, 0, 0, 0.1, 0, 0)  # Highlight Startup and Cruise phases
+
+plt.figure(figsize=(8, 8))
+plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140, colors=colors, explode=explode)
+plt.title("Energy Consumption Breakdown per Flight Mission")
+plt.savefig("energy_consumption_breakdown.png", dpi=300, bbox_inches='tight')
+plt.close()
