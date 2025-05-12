@@ -5,9 +5,9 @@ import pandas as pd
 # constants
 g = 9.81  # m/s^2, acceleration due to gravity
 payload_mass = 2.5 * g  # kg, payload mass
-V_cruise = 10  # m/s, cruise speed
+V_cruise = 15  # m/s, cruise speed
 rho = 1.225  # kg/m^3, air density at sea level
-CL_cruise = 0.5  # lift coefficient (placeholder value)
+CL_cruise = 0.7  # lift coefficient (placeholder value)
 CLoverCD_cruise = 10  # lift-to-drag ratio (placeholder value)
 CD_cruise = CL_cruise / CLoverCD_cruise  # drag coefficient (placeholder value)
 CD_flat_plate = 1.17  # flat plate drag coefficient at 90deg aoa

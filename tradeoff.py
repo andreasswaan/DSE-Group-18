@@ -24,6 +24,8 @@ weights = np.array([0.1, 0.25, 0.3, 0.1, 0.25])
 def calculate_scores(scores, weights):
     return np.dot(scores, weights)
 
+print(np.dot(scores, weights))
+
 # Sensitivity study
 num_simulations = 1000
 winners = []
@@ -60,23 +62,24 @@ plt.savefig(os.path.join(plot_path, "sensitivity_gaussian.png"), dpi=300, bbox_i
 
 # Calculate standard results (scores with original weights)
 standard_scores = calculate_scores(scores, weights)
-
+margin = 0.1
 # Initialize a matrix to store scores for each design after perturbing each criterion
 perturbed_scores = []
 
 for i, crit in enumerate(criteria):
     # Add 20% error to the current criterion
     perturbed_weights = weights.copy()
-    perturbed_weights[i] += 0.2 * weights[i]
-    perturbed_weights = np.abs(perturbed_weights)  # Ensure no negative weights
-    perturbed_weights /= np.sum(perturbed_weights)  # Normalize to sum to 1
-
+    # perturbed_weights[i] += 0.2 * weights[i]
+    perturbed_weights[i] = margin + weights[i]
+    # perturbed_weights /= np.sum(perturbed_weights)  # Normalize to sum to 1
+    print(f"perturbed_weights {i, crit}: {perturbed_weights}")
     # Calculate scores with the perturbed weights
     total_scores = calculate_scores(scores, perturbed_weights)
     perturbed_scores.append(total_scores)
-
+print(perturbed_scores)
 # Convert to a NumPy array for easier manipulation
 perturbed_scores = np.array(perturbed_scores)  # Shape: (num_criteria, num_concepts)
+print(perturbed_scores)
 
 # Plot the results
 x = np.arange(len(criteria) + 1)  # Add one position for the standard results
@@ -111,9 +114,39 @@ for j, concept in enumerate(concepts):
 # Update x-axis labels
 plt.xlabel("Criteria")
 plt.ylabel("Scores")
-plt.title("Scores per Design (Standard vs. 20% Sensitivity)")
+plt.title(f"Scores per Design (Standard vs. {margin*100} offset Sensitivity)")
 plt.xticks(x, ["Standard"] + criteria)  # Add "Standard" as the first label
 plt.legend(title="Designs")
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.tight_layout()
 plt.savefig(os.path.join(plot_path, "sensitivity_linear.png"), dpi=300, bbox_inches='tight')
+plt.close()
+# Calculate the change in scores from the standard
+score_changes = perturbed_scores - standard_scores
+print(standard_scores)
+print(calculate_scores(scores, weights))
+
+# Plot the changes
+plt.figure(figsize=(14, 8))
+
+# Plot changes for each design
+for j, concept in enumerate(concepts):
+    plt.bar(
+        x[1:] + j * width - (width * (len(concepts) - 1) / 2),  # Offset for each design
+        score_changes[:, j],
+        width,
+        label=concept,
+        color=colors[j]
+    )
+
+# Update x-axis labels
+plt.xlabel("Criteria")
+plt.ylabel("Change in Scores")
+plt.title("Change in Scores per Design (20% Sensitivity)")
+plt.xticks(x[1:], criteria)  # Only show criteria labels (no "Standard")
+plt.axhline(0, color='black', linestyle='--', linewidth=1, alpha=0.7)  # Add a horizontal line at 0
+plt.legend(title="Designs")
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+plt.tight_layout()
+plt.savefig(os.path.join(plot_path, "sensitivity_change.png"), dpi=300, bbox_inches='tight')
+plt.close()
