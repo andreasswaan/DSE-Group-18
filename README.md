@@ -76,7 +76,7 @@ conda install conda-libmamba-solver
 ```bash
 conda config --set solver libmamba
 ```
-4. Now its time to install the actual libraries. Navigate the the project directory (with `cd`) and write:
+4. Now its time to install the actual libraries. Navigate to the project directory (with `cd`) and write:
 ```bash
 conda env create --file environment.yml
 ```
