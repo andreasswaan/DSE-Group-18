@@ -51,3 +51,40 @@ EX:
 UNIT test should be written AT THE SAME time as the function, this will allow the team to test changes before merging to the branch.
 
 All unit tests that intend to remain in the program should be written using pytest in a separate file.
+
+
+---------------------------------------------------
+
+# DSE Assignment: Group 18
+
+## VS Code Extensions
+- autoDocstring
+- Jupyter
+- GitLens
+- Rainbow CSV
+- vscode-pdf
+
+
+## Setting Up the Virtual Environment
+
+1. Ensure that you have `conda` installed and open anaconda prompt.
+2. First, we will change the conda's package-dependency solver to `libmamba`, as it is much faster. Let's first install it by activating the base environment and running
+```bash
+conda install conda-libmamba-solver
+```
+3. Deactivate the base enviroment and change the solver:
+```bash
+conda config --set solver libmamba
+```
+4. Now its time to install the actual libraries. Navigate the the project directory (with `cd`) and write:
+```bash
+conda env create --file environment.yml
+```
+5. Next, to ensure that python 'sees' the .py files in subfolders within project directory, activate the `DSE-18` environment and then run:
+```bash
+conda develop .
+```
+6. (Optional) If we add more packages, then run again:
+```bash
+conda env update --file environment.yml
+```

@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from globals import main_dir
 
+
 plot_path =  os.path.join(main_dir, "tradeoff")
 os.makedirs(plot_path, exist_ok=True)
 # Define the criteria and concepts
