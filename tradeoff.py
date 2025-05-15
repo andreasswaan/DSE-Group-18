@@ -7,7 +7,7 @@ from globals import main_dir
 plot_path =  os.path.join(main_dir, "tradeoff")
 os.makedirs(plot_path, exist_ok=True)
 # Define the criteria and concepts
-criteria = ["Production cost", "Operational cost", "Safety", "Sustainability", "Payload handling"]
+criteria = ["Site and Setup cost", "Operational cost", "Safety", "Sustainability", "Payload handling"]
 concepts = ["Multicopter", "Fixed-wing slingshot", "Fixed wing with hor. & ver. propellers", "Tilt-rotor"]
  
 # Scores for each concept on each criterion (rows: concepts, columns: criteria)
@@ -71,7 +71,6 @@ for i, crit in enumerate(criteria):
     # perturbed_weights[i] += 0.2 * weights[i]
     perturbed_weights[i] = margin + weights[i]
     perturbed_weights /= np.sum(perturbed_weights)  # Normalize to sum to 1
-    print(f"perturbed_weights {i, crit}: {perturbed_weights}")
     # Calculate scores with the perturbed weights
     total_scores = calculate_scores(scores, perturbed_weights)
     perturbed_scores.append(total_scores)
@@ -94,7 +93,6 @@ for j, concept in enumerate(concepts):
         x[0] + j * width - (width * (len(concepts) - 1) / 2),  # Center the bars for standard results
         [standard_scores[j]],  # Standard scores
         width,
-        label=f"{concept} (Standard)",
         color=colors[j],
         alpha=0.7  # Slight transparency for standard bars
     )
@@ -105,13 +103,14 @@ for j, concept in enumerate(concepts):
         x[1:] + j * width - (width * (len(concepts) - 1) / 2),  # Offset for perturbed bars
         perturbed_scores[:, j],
         width,
-        label=f"{concept} (Perturbed)" if j == 0 else None,  # Add label only once
+        # label=f"{concept}" if j == 0 else None,  # Add label only once
+        label=concept,
         color=colors[j]
     )
 
 # Update x-axis labels
-plt.xlabel("Criteria")
-plt.ylabel("Scores")
+plt.xlabel("Criteria", fontsize=14)
+plt.ylabel("Scores", fontsize=14)
 # plt.title(f"Scores per Design (Standard vs. {margin*100} offset Sensitivity)")
 plt.xticks(x, ["Standard"] + criteria)  # Add "Standard" as the first label
 plt.legend(title="Designs", loc='lower left', bbox_to_anchor=(0, 0), borderaxespad=0.)
@@ -136,8 +135,8 @@ for j, concept in enumerate(concepts):
     )
 
 # Update x-axis labels
-plt.xlabel("Criteria")
-plt.ylabel("Change in Scores")
+plt.xlabel("Criteria", fontsize=14)
+plt.ylabel("Change in Scores", fontsize=14)
 # plt.title(f"Change in Scores per Design ({margin}% Sensitivity)")
 plt.xticks(x[1:], criteria)  # Only show criteria labels (no "Standard")
 plt.axhline(0, color='black', linestyle='--', linewidth=1, alpha=0.7)  # Add a horizontal line at 0
