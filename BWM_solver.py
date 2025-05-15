@@ -42,7 +42,7 @@ def solve_bwm_scipy_safe(criteria, best_index, worst_index, BO_vector, OW_vector
 
 # === Example Usage ===
 
-criteria = ["Safety", "Production cost", "Sustainability", "Payload handling", "Operational cost"]
+criteria = ["Safety", "Site and Setup cost", "Sustainability", "Payload handling", "Operational cost"]
 
 # Simulate 10 people's preferences
 preferences = [
