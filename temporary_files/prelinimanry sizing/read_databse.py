@@ -8,7 +8,7 @@ def get_data_from_database():
     """
 
     # Read the data from the Excel file
-    file_path = "temporary files\preliminary sizing\Database.xlsx"
+    file_path = "temporary_files\preliminary sizing\Database.xlsx"
     dataframe = pd.read_excel(file_path)
 
     # Display the dataframe
