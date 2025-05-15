@@ -1,4 +1,4 @@
-﻿Location,distance to city centre in meters (oude kerk square),rent per year per m2,rent per month per m2,total m2,total rent per month
+﻿location,distance,rent_m2_yearly,rent_m2_monthly,m2,rent_total_monthly
 Voldersgracht 18,60,324,27,100,2700
 Voldersgracht 23,80,443,36.91666667,46,1698.166667
 Voldersgracht 22,80,233,19.41666667,154,2990.166667
@@ -68,7 +68,6 @@ Dijkgraafstraat,2690,150,12.5,200,2500
 Turbinweg 14-B,2700,127,10.58333333,54,571.5
 Dijkgraafstraat 7,2700,129,10.75,1350,14512.5
 Schieweg 64,2720,150,12.5,400,5000
-Molengraffsingel 8,2740,215,17.91666667,10000,179166.6667
 Ampereweg 12,2780,76,6.333333333,780,4940
 Rotterdamseweg 386-B1,2800,140,11.66666667,273,3185
 Dynamoweg 2,2840,145,12.08333333,165,1993.75
