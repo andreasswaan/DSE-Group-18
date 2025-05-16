@@ -102,39 +102,38 @@ def size_props(P_takeoff):
     return vert_prop_total_area, vert_prop_diameter"""
 
 
-#A_prop, vert_prop_diameter = size_props(calculate_power_takeoff(V_takeoff))
-#print("Vertical propeller total area:", A_prop, "m^2")
-#print("Vertical propeller diameter:", vert_prop_diameter, "m")
+# A_prop, vert_prop_diameter = size_props(calculate_power_takeoff(V_takeoff))
+# print("Vertical propeller total area:", A_prop, "m^2")
+# print("Vertical propeller diameter:", vert_prop_diameter, "m")
 
 
 def take_off_landing_energy(mass):
     D_takeoff = drag(A_drone, V_takeoff, Cd)
     D_land = drag(A_drone, V_land, Cd)
     energy_takeoff = (
-        (mass*9.81+D_takeoff)**1.5
-        / (np.sqrt(2 * ρ * prop_area) * η_prop)
-    )* cruise_height/ V_takeoff
+        ((mass * 9.81 + D_takeoff) ** 1.5 / (np.sqrt(2 * ρ * prop_area * η_prop)))
+        * cruise_height
+        / V_takeoff
+    )
     print("energy takeoff", energy_takeoff)
     energy_landing = (
-         (mass*9.81-D_land)**1.5
-        / (np.sqrt(2 * ρ * prop_area) * η_prop)
-    )* cruise_height / V_land
+        ((mass * 9.81 - D_land) ** 1.5 / (np.sqrt(2 * ρ * prop_area * η_prop)))
+        * cruise_height
+        / V_land
+    )
     print("energy landing", energy_landing)
     energy_takeoff += energy_landing
     return energy_takeoff
 
 
 def calculate_p_cruise(mass, speed):
-    p_hover = (
-        (mass * 9.81) ** (3 / 2)
-        / (np.sqrt(2 * rho * prop_area))
-        / prop_efficiency
-        / electric_efficiency
+    p_hover = (mass * 9.81) ** (3 / 2) / (
+        np.sqrt(2 * rho * prop_area * prop_efficiency)
     )
     D = 0.5 * Cd * A_drone * rho * speed**2
     alpha = np.arctan(D / (mass * 9.81))
     p_cruise = p_hover / np.cos(alpha)
-    return p_cruise
+    return p_cruise / electric_efficiency
 
 
 p_cruise_mtow = calculate_p_cruise(mtow, mission_profile["cruise_speed"])
@@ -166,7 +165,7 @@ def calculate_battery_mass(mission_profile, graph=False):
         + energy_loiter
         + TO_landing * energy_takeoff_landing
     )
-    battery_mass = energy_total / energy_density / (1-battery_lowest_limit)  # in kg
+    battery_mass = energy_total / energy_density / (1 - battery_lowest_limit)  # in kg
 
     # Create a pie chart
     if graph:
