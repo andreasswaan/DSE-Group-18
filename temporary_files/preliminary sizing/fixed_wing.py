@@ -24,7 +24,6 @@ V_stall = 10  # Stall speed in m/s (example value, adjust as needed)
 W_S = 110.25  # Wing loading in N/m²
 W_P = 0.163  # Power loading in N/W
 stat_miles_to_m = 1609.34  # Conversion factor from statute miles to meters
-η_p = 0.7
 c_p = 0.7
 m_s_to_mph = 2.23694  # Conversion factor from m/s to mph
 FF_startup = 0.999  # (adjusted to 0.999 from 0.998 as it is electric)
@@ -64,13 +63,13 @@ def payload_mass_to_mtow(payload_mass, R):
 def calc_cruise_FF():
     R_maxPL = mission_profile["cruise_MTOW"]
     FF_maxPL = 1 / np.exp(
-        R_maxPL / stat_miles_to_m * 1 / (375 * η_p / c_p * L_over_D_cruise)
+        R_maxPL / stat_miles_to_m * 1 / (375 * η_prop / c_p * L_over_D_cruise)
     )
     FF_0PL = 1 / np.exp(
         mission_profile["cruise_OEW"]
         / stat_miles_to_m
         * 1
-        / (375 * η_p / c_p * L_over_D_cruise)
+        / (375 * η_prop / c_p * L_over_D_cruise)
     )
     FF_cruise = FF_maxPL * FF_0PL
     return FF_cruise  # Fuel flow in kg/s
@@ -79,7 +78,7 @@ def calc_cruise_FF():
 def calc_loiter_FF():
     E_loiter = mission_profile["loitering_time"] / 3600
     V_s = V_stall * m_s_to_mph  # Convert stall speed to mph
-    FF_loiter = 1 / np.exp(E_loiter / (375 / V_s) / (η_p / c_p) / L_over_D_cruise)
+    FF_loiter = 1 / np.exp(E_loiter / (375 / V_s) / (η_prop / c_p) / L_over_D_cruise)
     return FF_loiter  # Fuel flow in kg/s
 
 
