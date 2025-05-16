@@ -132,7 +132,7 @@ ratio_FF_others_to_FF_cruise = (
     FF_others_to_FF_cruise_ratio_used()
 )  # Calculate ratio of cruise fuel flow to total fuel flow
 
-W_bat_total = (1 + ratio_FF_others_to_FF_cruise) * W_bat_cruise  # Total battery mass
+W_bat_total = ((1 + ratio_FF_others_to_FF_cruise) * W_bat_cruise)/(1-battery_lowest_limit)  # Total battery mass
 
 S = MTOW * g / W_S  # Wing area in m²
 

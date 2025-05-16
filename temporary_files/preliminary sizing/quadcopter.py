@@ -19,10 +19,13 @@ mission_profile = {
     # cruise speed
 """
 # Constants
-V_takeoff = 10  # Takeoff velocity in m/s
-Cd = 2
-A_drone = 0.45**2 + 0.3**2
-n_rotors = 4
+V_takeoff = 6.3  # Takeoff velocity in m/s
+V_land = 5
+Cd = 1.2
+A_drone = max_payload_dimension**2 + 0.3**2
+n_rotors = 8
+prop_diameter = 0.3
+prop_area = n_rotors * np.pi * (prop_diameter / 2) ** 2  # m^2, area of one propeller
 rho = ρ
 pl = payload_mass
 energy_density = battery_energy_density
@@ -30,7 +33,7 @@ TO_landing_time = 60
 prop_efficiency = η_prop
 electric_efficiency = η_elec
 ToverWmax_takeoff = 2  # thrust-to-weight ratio at takeoff (placeholder value)
-
+takeoff_nr = mission_profile["TO_LD"]  # number of takeoffs and landings
 
 cruise_height = mission_profile["cruise_h"]
 # Data
@@ -82,7 +85,7 @@ def calculate_drag(Cd, A, speed):
     return 0.5 * Cd * A * rho * speed**2
 
 
-def calculate_power_takeoff(V_takeoff):
+"""def calculate_power_takeoff(V_takeoff):
     Thrust = ToverWmax_takeoff * mtow * 9.81 + calculate_drag(Cd, A_drone, V_takeoff)
     P_takeoff = Thrust * V_takeoff / prop_efficiency / electric_efficiency
     return P_takeoff
@@ -96,36 +99,35 @@ def size_props(P_takeoff):
     vert_prop_diameter = 2 * np.sqrt(
         vert_prop_area / np.pi
     )  # m, diameter of propellers
-    return vert_prop_total_area, vert_prop_diameter
+    return vert_prop_total_area, vert_prop_diameter"""
 
 
-A_prop, vert_prop_diameter = size_props(calculate_power_takeoff(V_takeoff))
-print("Vertical propeller total area:", A_prop, "m^2")
-print("Vertical propeller diameter:", vert_prop_diameter, "m")
+#A_prop, vert_prop_diameter = size_props(calculate_power_takeoff(V_takeoff))
+#print("Vertical propeller total area:", A_prop, "m^2")
+#print("Vertical propeller diameter:", vert_prop_diameter, "m")
 
 
 def take_off_landing_energy(mass):
-    energy_takeoff_hover = (
-        2
-        * (mass * 9.81) ** 1.5
-        / (np.sqrt(2 * rho * A_prop))
-        * cruise_height
-        / V_takeoff
-    )
-    energy_takeoff_climb = 9.81 * mass * cruise_height
-    energy_takeoff_drag = calculate_drag(Cd, A_drone, V_takeoff) * cruise_height
+    D_takeoff = drag(A_drone, V_takeoff, Cd)
+    D_land = drag(A_drone, V_land, Cd)
     energy_takeoff = (
-        (energy_takeoff_hover + energy_takeoff_climb + energy_takeoff_drag)
-        / electric_efficiency
-        / prop_efficiency
-    )
+        (mass*9.81+D_takeoff)**1.5
+        / (np.sqrt(2 * ρ * prop_area) * η_prop)
+    )* cruise_height/ V_takeoff
+    print("energy takeoff", energy_takeoff)
+    energy_landing = (
+         (mass*9.81-D_land)**1.5
+        / (np.sqrt(2 * ρ * prop_area) * η_prop)
+    )* cruise_height / V_land
+    print("energy landing", energy_landing)
+    energy_takeoff += energy_landing
     return energy_takeoff
 
 
 def calculate_p_cruise(mass, speed):
     p_hover = (
         (mass * 9.81) ** (3 / 2)
-        / (np.sqrt(2 * rho * A_prop))
+        / (np.sqrt(2 * rho * prop_area))
         / prop_efficiency
         / electric_efficiency
     )
@@ -164,7 +166,7 @@ def calculate_battery_mass(mission_profile, graph=False):
         + energy_loiter
         + TO_landing * energy_takeoff_landing
     )
-    battery_mass = energy_total / energy_density / 0.7  # in kg
+    battery_mass = energy_total / energy_density / (1-battery_lowest_limit)  # in kg
 
     # Create a pie chart
     if graph:
@@ -189,14 +191,14 @@ def calculate_battery_mass(mission_profile, graph=False):
     return battery_mass, energy_total / 1000000
 
 
-battery_mass, energy_total = calculate_battery_mass(mission_profile, graph=False)
+battery_mass, energy_total = calculate_battery_mass(mission_profile, graph=True)
 
 
 mission_profile_average = {
-    "cruise_OEW": 10000,
-    "cruise_MTOW": 5000,
+    "cruise_OEW": 4000,
+    "cruise_MTOW": 4000,
     "loitering_time": 0 * 60,
-    "TO_LD": 6,
+    "TO_LD": 5,
     "cruise_h": 150,
     "cruise_speed": 15,
 }

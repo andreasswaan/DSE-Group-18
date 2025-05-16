@@ -40,15 +40,11 @@ V_takeoff = 6.3  # m/s, vertical takeoff speed
 V_land = 5  # m/s, vertical landing speed
 cruise_height = 150  # metres, height of takeoff or landing
 takeoff_time = cruise_height / V_takeoff  # seconds, time to reach cruise height
-max_payload_dimension = 0.5  # metres, maximum payload dimension (side of square)
-battery_lowest_limit = 0.1  # lowest limit of battery (10% of capacity)
 
 db_filter_max_payload = 4  # kg, maximum payload for database filter
 db_filter_max_range = 40  # km, maximum range for database filter
 db = get_data_from_database()
 
-def drag(S, V, CD):
-    return 0.5 * ρ * V**2 * S * CD
 
 def payload_mass_to_mtow(payload_mass, range):
     [A, B], C = get_regression_plane(db, db_filter_max_payload, db_filter_max_range)
@@ -98,7 +94,7 @@ def calculate_energy_per_mission(P_cruise, S):
         * (mtow+D_takeoff)**1.5
         / (np.sqrt(2 * ρ * vert_prop_total_area) * eta_vert_props)
     )* cruise_height/ V_takeoff
-    print("energy takeoff", energy_takeoff)
+    print("energy takeoff", energy_takeoff/takeoff_nr , "J per takeoff")
     energy_landing = (
         takeoff_nr
         * (mtow-D_land)**1.5

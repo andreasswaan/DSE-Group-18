@@ -7,3 +7,8 @@ battery_energy_density = (
     250 * 3600
 )  # J/kg, energy density of battery (placeholder value)
 L_over_D_cruise = 10.0  # Lift-to-drag ratio during cruise test change
+battery_lowest_limit = 0.2  # Lowest limit of battery (20% of capacity)
+max_payload_dimension = 0.5  # metres, maximum payload dimension (side of square)
+
+def drag(S, V, CD):
+    return 0.5 * ρ * V**2 * S * CD
