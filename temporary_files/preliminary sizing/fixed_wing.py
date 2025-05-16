@@ -65,11 +65,9 @@ def calc_cruise_FF():
     FF_maxPL = 1 / np.exp(
         R_maxPL / stat_miles_to_m * 1 / (375 * η_prop / c_p * L_over_D_cruise)
     )
+    R_zeroPL = mission_profile["cruise_OEW"]
     FF_0PL = 1 / np.exp(
-        mission_profile["cruise_OEW"]
-        / stat_miles_to_m
-        * 1
-        / (375 * η_prop / c_p * L_over_D_cruise)
+        R_zeroPL / stat_miles_to_m * 1 / (375 * η_prop / c_p * L_over_D_cruise)
     )
     FF_cruise = FF_maxPL * FF_0PL
     return FF_cruise  # Fuel flow in kg/s
@@ -132,7 +130,9 @@ ratio_FF_others_to_FF_cruise = (
     FF_others_to_FF_cruise_ratio_used()
 )  # Calculate ratio of cruise fuel flow to total fuel flow
 
-W_bat_total = ((1 + ratio_FF_others_to_FF_cruise) * W_bat_cruise)/(1-battery_lowest_limit)  # Total battery mass
+W_bat_total = ((1 + ratio_FF_others_to_FF_cruise) * W_bat_cruise) / (
+    1 - battery_lowest_limit
+)  # Total battery mass
 
 S = MTOW * g / W_S  # Wing area in m²
 
