@@ -14,12 +14,12 @@ mission_profile = {
     "cruise_speed": 15,
 }
 """
-    cruise OEW length,
-    cruise MTOW length,
-    loitering time, 
-    #TO/landing, 
-    # cruise height, 
-    # cruise speed
+    cruise OEW length [m],
+    cruise MTOW length [m],
+    loitering time [s], 
+    #TO/landing [#], 
+    # cruise height [m], 
+    # cruise speed [m/s]
 """
 # constants
 V_cruise = 15  # m/s, cruise speed
@@ -47,8 +47,10 @@ db_filter_max_payload = 4  # kg, maximum payload for database filter
 db_filter_max_range = 40  # km, maximum range for database filter
 db = get_data_from_database()
 
+
 def drag(S, V, CD):
     return 0.5 * ρ * V**2 * S * CD
+
 
 def payload_mass_to_mtow(payload_mass, range):
     [A, B], C = get_regression_plane(db, db_filter_max_payload, db_filter_max_range)
@@ -94,16 +96,24 @@ def calculate_energy_per_mission(P_cruise, S):
     D_takeoff = drag(max_payload_dimension**2 + S, V_takeoff, CD_flat_plate)
     D_land = drag(max_payload_dimension**2 + S, V_land, CD_flat_plate)
     energy_takeoff = (
-        takeoff_nr
-        * (mtow+D_takeoff)**1.5
-        / (np.sqrt(2 * ρ * vert_prop_total_area) * eta_vert_props)
-    )* cruise_height/ V_takeoff
+        (
+            takeoff_nr
+            * (mtow + D_takeoff) ** 1.5
+            / (np.sqrt(2 * ρ * vert_prop_total_area) * eta_vert_props)
+        )
+        * cruise_height
+        / V_takeoff
+    )
     print("energy takeoff", energy_takeoff)
     energy_landing = (
-        takeoff_nr
-        * (mtow-D_land)**1.5
-        / (np.sqrt(2 * ρ * vert_prop_total_area) * eta_vert_props)
-    )* cruise_height / V_land
+        (
+            takeoff_nr
+            * (mtow - D_land) ** 1.5
+            / (np.sqrt(2 * ρ * vert_prop_total_area) * eta_vert_props)
+        )
+        * cruise_height
+        / V_land
+    )
     print("energy landing", energy_landing)
     energy_cruise = P_cruise * avg_mission_time
     print("energy cruise", energy_cruise)
@@ -111,13 +121,14 @@ def calculate_energy_per_mission(P_cruise, S):
     energy_per_mission = (energy_takeoff + energy_cruise + energy_landing) / η_elec
     # Pie chart for energy distribution
     energies = [energy_takeoff, energy_cruise, energy_landing]
-    labels = ['Takeoff', 'Cruise', 'Landing']
+    labels = ["Takeoff", "Cruise", "Landing"]
     plt.figure(figsize=(6, 6))
-    plt.pie(energies, labels=labels, autopct='%1.1f%%', startangle=90)
-    plt.title('Energy Distribution per Mission')
+    plt.pie(energies, labels=labels, autopct="%1.1f%%", startangle=90)
+    plt.title("Energy Distribution per Mission")
     plt.show()
 
     return energy_per_mission
+
 
 def size_battery(energy_per_mission):
 
@@ -125,6 +136,7 @@ def size_battery(energy_per_mission):
         1 - battery_lowest_limit
     )  # kg
     return battery_mass
+
 
 mtow = payload_mass_to_mtow(payload_mass, range_at_max_payload)  # kg
 S = calculate_wing_surface_area(mtow)  # m^2
@@ -140,6 +152,7 @@ print("S:", S, "m^2")
 print("Battery mass:", battery_mass, "kg")
 print("Energy per mission:", energy_per_mission, "J")
 
+
 def plot_takeoff_energy_vs_speed(S, speed_range=None):
     if speed_range is None:
         speed_range = np.linspace(1, 15, 30)  # m/s, adjust as needed
@@ -151,15 +164,18 @@ def plot_takeoff_energy_vs_speed(S, speed_range=None):
             mission_profile["TO_LD"]
             * (mtow + D_takeoff) ** 1.5
             / (np.sqrt(2 * ρ * vert_prop_total_area) * eta_vert_props)
-            * mission_profile["cruise_h"] / v
+            * mission_profile["cruise_h"]
+            / v
         )
         takeoff_energies.append(energy_takeoff)
 
     plt.figure(figsize=(8, 5))
-    plt.plot(speed_range, takeoff_energies, marker='o')
+    plt.plot(speed_range, takeoff_energies, marker="o")
     plt.xlabel("Takeoff Speed (m/s)")
     plt.ylabel("Takeoff Energy (J)")
     plt.title("Takeoff Energy vs Takeoff Speed")
     plt.grid(True)
     plt.show()
-    print(min(takeoff_energies), "J at", speed_range[np.argmin(takeoff_energies)], "m/s")
+    print(
+        min(takeoff_energies), "J at", speed_range[np.argmin(takeoff_energies)], "m/s"
+    )

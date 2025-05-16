@@ -11,12 +11,12 @@ mission_profile = {
     "cruise_speed": 15,
 }
 """
-    cruise OEW length,
-    cruise MTOW length,
-    loitering time, 
-    #TO/landing, 
-    # cruise height, 
-    # cruise speed
+    cruise OEW length [m],
+    cruise MTOW length [m],
+    loitering time [s], 
+    #TO/landing [#], 
+    # cruise height [m], 
+    # cruise speed [m/s]
 """
 # Constants
 V_takeoff = 10  # Takeoff velocity in m/s

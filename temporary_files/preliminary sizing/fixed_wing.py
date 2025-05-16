@@ -12,12 +12,12 @@ mission_profile = {
     "cruise_speed": 15,
 }
 """
-    cruise OEW length,
-    cruise MTOW length,
-    loitering time, 
-    #TO/landing, 
-    # cruise height, 
-    # cruise speed
+    cruise OEW length [m],
+    cruise MTOW length [m],
+    loitering time [s], 
+    #TO/landing [#], 
+    # cruise height [ft], 
+    # cruise speed [m/s]
 """
 
 V_stall = 10  # Stall speed in m/s (example value, adjust as needed)
@@ -29,13 +29,14 @@ c_p = 0.7
 m_s_to_mph = 2.23694  # Conversion factor from m/s to mph
 FF_startup = 0.999  # (adjusted to 0.999 from 0.998 as it is electric)
 FF_taxi = 1
-std_climb = 4000
+std_climb = 4000  # ft
 FF_descent = 1 - (1 - 0.998) / (std_climb / mission_profile["cruise_h"])
 FF_climb = 1 - (1 - 0.995) / (
     std_climb / mission_profile["cruise_h"]
 )  # Fuel flow during climb
 n_climb = 3
 n_descent = 3
+
 
 db_filter_max_payload = 4  # kg, maximum payload for database filter
 db_filter_max_range = 40  # km, maximum range for database filter
