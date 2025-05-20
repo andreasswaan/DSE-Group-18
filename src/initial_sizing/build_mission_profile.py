@@ -1,4 +1,5 @@
 from vert_and_hori import iterations
+from ...city_density import get_distance_constants
 
 
 def build_mission_profile(
@@ -22,19 +23,16 @@ def build_mission_profile(
     LD_speed: landing speed (m/s)
     """
     profile = []
-    for i, seg in enumerate(sequence):
-        key = None
-        if seg == "D":
-            # Depot, usually no cruise, just loiter or ground
+    for i in range(len(sequence)):
+        if i == len(sequence) - 1:
             continue
-        elif seg == "R":
-            key = "DR"
-        elif seg == "C":
-            key = "RC"
-        else:
-            key = seg  # fallback
+        TO_letter = sequence[i]
+        LD_letter = sequence[i + 1]
+        leg_letter = TO_letter + LD_letter
 
-        cruise_distance = distances.get(key, 0)
+        print(f"leg: {leg_letter}, TO: {TO_letter}, LD: {LD_letter}")
+
+        cruise_distance = distances.get(leg_letter, 0)
         loitering_time = (
             loitering_times[i] if isinstance(loitering_times, list) else loitering_times
         )
@@ -43,27 +41,27 @@ def build_mission_profile(
         payload = (
             payload_masses[i] if isinstance(payload_masses, list) else payload_masses
         )
-
         profile.append(
             {
                 "cruise_distance": cruise_distance,
-                "loitering_time": loitering_time[seg],
+                "loitering_time": loitering_time[LD_letter],
                 "cruise_h": h,
                 "cruise_speed": speed,
-                "payload_mass": payload[seg],
-                "TO_speed": TO_speed[seg],
-                "LD_speed": LD_speed[seg],
+                "payload_mass": payload[LD_letter],
+                "TO_speed": TO_speed[TO_letter],
+                "LD_speed": LD_speed[LD_letter],
             }
         )
     return profile
 
 
-sequence = "DRCCD"
+print(get_distance_constants())
+sequence = "DRCCRCCRCCD"
 distances = {"DR": 5000, "RC": 5000, "CC": 5000, "CD": 5000}
 loitering_times = {"R": 120, "C": 30, "D": 0}
 cruise_h = 200
 cruise_speed = 15
-payload_masses = {"D": 0, "R": 2.5, "C": 0}
+payload_masses = {"D": 0, "R": 0, "C": 2.5}
 TO_speed = {"D": 6, "R": 7, "C": 8}
 LD_speed = {"D": 3, "R": 4, "C": 5}
 
