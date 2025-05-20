@@ -404,7 +404,7 @@ def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=False):
     return battery_mass
 
 
-def iterations(design_payload, mission_profile, iterations=10, PLOT=False):
+def iterations(mission_profile, design_payload=2.5, iterations=10, PLOT=False):
     mtow = payload_mass_to_mtow(design_payload, design_range / 1000)  # kg
     print("Start MTOW", mtow)
     structures_mass_frac = 0.35
