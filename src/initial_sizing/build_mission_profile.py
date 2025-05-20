@@ -1,3 +1,5 @@
+from vert_and_hori import iterations, design_payload
+
 def build_mission_profile(
     sequence,
     distances,
@@ -64,3 +66,5 @@ mission_profile_2 = build_mission_profile(
 
 print("Mission Profile 2:")
 print(mission_profile_2)
+
+iterations(design_payload, mission_profile_2)
