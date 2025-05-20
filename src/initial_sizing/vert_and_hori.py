@@ -404,19 +404,18 @@ def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=False):
     return battery_mass
 
 
-def iterations(start_mtow, design_payload, mission_profile):
-    PLOT = True
-    print("Start MTOW", start_mtow)
+def iterations(design_payload, mission_profile, iterations=10, PLOT=False):
+    mtow = payload_mass_to_mtow(design_payload, design_range / 1000)  # kg
+    print("Start MTOW", mtow)
     structures_mass_frac = 0.35
-    structures_mass = start_mtow / g * structures_mass_frac
+    structures_mass = mtow / g * structures_mass_frac
     total_nr_motors = n_vert_props + n_hori_props
     motor_mass = total_nr_motors * 0.16
     propellor_mass = total_nr_motors * 0.012
-    OEW = start_mtow - design_payload * g
-    mtow = start_mtow
+    OEW = mtow - design_payload * g
     mtows = []
 
-    for i in range(10):
+    for i in range(iterations):
         structures_mass = mtow / g * structures_mass_frac
         battery_mass = perform_calc_mission(mission_profile, mtow, OEW)
         new_mtow = (
@@ -448,16 +447,4 @@ if __name__ == "__main__":
     mtow = payload_mass_to_mtow(design_payload, design_range / 1000)  # kg
     OEW = mtow - design_payload * g
     battery_mass = perform_calc_mission(mission_profile_2, mtow, OEW)
-
-    iterations(mtow, design_payload, mission_profile_2)
-
-
-if __name__ == "__init__":
-    PLOT = False
-    design_payload = 2.5
-    design_range = 15000
-    mtow = payload_mass_to_mtow(design_payload, design_range / 1000)  # kg
-    OEW = mtow - design_payload * g
-    battery_mass = perform_calc_mission(mission_profile_2, mtow, OEW)
-
-    iterations(mtow, design_payload, mission_profile_2)
+    iterations(design_payload, mission_profile_2, 10)
