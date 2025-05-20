@@ -113,7 +113,7 @@ def drag(S, V, CD):
     return 0.5 * ρ * V**2 * S * CD
 
 
-def payload_mass_to_mtow(payload_mass, range):
+def payload_mass_to_mtow(payload_mass):
     # [A, B], C = get_regression_plane(db, db_filter_max_payload, db_filter_max_range)
     [A], C = get_regression_plane(db, db_filter_max_payload, db_filter_max_range)
 
@@ -405,7 +405,7 @@ def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=False):
 
 
 def iterations(design_payload, mission_profile, iterations=10, PLOT=False):
-    mtow = payload_mass_to_mtow(design_payload, design_range / 1000)  # kg
+    mtow = payload_mass_to_mtow(design_payload)  # kg
     print("Start MTOW", mtow)
     structures_mass_frac = 0.35
     structures_mass = mtow / g * structures_mass_frac
