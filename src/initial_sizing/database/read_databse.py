@@ -9,8 +9,8 @@ def get_data_from_database():
     """
 
     # Read the data from the Excel file
-    file_path = "src/initial_sizing/database/pablo database.xlsx"
-    # file_path = "src/initial_sizing/database/eVTOL.xlsx"
+    # file_path = "src/initial_sizing/database/pablo database.xlsx"
+    file_path = "src/initial_sizing/database/eVTOL.xlsx"
 
     dataframe = pd.read_excel(file_path)
 

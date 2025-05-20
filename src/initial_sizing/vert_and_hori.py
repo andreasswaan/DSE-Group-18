@@ -285,7 +285,7 @@ def plot_takeoff_energy_vs_speed(S, speed_range=None):
 #     print("Energy per mission:", energy_per_mission, "J")
 
 
-def perform_calc_mission(mission_profile, mtow, OEW):
+def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=False):
     print(mtow)
     total_energy = 0
     total_TO_energy = 0
@@ -367,22 +367,24 @@ def perform_calc_mission(mission_profile, mtow, OEW):
 
         total_phase_energy = E_cruise_wing + E_cruise_prop + E_prop_TO + E_prop_LD
         phase_battery_mass = size_battery(total_phase_energy)
-        print(f"MISSION PHASE {i}")
-        print(f"Energy by cruise wing {E_cruise_wing}")
-        print(f"Energy by cruise prop {E_cruise_prop}")
-        print(f"Energy for TO {E_prop_TO}")
-        print(f"Energy for LD {E_prop_LD}")
-        print(f"Energy for loitering {E_prop_loitering}")
-        print(f"Total phase energy {total_phase_energy}")
-        print(f"Phase battery Mass {phase_battery_mass} kg")
-        print("\n")
+        if PRINT:
+            print(f"MISSION PHASE {i}")
+            print(f"Energy by cruise wing {E_cruise_wing}")
+            print(f"Energy by cruise prop {E_cruise_prop}")
+            print(f"Energy for TO {E_prop_TO}")
+            print(f"Energy for LD {E_prop_LD}")
+            print(f"Energy for loitering {E_prop_loitering}")
+            print(f"Total phase energy {total_phase_energy}")
+            print(f"Phase battery Mass {phase_battery_mass} kg")
+            print("\n")
 
         i += 1
 
     battery_mass = size_battery(total_energy) * (1 + battery_lowest_limit)
-    print(f"Total Energy {total_energy} J")
-    print(f"Battery Mass {battery_mass} kg")
-    print(f"max power props {np.max(power_provided_by_props)} W")
+    if PRINT:
+        print(f"Total Energy {total_energy} J")
+        print(f"Battery Mass {battery_mass} kg")
+        print(f"max power props {np.max(power_provided_by_props)} W")
     if PLOT:
         energies = [
             total_cruise_prop_energy,
@@ -402,16 +404,60 @@ def perform_calc_mission(mission_profile, mtow, OEW):
     return battery_mass
 
 
-if __name__ == "__main__":
+def iterations(start_mtow, design_payload, mission_profile):
     PLOT = True
-    design_payload = 2.5
+    print("Start MTOW", start_mtow)
     structures_mass_frac = 0.35
-    design_range = 15000
-    mtow = payload_mass_to_mtow(design_payload, design_range / 1000)  # kg
-    structures_mass = mtow * structures_mass_frac
+    structures_mass = start_mtow / g * structures_mass_frac
     total_nr_motors = n_vert_props + n_hori_props
     motor_mass = total_nr_motors * 0.16
     propellor_mass = total_nr_motors * 0.012
-    OEW = mtow - design_payload * g
+    OEW = start_mtow - design_payload * g
+    mtow = start_mtow
+    mtows = []
 
+    for i in range(10):
+        structures_mass = mtow / g * structures_mass_frac
+        battery_mass = perform_calc_mission(mission_profile, mtow, OEW)
+        new_mtow = (
+            battery_mass
+            + structures_mass
+            + motor_mass
+            + propellor_mass
+            + design_payload
+        ) * g
+        new_OEW = new_mtow - design_payload * g
+        print(f"new MTOW {new_mtow/g}")
+        print(f"new OEW {new_OEW/g}")
+        OEW = new_OEW
+        mtow = new_mtow
+        mtows.append(mtow)
+    if PLOT:
+        plt.plot(range(len(mtows)), np.array(mtows) / g)
+        plt.xlabel("Iteration")
+        plt.ylabel("MTOW (kg)")
+        plt.title("MTOW Convergence")
+        plt.grid()
+        plt.show()
+
+
+if __name__ == "__main__":
+    PLOT = True
+    design_payload = 2.5
+    design_range = 15000
+    mtow = payload_mass_to_mtow(design_payload, design_range / 1000)  # kg
+    OEW = mtow - design_payload * g
     battery_mass = perform_calc_mission(mission_profile_2, mtow, OEW)
+
+    iterations(mtow, design_payload, mission_profile_2)
+
+
+if __name__ == "__init__":
+    PLOT = False
+    design_payload = 2.5
+    design_range = 15000
+    mtow = payload_mass_to_mtow(design_payload, design_range / 1000)  # kg
+    OEW = mtow - design_payload * g
+    battery_mass = perform_calc_mission(mission_profile_2, mtow, OEW)
+
+    iterations(mtow, design_payload, mission_profile_2)
