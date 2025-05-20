@@ -1,5 +1,6 @@
 from vert_and_hori import iterations
 
+
 def build_mission_profile(
     sequence,
     distances,
@@ -8,7 +9,7 @@ def build_mission_profile(
     cruise_speed,
     payload_masses,
     TO_speed,
-    LD_speed
+    LD_speed,
 ):
     """
     sequence: str, e.g. "DRCCD"
@@ -34,20 +35,26 @@ def build_mission_profile(
             key = seg  # fallback
 
         cruise_distance = distances.get(key, 0)
-        loitering_time = loitering_times[i] if isinstance(loitering_times, list) else loitering_times
+        loitering_time = (
+            loitering_times[i] if isinstance(loitering_times, list) else loitering_times
+        )
         h = cruise_h[i] if isinstance(cruise_h, list) else cruise_h
         speed = cruise_speed[i] if isinstance(cruise_speed, list) else cruise_speed
-        payload = payload_masses[i] if isinstance(payload_masses, list) else payload_masses
+        payload = (
+            payload_masses[i] if isinstance(payload_masses, list) else payload_masses
+        )
 
-        profile.append({
-            "cruise_distance": cruise_distance,
-            "loitering_time": loitering_time,
-            "cruise_h": h,
-            "cruise_speed": speed,
-            "payload_mass": payload,
-            "TO_speed": TO_speed,
-            "LD_speed": LD_speed,
-        })
+        profile.append(
+            {
+                "cruise_distance": cruise_distance,
+                "loitering_time": loitering_time[seg],
+                "cruise_h": h,
+                "cruise_speed": speed,
+                "payload_mass": payload[seg],
+                "TO_speed": TO_speed[seg],
+                "LD_speed": LD_speed[seg],
+            }
+        )
     return profile
 
 
@@ -61,7 +68,14 @@ TO_speed = {"D": 6, "R": 7, "C": 8}
 LD_speed = {"D": 3, "R": 4, "C": 5}
 
 mission_profile_2 = build_mission_profile(
-    sequence, distances, loitering_times, cruise_h, cruise_speed, payload_masses, TO_speed, LD_speed
+    sequence,
+    distances,
+    loitering_times,
+    cruise_h,
+    cruise_speed,
+    payload_masses,
+    TO_speed,
+    LD_speed,
 )
 
 print("Mission Profile 2:")
