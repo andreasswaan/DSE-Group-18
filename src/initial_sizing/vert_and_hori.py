@@ -91,6 +91,7 @@ takeoff_time = (
     mission_profile["cruise_h"] / V_takeoff
 )  # seconds, time to reach cruise height
 range_at_max_payload = mission_profile["cruise_MTOW"] / 1000
+percentage_of_mtow_by_wing = 0.8  # []
 
 
 # Efficiency Constants
@@ -265,7 +266,27 @@ def plot_takeoff_energy_vs_speed(S, speed_range=None):
     )
 
 
-def perform_calc_mission(mission_profile, mtow, OEW, pct_wing_lift=1, PLOT=False, PRINT=False):
+# if __name__ == "__main__":
+#     PLOT = True
+#     mtow = payload_mass_to_mtow(
+#         mission_profile["payload_mass"], range_at_max_payload
+#     )  # kg
+#     S = calculate_wing_surface_area(mtow * percentage_of_mtow_by_wing)  # m^2
+#     D = calculate_drag_cruise(S, mission_profile["cruise_speed"])  # N
+#     T = calculate_thrust_cruise(D)  # N
+#     P_cruise = calculate_power_cruise(T, mission_profile["cruise_speed"])  # W
+#     energy_per_mission = calculate_energy_per_mission(P_cruise, S, PLOT)  # J
+#     battery_mass = size_battery(energy_per_mission)  # kg
+
+#     print("MTOW:", mtow, "N")
+#     print("MTOW:", mtow / g, "kg")
+#     print("S:", S, "m^2")
+#     print("Battery mass:", battery_mass, "kg")
+#     print("Energy per mission:", energy_per_mission, "J")
+
+
+def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=True):
+    print(mtow)
     total_energy = 0
     total_TO_energy = 0
     total_LD_energy = 0
@@ -289,7 +310,7 @@ def perform_calc_mission(mission_profile, mtow, OEW, pct_wing_lift=1, PLOT=False
     print("\n")
 
     i = 0
-    for mission_phase in mission_profile_2:
+    for mission_phase in mission_profile:
         payload_weight = mission_phase["payload_mass"] * g
         D = calculate_drag_cruise(wing_surface, mission_phase["cruise_speed"])  # [N]
         T = calculate_thrust_cruise(D)
@@ -346,6 +367,7 @@ def perform_calc_mission(mission_profile, mtow, OEW, pct_wing_lift=1, PLOT=False
 
         total_phase_energy = E_cruise_wing + E_cruise_prop + E_prop_TO + E_prop_LD
         phase_battery_mass = size_battery(total_phase_energy)
+
         if PRINT:
             print(f"MISSION PHASE {i}")
             print(f"Energy by cruise wing {E_cruise_wing}")
@@ -360,10 +382,12 @@ def perform_calc_mission(mission_profile, mtow, OEW, pct_wing_lift=1, PLOT=False
         i += 1
 
     battery_mass = size_battery(total_energy) * (1 + battery_lowest_limit)
+    hover_noise = 9.2 * np.log(mtow / g) + 71.7
     if PRINT:
         print(f"Total Energy {total_energy} J")
         print(f"Battery Mass {battery_mass} kg")
         print(f"max power props {np.max(power_provided_by_props)} W")
+        print(f"Noise during hover {hover_noise} dB(A)")
     if PLOT:
         energies = [
             total_cruise_prop_energy,
