@@ -46,7 +46,7 @@ def build_mission_profile(
         )
         profile.append(
             {
-                "cruise_distance": cruise_distance,
+                "cruise_distance": cruise_distance * 1000,
                 "loitering_time": loitering_time[LD_letter],
                 "cruise_h": h,
                 "cruise_speed": speed,
@@ -60,7 +60,7 @@ def build_mission_profile(
 
 sequence = "DRCCRCCRCCD"
 # distances = {"DR": 5000, "RC": 5000, "CC": 5000, "CD": 5000}
-distances = get_distance_constants()
+distances = get_distance_constants()["Center"]
 loitering_times = {"R": 120, "C": 120, "D": 30}
 cruise_h = 200
 cruise_speed = 15
@@ -68,6 +68,8 @@ payload_masses = {"DR": 0, "RC": 2.5, "CC": 2, "CD": 0, "CR": 0}
 TO_speed = {"D": 6, "R": 7, "C": 8}
 LD_speed = {"D": 3, "R": 4, "C": 5}
 pct_wing_lift_array = np.linspace(0.5, 1.0, 6)
+# pct_wing_lift_array = [1]
+
 # print("pct_wing_lift_array:", pct_wing_lift_array)
 
 mission_profile_2 = build_mission_profile(
@@ -96,13 +98,14 @@ for i, pct_wing_lift in enumerate(pct_wing_lift_array):
     mtows = np.array(mtow_histories[i]) / g  # Divide all MTOW by g before plotting
     plt.plot(range(1, len(mtows) + 1), mtows, label=f"{pct_wing_lift:.1f}")
 
+plt.xticks(range(1, len(mtows) + 1), range(1, len(mtows) + 1))
 plt.xlabel("Iteration [-]")
 plt.ylabel("MTOW [kg]")
 plt.title("MTOW Convergence for Different frac_wing_lift")
 plt.legend(title="frac_wing_lift")
 plt.grid(True, linestyle="--", alpha=0.7)
 plt.tight_layout()
-plot_folder = 'src/initial_sizing/plots'
+plot_folder = "src/initial_sizing/plots"
 os.makedirs(plot_folder, exist_ok=True)
 plt.savefig(os.path.join(plot_folder, "mtow_convergence.svg"), format="svg", dpi=300)
 plt.close()
