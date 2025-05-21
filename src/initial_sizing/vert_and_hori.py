@@ -91,7 +91,7 @@ takeoff_time = (
     mission_profile["cruise_h"] / V_takeoff
 )  # seconds, time to reach cruise height
 range_at_max_payload = mission_profile["cruise_MTOW"] / 1000
-percentage_of_mtow_by_wing = 1  # []
+percentage_of_mtow_by_wing = 0.8  # []
 
 
 # Efficiency Constants
@@ -310,7 +310,7 @@ def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=True):
     print("\n")
 
     i = 0
-    for mission_phase in mission_profile_2:
+    for mission_phase in mission_profile:
         payload_weight = mission_phase["payload_mass"] * g
         D = calculate_drag_cruise(wing_surface, mission_phase["cruise_speed"])  # [N]
         T = calculate_thrust_cruise(D)

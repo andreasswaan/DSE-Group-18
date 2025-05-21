@@ -55,9 +55,9 @@ def build_mission_profile(
     return profile
 
 
-print(get_distance_constants())
+print(get_distance_constants()["Center"])
 sequence = "DRCCRCCRCCD"
-distances = {"DR": 5000, "RC": 5000, "CC": 5000, "CD": 5000}
+distances = get_distance_constants()["Center"]
 loitering_times = {"R": 120, "C": 30, "D": 0}
 cruise_h = 200
 cruise_speed = 15
