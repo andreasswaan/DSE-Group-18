@@ -29,7 +29,7 @@ mission_profile = {
 
 mission_profile_2 = [
     {
-        "cruise_distance": 2500*np.sqrt(3),
+        "cruise_distance": 2500 * np.sqrt(3),
         "loitering_time": 2 * 60,
         "cruise_h": 200,
         "cruise_speed": 15,
@@ -38,7 +38,7 @@ mission_profile_2 = [
         "LD_speed": 3,
     },
     {
-        "cruise_distance": 2500*np.sqrt(3),
+        "cruise_distance": 2500 * np.sqrt(3),
         "loitering_time": 2 * 60,
         "cruise_h": 200,
         "cruise_speed": 15,
@@ -47,7 +47,7 @@ mission_profile_2 = [
         "LD_speed": 3,
     },
     {
-        "cruise_distance": 2500*np.sqrt(3),
+        "cruise_distance": 2500 * np.sqrt(3),
         "loitering_time": 0.5 * 60,
         "cruise_h": 200,
         "cruise_speed": 15,
@@ -285,7 +285,9 @@ def plot_takeoff_energy_vs_speed(S, speed_range=None):
 #     print("Energy per mission:", energy_per_mission, "J")
 
 
-def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=True):
+def perform_calc_mission(
+    mission_profile, mtow, OEW, pct_wing_lift=1, PLOT=False, PRINT=True
+):
     print(mtow)
     total_energy = 0
     total_TO_energy = 0
@@ -407,7 +409,9 @@ def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=True):
     return battery_mass
 
 
-def iterations(mission_profile, pct_wing_lift=1, design_payload=2.5, iterations=10, PLOT=False):
+def iterations(
+    mission_profile, pct_wing_lift=1, design_payload=2.5, iterations=10, PLOT=False
+):
     mtow = payload_mass_to_mtow(design_payload)  # kg
     print("Start MTOW", mtow)
     structures_mass_frac = 0.35
@@ -420,7 +424,9 @@ def iterations(mission_profile, pct_wing_lift=1, design_payload=2.5, iterations=
 
     for i in range(iterations):
         structures_mass = mtow / g * structures_mass_frac
-        battery_mass = perform_calc_mission(mission_profile, mtow, OEW, pct_wing_lift=pct_wing_lift)
+        battery_mass = perform_calc_mission(
+            mission_profile, mtow, OEW, pct_wing_lift=pct_wing_lift
+        )
         new_mtow = (
             battery_mass
             + structures_mass
@@ -455,7 +461,10 @@ if __name__ == "__main__":
     for pct_wing_lift in pct_wing_lift_array:
         print(f"wing lift fraction {pct_wing_lift}")
         mtows = iterations(
-            mission_profile_2, pct_wing_lift=pct_wing_lift, design_payload=design_payload, iterations=10, PLOT=PLOT
+            mission_profile_2,
+            pct_wing_lift=pct_wing_lift,
+            design_payload=design_payload,
+            iterations=10,
+            PLOT=PLOT,
         )
         print("Final MTOW", mtows[-1] / g)
-    
