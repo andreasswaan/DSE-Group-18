@@ -59,8 +59,9 @@ def build_mission_profile(
 
 
 sequence = "DRCCRCCRCCD"
+print(get_distance_constants())
 # distances = {"DR": 5000, "RC": 5000, "CC": 5000, "CD": 5000}
-distances = get_distance_constants()
+distances = get_distance_constants()["Center"]
 loitering_times = {"R": 120, "C": 120, "D": 30}
 cruise_h = 200
 cruise_speed = 15
@@ -89,6 +90,8 @@ for pct_wing_lift in pct_wing_lift_array:
     print(f"pct_wing_lift: {pct_wing_lift}")
     mtows = iterations(mission_profile_2, pct_wing_lift, PLOT=False)
     mtow_histories.append(mtows)
+    print(f"mtows: {mtows}")
+
 
 # Plot MTOW convergence for each pct_wing_lift
 plt.figure(figsize=(10, 6))
@@ -102,7 +105,7 @@ plt.title("MTOW Convergence for Different frac_wing_lift")
 plt.legend(title="frac_wing_lift")
 plt.grid(True, linestyle="--", alpha=0.7)
 plt.tight_layout()
-plot_folder = 'src/initial_sizing/plots'
+plot_folder = "src/initial_sizing/plots"
 os.makedirs(plot_folder, exist_ok=True)
 plt.savefig(os.path.join(plot_folder, "mtow_convergence.svg"), format="svg", dpi=300)
 plt.close()

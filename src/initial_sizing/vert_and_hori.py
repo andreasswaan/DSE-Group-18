@@ -123,14 +123,13 @@ def payload_mass_to_mtow(payload_mass):
     return mtow * g
 
 
-def calculate_wing_surface_area(weight):
-    V_cruise = mission_profile["cruise_speed"]
+def calculate_wing_surface_area(weight, V_cruise):
+
     S = weight / (0.5 * ρ * V_cruise**2 * CL_cruise)
     return S
 
 
 def calculate_drag_cruise(S, V_cruise):
-    V_cruise = mission_profile["cruise_speed"]
     D = 0.5 * ρ * V_cruise**2 * S * CD_cruise
     return D
 
@@ -301,7 +300,7 @@ def perform_calc_mission(
     for mission_phase in mission_profile:
         payload_weight = mission_phase["payload_mass"] * g
         wing_surface = calculate_wing_surface_area(
-            (OEW + payload_weight) * pct_wing_lift
+            (OEW + payload_weight) * pct_wing_lift, mission_phase["cruise_speed"]
         )
         wing_surfaces.append(wing_surface)
 
@@ -410,7 +409,7 @@ def perform_calc_mission(
 
 
 def iterations(
-    mission_profile, pct_wing_lift=1, design_payload=2.5, iterations=10, PLOT=False
+    mission_profile, pct_wing_lift=1, design_payload=2.5, iterations=30, PLOT=False
 ):
     mtow = payload_mass_to_mtow(design_payload)  # kg
     print("Start MTOW", mtow)
