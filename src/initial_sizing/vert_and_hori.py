@@ -285,7 +285,7 @@ def plot_takeoff_energy_vs_speed(S, speed_range=None):
 #     print("Energy per mission:", energy_per_mission, "J")
 
 
-def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=False):
+def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=True):
     print(mtow)
     total_energy = 0
     total_TO_energy = 0
@@ -367,6 +367,7 @@ def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=False):
 
         total_phase_energy = E_cruise_wing + E_cruise_prop + E_prop_TO + E_prop_LD
         phase_battery_mass = size_battery(total_phase_energy)
+
         if PRINT:
             print(f"MISSION PHASE {i}")
             print(f"Energy by cruise wing {E_cruise_wing}")
@@ -381,10 +382,12 @@ def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=False):
         i += 1
 
     battery_mass = size_battery(total_energy) * (1 + battery_lowest_limit)
+    hover_noise = 9.2 * np.log(mtow / g) + 71.7
     if PRINT:
         print(f"Total Energy {total_energy} J")
         print(f"Battery Mass {battery_mass} kg")
         print(f"max power props {np.max(power_provided_by_props)} W")
+        print(f"Noise during hover {hover_noise} dB(A)")
     if PLOT:
         energies = [
             total_cruise_prop_energy,

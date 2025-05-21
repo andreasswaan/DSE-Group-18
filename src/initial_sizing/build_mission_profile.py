@@ -1,5 +1,5 @@
 from vert_and_hori import iterations
-from ...city_density import get_distance_constants
+from city_density import get_distance_constants
 
 
 def build_mission_profile(
