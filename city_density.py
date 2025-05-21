@@ -5,8 +5,8 @@ from scipy.spatial.distance import cdist
 import matplotlib.patches as mpatches
 
 # City parameters
-city_radius = 2.5  # km
-num_samples = 1000
+city_radius = 3  # km
+num_samples = 10000
 PLOT = False
 
 # Grid for plotting
@@ -16,11 +16,15 @@ y = np.linspace(-city_radius, city_radius, grid_size)
 X, Y = np.meshgrid(x, y)
 pos = np.dstack((X, Y))
 
+# --- Mask for circle ---
+circle_mask = X**2 + Y**2 <= city_radius**2
+
 # Define restaurant density: peak at center
 restaurant_mu = [0, 0]
 restaurant_sigma = [[0.8**2, 0], [0, 0.8**2]]
 restaurant_rv = multivariate_normal(restaurant_mu, restaurant_sigma)
 restaurant_density = restaurant_rv.pdf(pos)
+restaurant_density[~circle_mask] = 0  # Zero density outside the circle
 
 # Define customer density: ring around center (radius ≈ 2 km)
 customer_mu = [0, 0]
@@ -30,6 +34,7 @@ customer_density = (
     customer_rv.pdf(pos)
     * (cdist(pos.reshape(-1, 2), [[0, 0]]).reshape(grid_size, grid_size) + 0.2) ** 0.3
 )
+customer_density[~circle_mask] = 0  # Zero density outside the circle
 
 
 def sample_points(density, num_samples):
@@ -133,5 +138,5 @@ def get_distance_constants(PLOT=False):
 
 
 if __name__ == "__main__":
-    distances = get_distance_constants()
+    distances = get_distance_constants(PLOT=True)
     print(distances)

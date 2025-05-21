@@ -29,7 +29,7 @@ mission_profile = {
 
 mission_profile_2 = [
     {
-        "cruise_distance": 5000,
+        "cruise_distance": 2500*np.sqrt(3),
         "loitering_time": 2 * 60,
         "cruise_h": 200,
         "cruise_speed": 15,
@@ -38,7 +38,7 @@ mission_profile_2 = [
         "LD_speed": 3,
     },
     {
-        "cruise_distance": 5000,
+        "cruise_distance": 2500*np.sqrt(3),
         "loitering_time": 2 * 60,
         "cruise_h": 200,
         "cruise_speed": 15,
@@ -47,7 +47,7 @@ mission_profile_2 = [
         "LD_speed": 3,
     },
     {
-        "cruise_distance": 5000,
+        "cruise_distance": 2500*np.sqrt(3),
         "loitering_time": 0.5 * 60,
         "cruise_h": 200,
         "cruise_speed": 15,
@@ -58,7 +58,7 @@ mission_profile_2 = [
 ]
 
 
-# Aerodynamics Constats:
+# Aerodynamics Constants:
 L_over_D_cruise = 10.0  # Lift-to-drag ratio during cruise
 CL_cruise = 0.5  # lift coefficient (placeholder value)
 CD_flat_plate = 1.17  # flat plate drag coefficient at 90deg aoa
@@ -91,7 +91,6 @@ takeoff_time = (
     mission_profile["cruise_h"] / V_takeoff
 )  # seconds, time to reach cruise height
 range_at_max_payload = mission_profile["cruise_MTOW"] / 1000
-percentage_of_mtow_by_wing = 1  # []
 
 
 # Efficiency Constants
@@ -162,7 +161,7 @@ def calculate_prop_power(needed_thrust):
     return power
 
 
-def calculate_energy_per_mission(P_cruise, S, PLOT=False):
+def calculate_energy_per_mission(P_cruise, S, pct_wing_lift=1, PLOT=False):
     takeoff_nr = mission_profile["TO_LD"]
     cruise_height = mission_profile["cruise_h"]
     avg_mission_time = (
@@ -196,7 +195,7 @@ def calculate_energy_per_mission(P_cruise, S, PLOT=False):
 
     energy_cruise_by_props = (
         (
-            (mtow * (1 - percentage_of_mtow_by_wing)) ** 1.5
+            (mtow * (1 - pct_wing_lift)) ** 1.5
             / (np.sqrt(2 * ρ * vert_prop_total_area) * eta_vert_props)
         )
         * mission_profile["cruise_MTOW"]
@@ -266,27 +265,7 @@ def plot_takeoff_energy_vs_speed(S, speed_range=None):
     )
 
 
-# if __name__ == "__main__":
-#     PLOT = True
-#     mtow = payload_mass_to_mtow(
-#         mission_profile["payload_mass"], range_at_max_payload
-#     )  # kg
-#     S = calculate_wing_surface_area(mtow * percentage_of_mtow_by_wing)  # m^2
-#     D = calculate_drag_cruise(S, mission_profile["cruise_speed"])  # N
-#     T = calculate_thrust_cruise(D)  # N
-#     P_cruise = calculate_power_cruise(T, mission_profile["cruise_speed"])  # W
-#     energy_per_mission = calculate_energy_per_mission(P_cruise, S, PLOT)  # J
-#     battery_mass = size_battery(energy_per_mission)  # kg
-
-#     print("MTOW:", mtow, "N")
-#     print("MTOW:", mtow / g, "kg")
-#     print("S:", S, "m^2")
-#     print("Battery mass:", battery_mass, "kg")
-#     print("Energy per mission:", energy_per_mission, "J")
-
-
-def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=False):
-    print(mtow)
+def perform_calc_mission(mission_profile, mtow, OEW, pct_wing_lift=1, PLOT=False, PRINT=False):
     total_energy = 0
     total_TO_energy = 0
     total_LD_energy = 0
@@ -299,7 +278,7 @@ def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=False):
     for mission_phase in mission_profile:
         payload_weight = mission_phase["payload_mass"] * g
         wing_surface = calculate_wing_surface_area(
-            (OEW + payload_weight) * percentage_of_mtow_by_wing
+            (OEW + payload_weight) * pct_wing_lift
         )
         wing_surfaces.append(wing_surface)
 
@@ -322,7 +301,7 @@ def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=False):
         total_cruise_wing_energy += E_cruise_wing
 
         P_prop_cruise = calculate_prop_power(
-            (OEW + payload_weight) * (1 - percentage_of_mtow_by_wing)
+            (OEW + payload_weight) * (1 - pct_wing_lift)
         )
         power_provided_by_props.append(P_prop_cruise)
         E_cruise_prop = P_prop_cruise * time_cruise
@@ -404,7 +383,7 @@ def perform_calc_mission(mission_profile, mtow, OEW, PLOT=False, PRINT=False):
     return battery_mass
 
 
-def iterations(mission_profile, design_payload=2.5, iterations=10, PLOT=False):
+def iterations(mission_profile, pct_wing_lift=1, design_payload=2.5, iterations=10, PLOT=False):
     mtow = payload_mass_to_mtow(design_payload)  # kg
     print("Start MTOW", mtow)
     structures_mass_frac = 0.35
@@ -417,7 +396,7 @@ def iterations(mission_profile, design_payload=2.5, iterations=10, PLOT=False):
 
     for i in range(iterations):
         structures_mass = mtow / g * structures_mass_frac
-        battery_mass = perform_calc_mission(mission_profile, mtow, OEW)
+        battery_mass = perform_calc_mission(mission_profile, mtow, OEW, pct_wing_lift=pct_wing_lift)
         new_mtow = (
             battery_mass
             + structures_mass
@@ -438,13 +417,21 @@ def iterations(mission_profile, design_payload=2.5, iterations=10, PLOT=False):
         plt.title("MTOW Convergence")
         plt.grid()
         plt.show()
+    return mtows
 
 
 if __name__ == "__main__":
     PLOT = True
     design_payload = 2.5
     design_range = 15000
-    mtow = payload_mass_to_mtow(design_payload, design_range / 1000)  # kg
+    pct_wing_lift_array = [1]
+    mtow = payload_mass_to_mtow(design_payload)  # kg
     OEW = mtow - design_payload * g
     battery_mass = perform_calc_mission(mission_profile_2, mtow, OEW)
-    iterations(design_payload, mission_profile_2, 10)
+    for pct_wing_lift in pct_wing_lift_array:
+        print(f"wing lift fraction {pct_wing_lift}")
+        mtows = iterations(
+            mission_profile_2, pct_wing_lift=pct_wing_lift, design_payload=design_payload, iterations=10, PLOT=PLOT
+        )
+        print("Final MTOW", mtows[-1] / g)
+    
