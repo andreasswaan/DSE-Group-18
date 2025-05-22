@@ -65,7 +65,7 @@ def size_vert_props(P_takeoff):
 def calculate_evergy_per_mission(P_cruise, S):
 
     vert_prop_total_area, vert_prop_diameter = size_vert_props(calculate_power_takeoff(V_takeoff))
-    energy_takeoff_hover = 6 * mtow ** 1.5 / (np.sqrt(2 * rho * vert_prop_total_area) * eta_vert_props)
+    energy_takeoff_hover = 6 * mtow ** 1.5 / (np.sqrt(2 * rho * vert_prop_total_area) * eta_vert_props) * takeoff_time
     energy_takeoff_climb = 3 * mtow * cruise_height
     energy_takeoff_drag = 3 * CD_flat_plate * 0.5 * rho * V_takeoff**2 * (max_payload_dimension**2 + S) * cruise_height
     energy_takeoff = energy_takeoff_hover + energy_takeoff_climb + energy_takeoff_drag
