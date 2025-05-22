@@ -6,9 +6,16 @@ class MissionPhase:
         self.altitude = altitude_m
         self.mode = mode  # 'hover', 'cruise', etc.
 
+
 class Mission:
-    def __init__(self, phases):
-        self.phases = phases
+    """Class for a mission."""
+
+    phases_str: str  # Attribute type annotation
+    phases: list[MissionPhase]  # Attribute type annotation
+
+    def __init__(self, phases_str: str):
+        self.phases_str = phases_str
+        self.phases
 
     def total_energy_and_peak_power(self, drone):
         total_energy = 0
