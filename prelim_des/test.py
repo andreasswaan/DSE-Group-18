@@ -10,5 +10,5 @@ mission = Mission(
     {"DR": 1, "RC": 5, "CC": 5, "CD": 5},
 )
 print("Mission phases:", mission.phases_str)
-print(mission.phases[0].__dict__)
+print(mission.phases)
 print("Mission phase objects:", mission.phases_dict)

@@ -3,22 +3,22 @@ from prelim_des.elems import Wing
 from prelim_des.structure import Structure
 from prelim_des.constants import *
 
+
 class Drone:
-    def __init__(self, config, mission):
+    def __init__(self, config):
         self.config = config
-        self.mission = mission
-        self.payload_mass = config['payload_mass']
+        self.payload_mass = config["payload_mass"]
 
         # Subsystems
-        self.wing = Wing(config['wing'])
+        self.wing = Wing(config["wing"])
         self.structure = Structure()
         self.propulsion = PropulsionSystem()
 
     def estimate_thrust_for_phase(self, phase):
         # Placeholder: replace with real aerodynamic model
-        if phase.mode == 'hover':
+        if phase.mode == "hover":
             return g * (self.payload_mass + 5)  # hover = full lift
-        elif phase.mode == 'cruise':
+        elif phase.mode == "cruise":
             return 0.3 * g * self.payload_mass  # lower for cruise
         else:
             return 0.5 * g * self.payload_mass
