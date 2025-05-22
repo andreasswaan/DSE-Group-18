@@ -7,6 +7,10 @@ class MissionPhase:
     TO_speed: float
     LD_speed: float
     distance: float
+    cruise_h: float
+    cruise_speed: float
+    TO_time: float
+    LD_time: float
 
     def __init__(
         self,
@@ -17,6 +21,8 @@ class MissionPhase:
         TO_speed: float,
         LD_speed: float,
         distance: float,
+        cruise_h: float = 200,
+        cruise_speed: float = 15,
     ):
         self.TO_str = TO_str
         self.LD_str = LD_str
@@ -25,28 +31,17 @@ class MissionPhase:
         self.TO_speed = TO_speed
         self.LD_speed = LD_speed
         self.distance = distance
-
-    @property
-    def dict(self):
-        return {
-            "TO": self.TO_str,
-            "LD": self.LD_str,
-            "cruise_distance:": self.distance,
-            "loitering_time": self.loitering_time,
-            "payload_mass": self.payload_mass,
-            "TO_speed": self.TO_speed,
-            "LD_speed": self.LD_speed,
-            "cruise_h": 200,
-            "cruise_speed": 15,
-        }
+        self.cruise_h = cruise_h
+        self.cruise_speed = cruise_speed
+        self.TO_time = cruise_h / TO_speed
+        self.LD_time = cruise_h / LD_speed
 
 
 class Mission:
-    """Class for a mission."""
+    """Class for a mission"""
 
     phases_str: str  # Attribute type annotation
     phases: list[MissionPhase]  # Attribute type annotation
-    # loitering_times only contains keys "R", "C", and "D" (all str), values are int (seconds)
     loitering_times: dict[Literal["R", "C", "D"], float]
     payload_masses: dict[Literal["DR", "RC", "CC", "CD", "CR"], float]
     TO_speed: dict[Literal["R", "C", "D"], float]
@@ -91,13 +86,6 @@ class Mission:
             )
         return phases
 
-    @property
-    def phases_dict(self) -> list[MissionPhase.dict]:
-        phases_dict = []
-        for phase in self.phases:
-            phases_dict.append(phase.dict)
-        return phases_dict
-
     def __payload_mass(self, TO_str: str, LD_str: str):
         match TO_str + LD_str:
             case "DR" | "RD":
@@ -123,3 +111,10 @@ class Mission:
                 return self.distances["CD"]
             case _:
                 raise ValueError("Invalid mission phase")
+
+    @property
+    def phases_dict(self) -> list[MissionPhase.__dict__]:  # type: ignore
+        phases_dict = []
+        for phase in self.phases:
+            phases_dict.append(phase.__dict__)
+        return phases_dict
