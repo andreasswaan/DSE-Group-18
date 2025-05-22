@@ -68,9 +68,9 @@ class Mission:
         self.TO_speed = TO_speed
         self.LD_speed = LD_speed
         self.distances = distances
-        self.phases = self._phases_obj()
+        self.phases = self.__phases_obj()
 
-    def _phases_obj(self) -> list[MissionPhase]:
+    def __phases_obj(self) -> list[MissionPhase]:
         phases_str = self.phases_str
         phases = []
         for i in range(len(phases_str)):
@@ -83,10 +83,10 @@ class Mission:
                     TO_letter,
                     LD_letter,
                     self.loitering_times[LD_letter],
-                    self._payload_mass(TO_letter, LD_letter),
+                    self.__payload_mass(TO_letter, LD_letter),
                     self.TO_speed[TO_letter],
                     self.LD_speed[LD_letter],
-                    self._distance(TO_letter, LD_letter),
+                    self.__distance(TO_letter, LD_letter),
                 )
             )
         return phases
@@ -98,7 +98,7 @@ class Mission:
             phases_dict.append(phase.dict)
         return phases_dict
 
-    def _payload_mass(self, TO_str: str, LD_str: str):
+    def __payload_mass(self, TO_str: str, LD_str: str):
         match TO_str + LD_str:
             case "DR" | "RD":
                 return self.payload_masses["DR"]
@@ -111,7 +111,7 @@ class Mission:
             case _:
                 raise ValueError("Invalid mission phase")
 
-    def _distance(self, TO_str: str, LD_str: str):
+    def __distance(self, TO_str: str, LD_str: str):
         match TO_str + LD_str:
             case "DR" | "RD":
                 return self.distances["DR"]
