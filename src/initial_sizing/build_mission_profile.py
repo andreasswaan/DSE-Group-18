@@ -35,7 +35,7 @@ def build_mission_profile(
 
         print(f"leg: {leg_letter}, TO: {TO_letter}, LD: {LD_letter}")
 
-        cruise_distance = distances.get(leg_letter, 0)
+        cruise_distance = distances[leg_letter]
         loitering_time = (
             loitering_times[i] if isinstance(loitering_times, list) else loitering_times
         )
@@ -58,8 +58,9 @@ def build_mission_profile(
     return profile
 
 
-sequence = "DRCCRCCRCCD"
-# distances = {"DR": 5000, "RC": 5000, "CC": 5000, "CD": 5000}
+# sequence = "DRCCRCCRCCD"
+sequence = "DR"
+# distances = {"DR": 1, "RC": 5, "CC": 5, "CD": 5}
 distances = get_distance_constants()["Center"]
 loitering_times = {"R": 120, "C": 120, "D": 30}
 cruise_h = 200
