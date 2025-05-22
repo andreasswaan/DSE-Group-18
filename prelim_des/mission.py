@@ -1,4 +1,7 @@
 from typing import Literal
+from utils.import_toml import load_toml
+
+toml = load_toml()
 
 
 class MissionPhase:
@@ -51,21 +54,17 @@ class Mission:
     def __init__(
         self,
         phases_str: str,
-        loitering_times: dict[Literal["R", "C", "D"], float],
-        payload_masses: dict[Literal["DR", "RC", "CC", "CD", "CR"], float],
-        TO_speed: dict[Literal["R", "C", "D"], float],
-        LD_speed: dict[Literal["R", "C", "D"], float],
-        distances: dict[Literal["DR", "RC", "CC", "CD"], float],
     ):
         self.phases_str = phases_str
-        self.loitering_times = loitering_times
-        self.payload_masses = payload_masses
-        self.TO_speed = TO_speed
-        self.LD_speed = LD_speed
-        self.distances = distances
-        self.phases = self.__phases_obj()
+        self.loitering_times = toml["config"]["mission"]["loitering_times"]
+        self.payload_masses = toml["config"]["mission"]["payload_masses"]
+        self.TO_speed = toml["config"]["mission"]["TO_speed"]
+        self.LD_speed = toml["config"]["mission"]["LD_speed"]
+        self.distances = toml["config"]["mission"]["distances"]
+        self.phases = self.phases_obj()
 
-    def __phases_obj(self) -> list[MissionPhase]:
+    def phases_obj(self) -> list[MissionPhase]:
+        """Recalculates the mission phases (to be used when a mission reset is needed)"""
         phases_str = self.phases_str
         phases = []
         for i in range(len(phases_str)):
