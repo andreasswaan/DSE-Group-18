@@ -4,7 +4,7 @@ from constants import ρ
 
 
 class Aerodynamics:
-    def __init__(self, CL_max: float = 2.0, CL_cruise: float = 1.5, C_D0: float = 0.05, oswald_efficiency: float = 0.8, S: float = 0.5):
+    def __init__(self, CL_max: float = 2.0, CL_cruise: float = 1.5, C_D0: float = 0.05, oswald_efficiency: float = 0.8, S: float = 0.5, L_over_D_cruise: float = 10.0, T_over_D_cruise: float = 1.0, T_over_W_takeoff: float = 2.0):
         """
         Initialize the Aerodynamics class with default parameters.
         
@@ -14,6 +14,9 @@ class Aerodynamics:
         C_D0 (float): Zero-lift drag coefficient.
         oswald_efficiency (float): Oswald efficiency factor.
         S (float): Wing surface area in m^2.
+        L_over_D_cruise (float): Lift-to-drag ratio at cruise.
+        T_over_D_cruise (float): Thrust-to-drag ratio at cruise.
+        T_over_W_takeoff (float): Thrust-to-weight ratio at takeoff.
         """
         self.CL_max = CL_max
         self.CL_cruise = CL_cruise
@@ -23,9 +26,9 @@ class Aerodynamics:
         self.drone = Drone()
     
     @property
-    def CD(self) -> float:
-        return self.C_D0 + (self.CL_max / (np.pi * self.oswald_efficiency * self.drone.wing.geom_AR))**2
-    
+    def CD(self, CL) -> float:
+        return self.C_D0 + (CL**2 / (np.pi * self.oswald_efficiency * self.drone.wing.geom_AR))
+
     
     def estimate_drag(self, speed: float) -> float:
         """
