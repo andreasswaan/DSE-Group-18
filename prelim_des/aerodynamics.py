@@ -21,6 +21,9 @@ class Aerodynamics:
         C_D0 (float): Zero-lift drag coefficient.
         oswald_efficiency (float): Oswald efficiency factor.
         S (float): Wing surface area in m^2.
+        L_over_D_cruise (float): Lift-to-drag ratio at cruise.
+        T_over_D_cruise (float): Thrust-to-drag ratio at cruise.
+        T_over_W_takeoff (float): Thrust-to-weight ratio at takeoff.
         """
         self.CL_max = CL_max
         self.CL_cruise = CL_cruise
