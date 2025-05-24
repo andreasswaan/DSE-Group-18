@@ -317,7 +317,7 @@ def perform_calc_mission(
             mission_phase["TO_speed"],
             CD_flat_plate,
         )
-        P_prop_TO = calculate_prop_power((OEW + payload_weight) + drag_TO)
+        P_prop_TO = calculate_prop_power((OEW + payload_weight) + drag_TO) # This formula should not be used here as this is the available power and not the required power. 
         power_provided_by_props.append(P_prop_TO)
         E_prop_TO = P_prop_TO * time_TO
         total_energy += E_prop_TO
