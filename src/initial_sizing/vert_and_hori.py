@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from database.read_databse import (
+from database.read_database import (
     get_data_from_database,
     get_regression_plane,
 )

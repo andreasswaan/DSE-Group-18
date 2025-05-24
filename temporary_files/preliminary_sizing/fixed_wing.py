@@ -1,6 +1,6 @@
 import numpy as np
 from constants import *
-from read_databse import get_data_from_database, get_regression_plane
+from read_database import get_data_from_database, get_regression_plane
 
 
 mission_profile = {

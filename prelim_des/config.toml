@@ -6,7 +6,7 @@ CL_max = 2.0                              # [-]
 CL_cruise = 1.5                           # [-]
 CD0 = 0.05                                # [-]
 oswald_efficiency = 0.80                  # [-]
-
+CD_flat_plate = 1.30                      # [-]
 
 #------------------------------------------------------------------------------------------------------------------------------
 
@@ -15,8 +15,8 @@ oswald_efficiency = 0.80                  # [-]
 cruise_speed = 15                         # m/s
 
 [config.mission.loitering_times]
-R = 120                                   # s
-C = 120                                   # s
+R = 90                                    # s
+C = 90                                    # s
 D = 30                                    # s
 
 [config.mission.payload_masses]
@@ -27,20 +27,20 @@ CD = 0                                    # kg
 CR = 0                                    # kg
 
 [config.mission.TO_speed]
-R = 7                                     # m/s
-C = 8                                     # m/s
-D = 6                                     # m/s
-
-[config.mission.LD_speed]
-R = 4                                     # m/s
-C = 5                                     # m/s
+R = 2                                     # m/s
+C = 2                                     # m/s
 D = 3                                     # m/s
 
+[config.mission.LD_speed]
+R = 2                                     # m/s
+C = 2                                     # m/s
+D = 4                                     # m/s
+
 [config.mission.distances]
-DR = 1                                    # m
-RC = 5                                    # m
-CC = 5                                    # m
-CD = 5                                    # m
+DR = 960                                  # m
+RC = 1850                                 # m
+CC = 1290                                 # m
+CD = 1620                                 # m
 
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -57,7 +57,8 @@ dihedral = 1                              # deg
 [config.battery]
 
 energy_density = 250                      # Wh/kg
-minimum_battery = 0.2                     # -
+min_batt_lvl = 0.2                        # -
+batt_energy_ratio = 0.71                  # -
 
 [config.motor]
 "η_elec" = 0.95                               
@@ -65,5 +66,23 @@ minimum_battery = 0.2                     # -
 [config.propeller]
 "η_prop" = 0.8
 
+[config.performance]
+L_over_D_cruise = 10                      # -
+T_over_D_cruise = 1                       # -
+T_over_W_takeoff = 2                      # -
 
+#-----------------------------------------------------------------------------------------------------------------------
 
+[config.payload]
+box_height = 0.06                         # m
+box_width = 0.45                          # m
+box_length = 0.45                         # m
+n_pax = 0                                 # people
+box_weight = 0.5                          # kg
+n_box = 5                                 # -
+
+#-----------------------------------------------------------------------------------------------------------------------
+
+[config.landing_gear]
+
+shock_strut_length_MG = 0.15              # m Roskam page 81, update when designed

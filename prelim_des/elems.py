@@ -1,42 +1,26 @@
 import numpy as np
+from prelim_des.drone import Drone
 from constants import g
+from prelim_des.utils.import_toml import load_toml
+from prelim_des.utils.unit_converter import ImperialConverter
+
+toml = load_toml()
 
 
 class Wing:
     """Class for a wing."""
-
+    S:float
+    mac:float
     def __init__(
         self,
-        S,
-        span,
-        taper_ratio,
-        tip_over_chord,
-        Γ,
-        Λ_c4,
-        mac=None,
+        drone: Drone = None
     ):
-        """Wing class.
-
-        :param S: Wing surface area [m2]
-        :type S: float
-        :param span: Wing span [m]
-        :type span: float
-        :param tip_over_chord: thickness over chord ratio [-]
-        :type tip_over_chord: float
-        :param Γ: Wing dihedral angle [rad]
-        :type Γ: float
-        :param Λ_c4: Sweep angle at quarter chord [rad]
-        :type Λ_c4: float
-        :param mac: Mean aerodynamic chord length [m], defaults to None
-        :type mac: float, optional
-        """
-        self.S = S
-        self.span = span
-        self.tip_over_chord = tip_over_chord
-        self.Γ = np.deg2rad(Γ)
-        self.Λ_c4 = np.deg2rad(Λ_c4)
-        self.mac = mac
-
+        self.drone = drone
+        self.span = toml["config"]["wing"]["wing_span"]
+        self.thick_over_chord = toml["config"]["wing"]["thickness_over_chord"]
+        self.Γ = toml["config"]["wing"]["dihedral"]
+        self.Λ_c4 = np.deg2rad(toml["config"]["wing"]["quarter_chord_sweep"])
+    
     @property
     def c_root(self):
         """Wing surface [m2]"""
@@ -131,6 +115,91 @@ class Wing:
         """
         assert y0 >= 0 and y1 >= 0 and y1 > y0, "Specify correct bounds!"
         return (self.chord(y0) + self.chord(y1)) / 2 * (y1 - y0)
+
+    def weight(self):
+        """Estimate the wing weight using Cessna method from Roskam V: 
+        https://research.tudelft.nl/files/144857482/6.2022_1485.pdf.
+
+        :return: Wing weight [kg]
+        :rtype: float
+        """
+        # Roskam Chapter 5 page 67
+        n_ult = self.drone.structure.calc_n_ult()
+        return (
+            ImperialConverter.mass_lbs_kg(
+            0.04674 * ImperialConverter.mass_kg_lbs(self.drone.MTOM)**0.397 
+            * ImperialConverter.area_m2_ft2(self.S)**0.360 
+            * n_ult**0.397 * self.geom_AR**1.712)
+        )
+
+
+class Fuselage:
+    def __init__(self, drone: Drone):
+        """Fuselage class."""
+        self.drone = drone
+        self.length = toml["config"]["fuselage"]["length"]
+        self.diameter = toml["config"]["fuselage"]["diameter"]
+
+    @property
+    def length(self):
+        """Fuselage length [m]"""
+        return self.drone.structure.fuselage_length()
+    
+    @property
+    def diameter(self):
+        """Fuselage diameter [m]"""
+        return self.drone.structure.fuselage_diameter()
+    @property
+    def perimeter(self):
+        """Fuselage perimeter [m]"""
+        return self.drone.structure.fuselage_max_perimeter()
+    
+    def weight(self):
+        """Estimate the fuselage weight using Cessna method from Roskam V: 
+        https://research.tudelft.nl/files/144857482/6.2022_1485.pdf.
+
+        :return: Fuselage weight [kg]
+        :rtype: float
+        """
+        # Roskam Chapter 5 page 76
+        N_pax = toml["config"]["fuselage"]["n_pax"]
+        return (
+            ImperialConverter.mass_lbs_kg(
+            14.86 * ImperialConverter.mass_kg_lbs(self.drone.MTOM**0.144)
+            * (self.length/self.perimeter)**0.778 
+            * ImperialConverter.len_m_ft(self.length)**0.383 
+            * N_pax**0.455)
+        )
+    
+
+class LandingGear:
+    def __init__(self, drone: Drone):
+        """Landing gear class."""
+        self.drone = drone
+        # self.n_legs = toml["config"]["landing_gear"]["n_legs"]
+        # self.wheel_diameter = toml["config"]["landing_gear"]["wheel_diameter"]
+        # self.wheel_width = toml["config"]["landing_gear"]["wheel_width"]
+    @property
+    def l_s_m():
+        """Length of the landing gear strut [m]"""
+        # Placeholder: replace with real calculation
+        return toml["config"]["landing_gear"]["shock_strut_length_MG"]
+    def weight(self):
+        """Estimate the landing gear weight using Cessna method from Roskam V: 
+        Placeholder method used: Update with better method once design is more clear.
+        """
+        # Roskam Chapter 5 page 81
+        n_ult = self.drone.structure.calc_n_ult()
+        box_weight = toml["config"]["payload"]["box_weight"]  # kg
+        design_landing_weight = self.drone.MTOM - box_weight  # kg
+        wheel_tire_assembly_weight = 0.1  # kg, placeholder value
+        return (
+            ImperialConverter.mass_lbs_kg(
+            0.013 * ImperialConverter.mass_kg_lbs(self.drone.MTOM) + 
+            0.146 * ImperialConverter.mass_kg_lbs(design_landing_weight**0.417) * n_ult**0.95 
+            * ImperialConverter.len_m_ft(self.l_s_m)**0.183 + wheel_tire_assembly_weight)
+        )
+        
 
 
 # class HorizontalTail(Wing):

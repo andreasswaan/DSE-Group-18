@@ -61,9 +61,10 @@ class Mission:
         self.TO_speed = toml["config"]["mission"]["TO_speed"]
         self.LD_speed = toml["config"]["mission"]["LD_speed"]
         self.distances = toml["config"]["mission"]["distances"]
-        self.phases = self.phases_obj()
+        self.phases = self.legs_obj
 
-    def phases_obj(self) -> list[MissionPhase]:
+    @property
+    def legs_obj(self) -> list[MissionPhase]:
         """Recalculates the mission phases (to be used when a mission reset is needed)"""
         phases_str = self.phases_str
         phases = []
@@ -112,7 +113,7 @@ class Mission:
                 raise ValueError("Invalid mission phase")
 
     @property
-    def phases_dict(self) -> list[MissionPhase.__dict__]:  # type: ignore
+    def legs_dict(self) -> list[MissionPhase.__dict__]:  # type: ignore
         phases_dict = []
         for phase in self.phases:
             phases_dict.append(phase.__dict__)
