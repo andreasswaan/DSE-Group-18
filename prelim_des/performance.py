@@ -1,6 +1,3 @@
-import numpy as np
-from prelim_des.elems import Wing
-from prelim_des.aerodynamics import Aerodynamics
 from prelim_des.drone import Drone
 from prelim_des.mission import Mission
 from constants import ρ, g

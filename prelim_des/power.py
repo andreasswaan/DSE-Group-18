@@ -4,17 +4,17 @@ from prelim_des.utils.unit_converter import ImperialConverter
 from prelim_des.drone import Drone
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
-from prelim_des.power import Battery, Motor, HorPropeller, VertPropeller
+
 
 toml = load_toml()
 
 class PropulsionSystem:
-    def __init__(self, drone: Drone, battery: Battery, motor: Motor, hor_prop: HorPropeller, ver_prop: VertPropeller):
+    def __init__(self, drone: Drone):
         self.drone = drone
-        self.battery = battery
-        self.motor = motor
-        self.hor_prop = hor_prop
-        self.ver_prop = ver_prop
+        self.battery = Battery()
+        self.motor = Motor()
+        self.hor_prop = HorPropeller()
+        self.ver_prop = VertPropeller()
 
     def estimate_weight(self, energy_required: float = None) -> float:
         return (
