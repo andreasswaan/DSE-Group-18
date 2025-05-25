@@ -1,8 +1,10 @@
 from __future__ import annotations
+import os
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from prelim_des.drone import Drone
 import numpy as np
+import matplotlib.pyplot as plt
 from constants import g
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.utils.unit_converter import ImperialConverter
@@ -135,6 +137,70 @@ class Wing:
         
         # Placeholder estimate for the wing weight based
         return (0.4 * self.S + 0.06 * self.drone.MTOW)
+    
+    def plot_planform(self, saveplot=False, filename='wing_planform.png'):
+        """
+        Plot the wing planform and display key parameters in a box.
+        """
+        span = self.span
+        c_root = self.c_root[0]
+        c_tip = self.c_tip[0]
+        sweep_LE = self.sweep(0)[0]  # radians
+        MAC = self.MAC[0]
+        xLEMAC = self.xLEMAC
+        yLEMAC = self.yLEMAC
+        AR = self.geom_AR
+        taper = self.taper
+
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        # Wing boundary (half-span, right side)
+        y = [0, span/2, span/2, 0]
+        x = [0, (span/2)*np.tan(sweep_LE), (span/2)*np.tan(sweep_LE)+c_tip, c_root]
+        ax.fill(y, x, facecolor='grey', alpha=0.1)
+        ax.fill(y, x, facecolor='none', edgecolor='black', linewidth=2, label="Wing Outline")
+
+        # Leading and trailing edge spars (example at 15% and 60% chord)
+        for spar_frac, label in zip([0.15, 0.6], ["LE Spar", "TE Spar"]):
+            spar_x = [c_root * spar_frac, (span/2)*np.tan(sweep_LE) + c_tip * spar_frac]
+            spar_y = [0, span/2]
+            ax.plot(spar_y, spar_x, linestyle=':', color='blue', lw=1, label=label)
+
+        # MAC line
+        ax.plot([yLEMAC, yLEMAC], [xLEMAC, xLEMAC + MAC], 'r-', lw=3, label="MAC")
+
+        # Axis settings
+        ax.set_xlabel('y [m]')
+        ax.set_ylabel('x [m]')
+        ax.set_title("Wing Planform with Key Parameters")
+        ax.set_aspect('equal')
+        ax.grid(True, alpha=0.2)
+        ax.legend()
+
+        # # Set y-limits to leave space for the info box
+        # ax.set_ylim(-0.0 * span, 0.4 * span)
+
+        # Key parameters box
+        param_text = (
+            f"Area (S): {self.S[0]:.2f} m²\n"
+            f"Span: {span:.2f} m\n"
+            f"Root chord: {c_root:.2f} m\n"
+            f"Tip chord: {c_tip:.2f} m\n"
+            f"MAC: {MAC:.2f} m\n"
+            f"Aspect Ratio: {AR[0]:.2f}\n"
+            f"Taper Ratio: {taper:.2f}\n"
+            f"Sweep (Λ_c/4): {np.degrees(sweep_LE):.1f}°"
+        )
+        props = dict(boxstyle='round', facecolor='white', alpha=0.8)
+        ax.text(0.98, 0.98, param_text, transform=ax.transAxes, fontsize=11,
+                verticalalignment='top', horizontalalignment='right', bbox=props)
+
+        plt.tight_layout()
+        if saveplot:
+            folder = os.path.join("prelim_des", "plots", "weight_estimate")
+            os.makedirs(folder, exist_ok=True)
+            plt.savefig(os.path.join(folder, filename), dpi=300)
+        plt.show()
 
 
 class Fuselage:

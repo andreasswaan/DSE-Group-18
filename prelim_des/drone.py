@@ -1,4 +1,6 @@
+import os
 import matplotlib.pyplot as plt
+from globals import main_dir
 from prelim_des.power import PropulsionSystem
 from prelim_des.elems import Wing, Fuselage, LandingGear
 from prelim_des.structure import Structure
@@ -71,29 +73,47 @@ class Drone:
         """
         Perform an iterative weight estimate until convergence.
         """
-        if self.MTOW is None or self.OEW is None:
+        if not hasattr(self, 'MTOW') or not hasattr(self, 'OEW') or self.MTOW is None or self.OEW is None:
             self.class_1_weight_estimate()
         mtow_history = [self.MTOW]
         self.wing.S = self.perf.wing_area(self.MTOW)
+        S_history = [self.wing.S]
         for i in range(max_iterations):
             MTOW_prev = self.MTOW
             self.class_2_weight_estimate()
             mtow_history.append(self.MTOW)
             self.wing.S = self.perf.wing_area(self.MTOW)
+            S_history.append(self.wing.S)
             if abs(self.MTOW - MTOW_prev) < tolerance * MTOW_prev:
                 break
         else:
             raise ValueError("Weight estimate did not converge within the maximum number of iterations.")
         
         if plot:
+            plot_path = os.path.join(main_dir, "prelim_des", "plots", "weight_estimate")
+            os.makedirs(plot_path, exist_ok=True)
+            
             plt.figure(figsize=(8, 5))
             plt.plot(mtow_history, marker='o')
-            plt.xlabel("Iteration")
-            plt.ylabel("MTOW")
-            plt.title("MTOW Convergence")
+            plt.xticks(range(len(mtow_history)))
+            plt.xlabel("Iteration Number [-]")
+            plt.ylabel("MTOW [kg]")
+            plt.title("MTOW Convergence after Class II Weight Estimation")
             plt.grid(True, linestyle='--', alpha=0.7)
             plt.tight_layout()
-            plt.show()
+            plt.savefig(os.path.join(plot_path, "mtow_convergence.png"), dpi=300)
+            plt.close()
+            
+            plt.figure(figsize=(8, 5))
+            plt.plot(S_history, marker='o')
+            plt.xticks(range(len(S_history)))
+            plt.xlabel("Iteration Number [-]")
+            plt.ylabel("Wing Area [m²]")
+            plt.title("Wing Area Convergence after Class II Weight Estimation")
+            plt.grid(True, linestyle='--', alpha=0.7)
+            plt.tight_layout()
+            plt.savefig(os.path.join(plot_path, "wing_area_convergence.png"), dpi=300)
+            plt.close()
         
         return self.MTOW, self.OEW
     
