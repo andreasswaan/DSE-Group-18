@@ -25,18 +25,5 @@ drone.perf = perf
 
 drone.iterative_weight_estimate(plot=True, tolerance=0.0001)
 
-# print("Wing parameters after iterative weight estimate:")
-# print(f"Wing area (S): {drone.wing.S:.2f} m²")
-# print(f"Aspect ratio (AR): {drone.wing.geom_AR:.2f}")
-# print(f"Mean aerodynamic chord (MAC): {drone.wing.MAC:.2f} m")
-# print(f"Root chord (c_root): {drone.wing.c_root:.2f} m")
-# print(f"Wing span (b): {drone.wing.span:.2f} m")
-# print(f"Taper ratio (TR): {drone.wing.taper:.2f}")
-# print(f"xLemac: {drone.wing.xLEMAC:.2f} m")
-# print(f"yLemac: {drone.wing.yLEMAC:.2f} m")
-# print(f"Quarter chord sweep (Λ): {drone.wing.Λ_c4:.2f} degrees")
-
-
-
 drone.wing.plot_planform(saveplot=True)
 

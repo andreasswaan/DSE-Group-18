@@ -152,7 +152,7 @@ class Wing:
         AR = self.geom_AR
         taper = self.taper
 
-        fig, ax = plt.subplots(figsize=(10, 5))
+        fig, ax = plt.subplots(figsize=(14, 8))
 
         # Wing boundary (half-span, right side)
         y = [0, span/2, span/2, 0]
@@ -175,12 +175,14 @@ class Wing:
         ax.set_title("Wing Planform with Key Parameters")
         ax.set_aspect('equal')
         ax.grid(True, alpha=0.2)
-        ax.legend()
 
-        # # Set y-limits to leave space for the info box
-        # ax.set_ylim(-0.0 * span, 0.4 * span)
+        # Place legend in upper left, outside the plot area
+        ax.legend(loc='upper left', fontsize=10, frameon=True, bbox_to_anchor=(0.0, 1.0))
 
-        # Key parameters box
+        # Set y-limits to leave space for the info box
+        ax.set_ylim(-0.1 * span, 0.6 * span)
+
+        # Key parameters box in upper right
         param_text = (
             f"Area (S): {self.S[0]:.2f} m²\n"
             f"Span: {span:.2f} m\n"
@@ -189,9 +191,9 @@ class Wing:
             f"MAC: {MAC:.2f} m\n"
             f"Aspect Ratio: {AR[0]:.2f}\n"
             f"Taper Ratio: {taper:.2f}\n"
-            f"Sweep (Λ_c/4): {np.degrees(sweep_LE):.1f}°"
+            f"Sweep (Λ_LE): {np.degrees(sweep_LE):.1f}°"
         )
-        props = dict(boxstyle='round', facecolor='white', alpha=0.8)
+        props = dict(boxstyle='round', facecolor='white', edgecolor='black', alpha=0.95)
         ax.text(0.98, 0.98, param_text, transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', horizontalalignment='right', bbox=props)
 
@@ -199,7 +201,7 @@ class Wing:
         if saveplot:
             folder = os.path.join("prelim_des", "plots", "weight_estimate")
             os.makedirs(folder, exist_ok=True)
-            plt.savefig(os.path.join(folder, filename), dpi=300)
+            plt.savefig(os.path.join(folder, filename), dpi=300, bbox_inches='tight')
         plt.show()
 
 
