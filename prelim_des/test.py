@@ -1,3 +1,4 @@
+from __future__ import annotations
 from mission import Mission
 from prelim_des.drone import Drone
 from prelim_des.performance import Performance
@@ -13,10 +14,12 @@ drone.perf = perf
 drone.class_1_weight_estimate()
 print("Drone MTOW:", drone.MTOW)
 print("Drone OEW:", drone.OEW)
+drone.wing.S = perf.wing_area(drone.OEW)
+print("Wing area (S):", drone.wing.S)
 
 drone.class_2_weight_estimate()
 print("Drone MTOW after class 2 estimate:", drone.MTOW)
 print("Drone OEW after class 2 estimate:", drone.OEW)
 
-drone.iterative_weight_estimate(plot=True)
+# drone.iterative_weight_estimate(plot=True)
 

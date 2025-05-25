@@ -1,5 +1,8 @@
-from prelim_des.drone import Drone
-from prelim_des.mission import Mission
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
+    from prelim_des.mission import Mission
 from constants import ρ, g
 from prelim_des.utils.import_toml import load_toml
 
@@ -19,9 +22,9 @@ class Performance:
         self.drone = drone
         self.mission = mission
 
-    def wing_area(self, weight, V_cruise=toml["config"]["mission"]["cruise_speed"]):
+    def wing_area(self, mass, V_cruise=toml["config"]["mission"]["cruise_speed"]):
         """Calculate required wing surface area for given weight and cruise speed."""
-        S = weight / (0.5 * ρ * V_cruise**2 * self.drone.aero.CL_cruise)  # Using lift equation with horizontal equilibrium
+        S = mass * g / (0.5 * ρ * V_cruise**2 * self.drone.aero.CL_cruise)  # Using lift equation with horizontal equilibrium
         return S
 
     def cruise_thrust(self, D):
@@ -47,14 +50,14 @@ class Performance:
         T = weight * g - self.drone.aero.drag(V_LD, TO_or_LD=True)
         return T
     
-    def hover_thrust(self, weight, V_loiter):
+    def hover_thrust(self, weight):
         """Calculate thrust required during loiter."""
         T = weight * g
         return T
     
     def cruise_energy(self, range):
-        η_elec = toml["config"]["propulsion"]["η_elec"]
-        η_prop = toml["config"]["propulsion"]["η_prop"]
+        η_elec = toml["config"]["motor"]["eff_elec"]
+        η_prop = toml["config"]["propeller"]["eff_prop"]
         L_over_D_cruise = toml["config"]["performance"]["L_over_D_cruise"]
         energy_cruise = range / (η_elec * η_prop * g * L_over_D_cruise)  # Energy required for cruise
         
@@ -77,7 +80,7 @@ class Performance:
         landing_power = self.drone.propulsion.ver_prop.power(landing_thrust)
         landing_energy = landing_power * (leg['LD_time'])
         
-        hover_thrust = self.hover_thrust(self.drone.OEW + PL_mass, leg['loiter_speed'])
+        hover_thrust = self.hover_thrust(self.drone.OEW + PL_mass)
         hover_power = self.drone.propulsion.ver_prop.power(hover_thrust)
         hover_energy = hover_power * leg['loitering_time']
         
@@ -91,12 +94,14 @@ class Performance:
         mission_energy = 0
         for leg in self.mission.legs_dict:
             
-            try:
-                leg_energy, cruise_power, takeoff_power, landing_power, hover_power = self.leg_energy(leg)
-                mission_energy += leg_energy
-                # Store or process the energy and power values as needed
-            except Exception as e:
-                print(f"Error calculating energy for leg {leg}: {e}")
+            # try:
+            #     leg_energy, cruise_power, takeoff_power, landing_power, hover_power = self.leg_energy(leg)
+            #     mission_energy += leg_energy
+            #     # Store or process the energy and power values as needed
+            # except Exception as e:
+            #     print(f"Error calculating energy for leg {leg}: {e}")
+            leg_energy, cruise_power, takeoff_power, landing_power, hover_power = self.leg_energy(leg)
+            mission_energy += leg_energy
         
         return mission_energy
                 

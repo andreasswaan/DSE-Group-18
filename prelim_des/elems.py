@@ -1,5 +1,8 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
 import numpy as np
-from prelim_des.drone import Drone
 from constants import g
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.utils.unit_converter import ImperialConverter
@@ -13,7 +16,7 @@ class Wing:
     mac:float
     def __init__(
         self,
-        drone: Drone = None
+        drone: Drone
     ):
         self.drone = drone
         self.span = toml["config"]["wing"]["wing_span"]
@@ -24,7 +27,7 @@ class Wing:
     @property
     def c_root(self):
         """Wing surface [m2]"""
-        return 2 * self.S / (self.b * (1 + self.taper))
+        return 2 * self.S / (self.span * (1 + self.taper))
 
     @property
     def c_tip(self):
@@ -34,7 +37,7 @@ class Wing:
     @property
     def geom_AR(self):
         """Geometric aspect ratio [-]"""
-        return self.span**2 / self.area
+        return self.span**2 / self.S
 
     def sweep(self, x):
         """Sweep angle [rad] at a given chord fraction [-]"""
@@ -127,7 +130,7 @@ class Wing:
         n_ult = self.drone.structure.calc_n_ult()
         return (
             ImperialConverter.mass_lbs_kg(
-            0.04674 * ImperialConverter.mass_kg_lbs(self.drone.MTOM)**0.397 
+            0.04674 * ImperialConverter.mass_kg_lbs(self.drone.MTOW)**0.397 
             * ImperialConverter.area_m2_ft2(self.S)**0.360 
             * n_ult**0.397 * self.geom_AR**1.712)
         )
@@ -137,8 +140,6 @@ class Fuselage:
     def __init__(self, drone: Drone):
         """Fuselage class."""
         self.drone = drone
-        self.length = toml["config"]["fuselage"]["length"]
-        self.diameter = toml["config"]["fuselage"]["diameter"]
 
     @property
     def length(self):
@@ -162,14 +163,16 @@ class Fuselage:
         :rtype: float
         """
         # Roskam Chapter 5 page 76
-        N_pax = toml["config"]["fuselage"]["n_pax"]
-        return (
-            ImperialConverter.mass_lbs_kg(
-            14.86 * ImperialConverter.mass_kg_lbs(self.drone.MTOM**0.144)
+        N_pax = toml["config"]["payload"]["n_pax"]
+        n_box = toml["config"]["payload"]["n_box"]
+        N_pax = max(N_pax, n_box)
+        
+        return ImperialConverter.mass_lbs_kg(
+            14.86 * ImperialConverter.mass_kg_lbs(self.drone.MTOW**0.144)
             * (self.length/self.perimeter)**0.778 
             * ImperialConverter.len_m_ft(self.length)**0.383 
-            * N_pax**0.455)
-        )
+            * (N_pax**0.455)) * (0.5/100)
+        # Assuming that a pax weighs 100kg and that a pizza weighs 300 g.
     
 
 class LandingGear:
@@ -180,7 +183,7 @@ class LandingGear:
         # self.wheel_diameter = toml["config"]["landing_gear"]["wheel_diameter"]
         # self.wheel_width = toml["config"]["landing_gear"]["wheel_width"]
     @property
-    def l_s_m():
+    def l_s_m(self):
         """Length of the landing gear strut [m]"""
         # Placeholder: replace with real calculation
         return toml["config"]["landing_gear"]["shock_strut_length_MG"]
@@ -191,13 +194,14 @@ class LandingGear:
         # Roskam Chapter 5 page 81
         n_ult = self.drone.structure.calc_n_ult()
         box_weight = toml["config"]["payload"]["box_weight"]  # kg
-        design_landing_weight = self.drone.MTOM - box_weight  # kg
+        design_landing_weight = self.drone.MTOW - box_weight  # kg
         wheel_tire_assembly_weight = 0.1  # kg, placeholder value
         return (
             ImperialConverter.mass_lbs_kg(
-            0.013 * ImperialConverter.mass_kg_lbs(self.drone.MTOM) + 
+            0.013 * ImperialConverter.mass_kg_lbs(self.drone.MTOW) + 
             0.146 * ImperialConverter.mass_kg_lbs(design_landing_weight**0.417) * n_ult**0.95 
-            * ImperialConverter.len_m_ft(self.l_s_m)**0.183 + wheel_tire_assembly_weight)
+            * ImperialConverter.len_m_ft(self.l_s_m)**0.183 
+            + ImperialConverter.mass_kg_lbs(wheel_tire_assembly_weight))
         )
         
 

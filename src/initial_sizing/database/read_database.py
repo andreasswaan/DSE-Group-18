@@ -70,7 +70,7 @@ def get_regression_plane(max_payload, max_range):
 
     return model.coef_, model.intercept_
 
-def get_MTOW_from_payload(payload, max_filter_payload, max_filter_range):
+def get_MTOW_from_payload(payload, max_filter_payload=4.5, max_filter_range=70):
     """
     Function to get the MTOW from the payload.
 

@@ -47,15 +47,23 @@ class Drone:
         """
         Estimate the weight of the drone using a class 2 weight estimate.
         """
+        if self.wing.S is None:
+            raise ValueError("Wing area (S) must be defined before performing class 2 weight estimate.")
+        
         mission_energy = self.perf.mission_energy()
         self.OEW = (
             self.wing.weight()
             + self.fuselage.weight()
             + self.landing_gear.weight()
-            + self.propulsion.estimate_weight(mission_energy)
+            + self.propulsion.weight(mission_energy)
         )
         self.max_payload = toml['config']['payload']['n_box'] * toml['config']['payload']['box_weight']
         self.MTOW = self.OEW + self.max_payload
+        print(f"Class 2 Weight Estimate: MTOW = {self.MTOW[0]:.2f} kg, OEW = {self.OEW[0]:.2f} kg")
+        print(f"Component Weights: Wing = {self.wing.weight()[0]:.2f} kg, "
+              f"Fuselage = {self.fuselage.weight()[0]:.5f} kg, "
+                f"Landing Gear = {self.landing_gear.weight()[0]:.2f} kg, "
+                f"Propulsion = {self.propulsion.weight(mission_energy)[0]:.2f} kg")
         
         return self.MTOW, self.OEW
     

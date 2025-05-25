@@ -1,7 +1,10 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
 import numpy as np
 from constants import ρ, g
 from prelim_des.utils.unit_converter import ImperialConverter
-from prelim_des.drone import Drone
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
 
@@ -16,7 +19,7 @@ class PropulsionSystem:
         self.hor_prop = HorPropeller()
         self.ver_prop = VertPropeller()
 
-    def estimate_weight(self, energy_required: float = None) -> float:
+    def weight(self, energy_required: float = None) -> float:
         return (
             self.battery.weight(energy_required)
             + self.motor.weight()
@@ -34,21 +37,15 @@ class Battery:
         return energy_required / (self.energy_density * self.batt_energy_ratio)
     
 class Motor:
-    def __init__(self, specific_power: float, peak_power: float, η_elec: float = 0.95):  # kW/kg
-        self.peak_power = peak_power
-        self.specific_power = specific_power
-        self.η_elec = η_elec
-
-    def n_motors(self, power: float) -> int:
+    def __init__(self): 
+        pass
+    
+    def n_motors(self) -> int:
         """
         Placeholder method to calculate the number of motors required based on power.
-        Parameters:
-        power (float): Power in Watts.
         Returns:
         int: Number of motors required.
         """
-        if power <= 0:
-            raise ValueError("Power must be greater than zero.")
         return 8
     
     def weight(self):
@@ -77,7 +74,7 @@ class VertPropeller:
     def area(self):
         return np.pi * (self.diameter / 2) ** 2 * self.n_blades
     
-    def power(self, thrust: float) -> float:
+    def power(self, thrust: float, FM=toml["config"]["propeller"]["FM"]) -> float:
         """
         Calculate the power required for the propeller.
         Parameters:
@@ -85,7 +82,7 @@ class VertPropeller:
         Returns:
         float: Power in Watts.
         """
-        return thrust ** 1.5 / np.sqrt(2 * ρ * self.area * self.η_prop)
+        return thrust ** 1.5 / np.sqrt(2 * ρ * self.area * self.η_prop) / FM
     
     def n_vert_prop(self) -> int:
         """

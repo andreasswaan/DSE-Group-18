@@ -1,9 +1,13 @@
 [config]
 config_name = "Drone 1"
+
+
+#-----------------------------------------------------------------------------------------------------------------------------
+
 [config.aero]
 
-CL_max = 2.0                              # [-]
-CL_cruise = 1.5                           # [-]
+CL_max = 1.0                              # [-]
+CL_cruise = 0.6                           # [-]
 CD0 = 0.05                                # [-]
 oswald_efficiency = 0.80                  # [-]
 CD_flat_plate = 1.30                      # [-]
@@ -61,10 +65,11 @@ min_batt_lvl = 0.2                        # -
 batt_energy_ratio = 0.71                  # -
 
 [config.motor]
-"η_elec" = 0.95                               
+eff_elec = 0.95                               
 
 [config.propeller]
-"η_prop" = 0.8
+eff_prop = 0.8
+FM = 0.7
 
 [config.performance]
 L_over_D_cruise = 10                      # -

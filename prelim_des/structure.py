@@ -1,7 +1,10 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
 import numpy as np
 from prelim_des.constants import g
 from prelim_des.utils.import_toml import load_toml
-from prelim_des.drone import Drone
 
 toml = load_toml()
 class Structure:
@@ -28,7 +31,7 @@ class Structure:
         This is a placeholder method and should be replaced with a real calculation.
         """
         # Placeholder: replace with real fuselage length calculation
-        payload_length = toml['config']['payload']['length'] * 2.1     # Assuming there are two pizzas stacked next to each other
+        payload_length = toml['config']['payload']['box_length'] * 2.1     # Assuming there are two pizzas stacked next to each other
         l_fus = max(payload_length, self.drone.wing.c_root)
         return l_fus
     def fuselage_diameter(self):
@@ -37,7 +40,10 @@ class Structure:
         This is a placeholder method and should be replaced with a real calculation.
         """
         # Placeholder: replace with real fuselage diameter calculation
-        payload_width = toml['config']['payload']['width'] * 1.1
+        payload_width = max(toml['config']['payload']['box_width'] * 1.1, 
+                            toml['config']['payload']['box_height'] 
+                            * toml['config']['payload']['n_box']
+                            * 1.1)  # Assuming some clearance around the payload
         return payload_width
     def fuselage_max_perimeter(self):
         """
