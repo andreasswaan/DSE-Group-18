@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     from prelim_des.drone import Drone
 import numpy as np
 from constants import ρ, g
-from prelim_des.utils.unit_converter import ImperialConverter
+from prelim_des.utils.unit_converter import ImperialConverter, TimeConverter
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
 
@@ -31,7 +31,7 @@ class Battery:
     def __init__(self):
         self.min_batt_lvl = toml["config"]["battery"]["min_batt_lvl"]
         self.batt_energy_ratio = toml["config"]["battery"]["batt_energy_ratio"]
-        self.energy_density = toml["config"]["battery"]["energy_density"]  # Wh/kg
+        self.energy_density = toml["config"]["battery"]["energy_density"] * TimeConverter.hours_to_sec(1)  # J/kg
 
     def weight(self, energy_required: float) -> float:
         return energy_required / (self.energy_density * self.batt_energy_ratio)

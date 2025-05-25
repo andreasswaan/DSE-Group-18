@@ -1,5 +1,6 @@
 from typing import Literal
 from utils.import_toml import load_toml
+from utils.unit_converter import ImperialConverter
 
 toml = load_toml()
 
@@ -24,8 +25,8 @@ class MissionPhase:
         TO_speed: float,
         LD_speed: float,
         distance: float,
-        cruise_h: float = 200,
-        cruise_speed: float = 15,
+        cruise_h: float = ImperialConverter.len_ft_m(toml["config"]["mission"]["cruise_height"]),
+        cruise_speed: float = toml["config"]["mission"]["cruise_speed"],
     ):
         self.TO_str = TO_str
         self.LD_str = LD_str

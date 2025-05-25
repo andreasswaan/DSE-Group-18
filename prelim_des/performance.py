@@ -59,7 +59,7 @@ class Performance:
         η_elec = toml["config"]["motor"]["eff_elec"]
         η_prop = toml["config"]["propeller"]["eff_prop"]
         L_over_D_cruise = toml["config"]["performance"]["L_over_D_cruise"]
-        energy_cruise = range / (η_elec * η_prop * g * L_over_D_cruise)  # Energy required for cruise
+        energy_cruise = self.drone.MTOW * range / (η_elec * η_prop * L_over_D_cruise / g)  # Energy required for cruise
         
         return energy_cruise
     
@@ -85,6 +85,11 @@ class Performance:
         hover_energy = hover_power * leg['loitering_time']
         
         leg_energy = cruise_energy + take_off_energy + landing_energy + hover_energy
+        # print(f"Energy breakdown: Cruise Energy: {cruise_energy[0]:.2f} J, "
+        #       f"Takeoff Energy: {take_off_energy[0]:.2f} J, "
+        #       f"Landing Energy: {landing_energy[0]:.2f} J, "
+        #       f"Hover Energy: {hover_energy[0]:.2f} J")
+        
         return leg_energy, cruise_power, takeoff_power, landing_power, hover_power
     
     def mission_energy(self):
@@ -94,14 +99,14 @@ class Performance:
         mission_energy = 0
         for leg in self.mission.legs_dict:
             
-            # try:
-            #     leg_energy, cruise_power, takeoff_power, landing_power, hover_power = self.leg_energy(leg)
-            #     mission_energy += leg_energy
-            #     # Store or process the energy and power values as needed
-            # except Exception as e:
-            #     print(f"Error calculating energy for leg {leg}: {e}")
-            leg_energy, cruise_power, takeoff_power, landing_power, hover_power = self.leg_energy(leg)
-            mission_energy += leg_energy
+            try:
+                leg_energy, cruise_power, takeoff_power, landing_power, hover_power = self.leg_energy(leg)
+                mission_energy += leg_energy
+                # Store or process the energy and power values as needed
+            except Exception as e:
+                print(f"Error calculating energy for leg {leg}: {e}")
+            
+        mission_energy = mission_energy / (1 - self.drone.propulsion.battery.min_batt_lvl)  # Adjust for minimum battery level
         
         return mission_energy
                 

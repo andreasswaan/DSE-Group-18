@@ -128,12 +128,13 @@ class Wing:
         """
         # Roskam Chapter 5 page 67
         n_ult = self.drone.structure.calc_n_ult()
-        return (
-            ImperialConverter.mass_lbs_kg(
-            0.04674 * ImperialConverter.mass_kg_lbs(self.drone.MTOW)**0.397 
-            * ImperialConverter.area_m2_ft2(self.S)**0.360 
+        roskam_w = ImperialConverter.mass_lbs_kg(
+            0.04674 * (ImperialConverter.mass_kg_lbs(self.drone.MTOW))**0.397 
+            * (ImperialConverter.area_m2_ft2(self.S))**0.360 
             * n_ult**0.397 * self.geom_AR**1.712)
-        )
+        
+        # Placeholder estimate for the wing weight based
+        return (0.4 * self.S + 0.06 * self.drone.MTOW)
 
 
 class Fuselage:
@@ -171,7 +172,7 @@ class Fuselage:
             14.86 * ImperialConverter.mass_kg_lbs(self.drone.MTOW**0.144)
             * (self.length/self.perimeter)**0.778 
             * ImperialConverter.len_m_ft(self.length)**0.383 
-            * (N_pax**0.455)) * (0.5/100)
+            * (N_pax**0.455)) * (0.5/100) + self.drone.structure.delivery_mechanism_weight()
         # Assuming that a pax weighs 100kg and that a pizza weighs 300 g.
     
 
@@ -196,11 +197,16 @@ class LandingGear:
         box_weight = toml["config"]["payload"]["box_weight"]  # kg
         design_landing_weight = self.drone.MTOW - box_weight  # kg
         wheel_tire_assembly_weight = 0.1  # kg, placeholder value
+        
+        # ImperialConverter.mass_lbs_kg(
+            # 0.013 * ImperialConverter.mass_kg_lbs(self.drone.MTOW) + 
+            # 0.146 * ImperialConverter.mass_kg_lbs(design_landing_weight**0.417) * n_ult**0.95 
+            # * ImperialConverter.len_m_ft(self.l_s_m)**0.183 
+            # + ImperialConverter.mass_kg_lbs(wheel_tire_assembly_weight)
+        # Placeholder estimate for the landing gear weight based on MTOW and wheel assembly weight, the design landing weight term has been omitted
         return (
             ImperialConverter.mass_lbs_kg(
-            0.013 * ImperialConverter.mass_kg_lbs(self.drone.MTOW) + 
-            0.146 * ImperialConverter.mass_kg_lbs(design_landing_weight**0.417) * n_ult**0.95 
-            * ImperialConverter.len_m_ft(self.l_s_m)**0.183 
+            0.013 * ImperialConverter.mass_kg_lbs(self.drone.MTOW) +  
             + ImperialConverter.mass_kg_lbs(wheel_tire_assembly_weight))
         )
         

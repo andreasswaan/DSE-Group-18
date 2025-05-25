@@ -65,3 +65,9 @@ class TimeConverter:
         minutes = int((sec % 3600) // 60)
         seconds = int(sec % 60)
         return datetime.time(hours, minutes, seconds)
+    
+    def hours_to_sec(hours):
+        """
+        Convert hours to seconds
+        """
+        return hours * 3600

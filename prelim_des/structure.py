@@ -60,3 +60,11 @@ class Structure:
         Placeholder method to calculate the top view area of the fuselage.
         """
         return self.fuselage_diameter() * self.fuselage_length()  # Assuming a cylindrical fuselage for simplicity
+    
+    def delivery_mechanism_weight(self):
+        """
+        Calculate the weight of the delivery mechanism.
+        This is a placeholder method and should be replaced with a real calculation.
+        """
+        # Placeholder: replace with real delivery mechanism weight calculation
+        return toml['config']['payload']['del_mech_weight']  # kg
