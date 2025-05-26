@@ -5,26 +5,27 @@ from database.read_database import (
     get_data_from_database,
     get_regression_plane,
 )
+import os
 
 
 mission_profile = [
     {
-    "cruise_distance": 6000,
-    "loitering_time": 5 * 60,
-    "cruise_h": 100,
-    "cruise_speed": 15,
-    "payload_mass": 0,
-    "TO_speed": 3,
-    "LD_speed": 5,
+        "cruise_distance": 6000,
+        "loitering_time": 5 * 60,
+        "cruise_h": 100,
+        "cruise_speed": 15,
+        "payload_mass": 0,
+        "TO_speed": 3,
+        "LD_speed": 5,
     },
     {
-    "cruise_distance": 9000,
-    "loitering_time": 5 * 60,
-    "cruise_h": 100,
-    "cruise_speed": 15,
-    "payload_mass": 2.5,
-    "TO_speed": 3,
-    "LD_speed": 5,
+        "cruise_distance": 9000,
+        "loitering_time": 5 * 60,
+        "cruise_h": 100,
+        "cruise_speed": 15,
+        "payload_mass": 2.5,
+        "TO_speed": 3,
+        "LD_speed": 5,
     },
 ]
 
@@ -319,7 +320,9 @@ def perform_calc_mission(
             mission_phase["TO_speed"],
             CD_flat_plate,
         )
-        P_prop_TO = calculate_prop_power((OEW + payload_weight) + drag_TO) # This formula should not be used here as this is the available power and not the required power. 
+        P_prop_TO = calculate_prop_power(
+            (OEW + payload_weight) + drag_TO
+        )  # This formula should not be used here as this is the available power and not the required power.
         power_provided_by_props.append(P_prop_TO)
         E_prop_TO = P_prop_TO * time_TO
         total_energy += E_prop_TO
@@ -346,8 +349,10 @@ def perform_calc_mission(
         total_energy += E_prop_loitering
         total_loitering_energy += E_prop_loitering
 
-        total_phase_energy = E_cruise_wing + E_cruise_prop + E_prop_TO + E_prop_LD + E_prop_loitering
-        
+        total_phase_energy = (
+            E_cruise_wing + E_cruise_prop + E_prop_TO + E_prop_LD + E_prop_loitering
+        )
+
         phase_battery_mass = size_battery(total_phase_energy)
         if PRINT:
             print(f"MISSION PHASE {i}")
@@ -381,7 +386,12 @@ def perform_calc_mission(
         plt.title(
             f"Energy Distribution per Mission, ({np.round(total_energy/1000,3)}kJ)"
         )
-        plt.show()
+        plot_folder = "src/initial_sizing/plots"
+        os.makedirs(plot_folder, exist_ok=True)
+        plt.savefig(
+            os.path.join(plot_folder, "energy_usage.svg"), format="svg", dpi=300
+        )
+        plt.close()
 
     return battery_mass
 

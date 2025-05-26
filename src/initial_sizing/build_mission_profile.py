@@ -2,7 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from vert_and_hori import iterations, g
-from city_density import get_distance_constants
+from city_density import CityDensity
 
 
 def build_mission_profile(
@@ -58,18 +58,19 @@ def build_mission_profile(
     return profile
 
 
-# sequence = "DRCCRCCRCCD"
-sequence = "DR"
+sequence = "DRCCRCCRCCD"
+# sequence = "DR"
 # distances = {"DR": 1, "RC": 5, "CC": 5, "CD": 5}
-distances = get_distance_constants()["Center"]
+city = CityDensity()
+distances = city.get_distance_constants()["Center"]
 loitering_times = {"R": 120, "C": 120, "D": 30}
 cruise_h = 200
 cruise_speed = 15
 payload_masses = {"DR": 0, "RC": 2.5, "CC": 2, "CD": 0, "CR": 0}
 TO_speed = {"D": 6, "R": 7, "C": 8}
 LD_speed = {"D": 3, "R": 4, "C": 5}
-pct_wing_lift_array = np.linspace(0.5, 1.0, 6)
-# pct_wing_lift_array = [1]
+# pct_wing_lift_array = np.linspace(0.5, 1.0, 6)
+pct_wing_lift_array = [1]
 
 # print("pct_wing_lift_array:", pct_wing_lift_array)
 
