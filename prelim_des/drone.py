@@ -59,10 +59,12 @@ class Drone:
             + self.landing_gear.weight()
             + self.propulsion.weight(mission_energy)
         )
+        print(f"Mission Energy: {mission_energy[0]:.2f} J" if mission_energy is not None else "Mission Energy: Not calculated")
         print(f"Component Weights: Wing = {self.wing.weight()[0]:.2f} kg, "
               f"Fuselage = {self.fuselage.weight()[0]:.5f} kg, "
                 f"Landing Gear = {self.landing_gear.weight()[0]:.2f} kg, "
                 f"Propulsion = {self.propulsion.weight(mission_energy)[0]:.2f} kg")
+        
         self.max_payload = toml['config']['payload']['n_box'] * toml['config']['payload']['box_weight']
         self.MTOW = self.OEW + self.max_payload
         print(f"Class 2 Weight Estimate: MTOW = {self.MTOW[0]:.2f} kg, OEW = {self.OEW[0]:.2f} kg")

@@ -235,12 +235,13 @@ class Fuselage:
         N_pax = toml["config"]["payload"]["n_pax"]
         n_box = toml["config"]["payload"]["n_box"]
         N_pax = max(N_pax, n_box)
+        box_weight = toml["config"]["payload"]["box_weight"]  # kg
         
         return ImperialConverter.mass_lbs_kg(
             14.86 * ImperialConverter.mass_kg_lbs(self.drone.MTOW**0.144)
             * (self.length/self.perimeter)**0.778 
             * ImperialConverter.len_m_ft(self.length)**0.383 
-            * (N_pax**0.455)) * (0.5/100) + self.drone.structure.delivery_mechanism_weight()
+            * (N_pax**0.455)) * (box_weight/100) + self.drone.structure.delivery_mechanism_weight()
         # Assuming that a pax weighs 100kg and that a pizza weighs 300 g.
     
 

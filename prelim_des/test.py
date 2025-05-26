@@ -13,17 +13,17 @@ mission = Mission("DRCCRCCRCCD")
 drone = Drone()
 perf = Performance(drone, mission)
 drone.perf = perf
-# drone.class_1_weight_estimate()
+drone.class_1_weight_estimate()
 # print("Drone MTOW:", drone.MTOW)
 # print("Drone OEW:", drone.OEW)
-# drone.wing.S = perf.wing_area(drone.OEW)
+drone.wing.S = perf.wing_area(drone.OEW)
 # print("Wing area (S):", drone.wing.S)
 
-# drone.class_2_weight_estimate()
+drone.class_2_weight_estimate()
 # print("Drone MTOW after class 2 estimate:", drone.MTOW)
 # print("Drone OEW after class 2 estimate:", drone.OEW)
 
-drone.iterative_weight_estimate(plot=True, tolerance=0.0001)
+# drone.iterative_weight_estimate(plot=True, tolerance=0.0001)
 
-drone.wing.plot_planform(saveplot=True)
+# drone.wing.plot_planform(saveplot=True)
 
