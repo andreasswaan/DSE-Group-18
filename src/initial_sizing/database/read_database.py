@@ -38,12 +38,11 @@ def apply_db_filters(db, max_payload, max_range):
     return db_filtered
 
 
-def get_regression_plane(db, max_payload, max_range):
+def get_regression_plane(max_payload, max_range):
     """
     Function to get the regression plane from the database.
 
     Args:
-        db (dataframe): start dataframe.
         max_payload (float): maximum payload for filter.
         max_range (float): maximum range for filter.
 
@@ -55,9 +54,9 @@ def get_regression_plane(db, max_payload, max_range):
     # dataframe = pd.read_excel(file_path)
 
     # Display the dataframe
+    db = get_data_from_database()
     db = db.dropna(subset=["Payload [kg]", "Range [km]", "MTOW [kg]"])
     db_filtered = apply_db_filters(db, max_payload, max_range)
-    # X = db_filtered[["Payload [kg]", "Range [km]"]]
     X = db_filtered[["Payload [kg]"]]
 
     y = db_filtered["MTOW [kg]"]
@@ -71,6 +70,20 @@ def get_regression_plane(db, max_payload, max_range):
 
     return model.coef_, model.intercept_
 
+def get_MTOW_from_payload(payload, max_filter_payload=4.5, max_filter_range=70):
+    """
+    Function to get the MTOW from the payload.
+
+    Args:
+        payload (float): Payload in kg.
+        max_filter_payload (float): Maximum payload for filter.
+        max_filter_range (float): Maximum range for filter.
+
+    Returns:
+        float: Maximum takeoff weight (MTOW) in kg.
+    """
+    A, C = get_regression_plane(max_filter_payload, max_filter_range)
+    return A * payload + C
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt

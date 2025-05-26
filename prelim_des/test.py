@@ -1,7 +1,29 @@
+from __future__ import annotations
+import numpy as np
+import matplotlib.pyplot as plt
 from mission import Mission
+from prelim_des.drone import Drone
+from prelim_des.performance import Performance
 
 
 mission = Mission("DRCCRCCRCCD")
-print("Mission phases:", mission.phases_str)
-print(mission.phases_obj())
-print("Mission phase objects:", mission.phases_dict)
+# print("Mission phases:", mission.phases_str)
+# print("Mission phase objects:", mission.legs_dict)
+
+drone = Drone()
+perf = Performance(drone, mission)
+drone.perf = perf
+# drone.class_1_weight_estimate()
+# print("Drone MTOW:", drone.MTOW)
+# print("Drone OEW:", drone.OEW)
+# drone.wing.S = perf.wing_area(drone.OEW)
+# print("Wing area (S):", drone.wing.S)
+
+# drone.class_2_weight_estimate()
+# print("Drone MTOW after class 2 estimate:", drone.MTOW)
+# print("Drone OEW after class 2 estimate:", drone.OEW)
+
+drone.iterative_weight_estimate(plot=True, tolerance=0.0001)
+
+drone.wing.plot_planform(saveplot=True)
+

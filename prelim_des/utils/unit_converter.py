@@ -13,6 +13,10 @@ class ImperialConverter:
     def mass_lbs_kg(masslbs):
         masskg = masslbs * 0.45359237
         return masskg
+    
+    def mass_kg_lbs(masskg):
+        masslbs = masskg / 0.45359237
+        return masslbs
 
     def alt_ft_m(hft):
         hm = hft * 0.3048
@@ -29,6 +33,18 @@ class ImperialConverter:
     def moment_lbsin_kgm(momentlbsin):
         momentkgm = momentlbsin * 0.0254 * 0.45359237
         return momentkgm
+    
+    def len_ft_m(lenft):
+        lenm = lenft * 0.3048
+        return lenm
+    
+    def len_m_ft(lenm):
+        lenft = lenm / 0.3048
+        return lenft
+    
+    def area_m2_ft2(area_m2):
+        area_ft2 = area_m2 / 0.09290304
+        return area_ft2
 
 
 class TimeConverter:
@@ -49,3 +65,9 @@ class TimeConverter:
         minutes = int((sec % 3600) // 60)
         seconds = int(sec % 60)
         return datetime.time(hours, minutes, seconds)
+    
+    def hours_to_sec(hours):
+        """
+        Convert hours to seconds
+        """
+        return hours * 3600

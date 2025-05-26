@@ -1,31 +1,33 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from database.read_databse import (
+from database.read_database import (
     get_data_from_database,
     get_regression_plane,
 )
 import os
 
 
-mission_profile = {
-    "cruise_OEW": 0,
-    "cruise_MTOW": 8000,
-    "loitering_time": 0 * 60,
-    "TO_LD": 5,
-    "cruise_h": 150,
-    "cruise_speed": 15,
-    "payload_mass": 3,
-}
-"""
-    cruise OEW length [m],
-    cruise MTOW length [m],
-    loitering time [s], 
-    #TO/landing [#], 
-    cruise height [m], 
-    cruise speed [m/s]
-    payload mass [kg]
-"""
+mission_profile = [
+    {
+        "cruise_distance": 6000,
+        "loitering_time": 5 * 60,
+        "cruise_h": 100,
+        "cruise_speed": 15,
+        "payload_mass": 0,
+        "TO_speed": 3,
+        "LD_speed": 5,
+    },
+    {
+        "cruise_distance": 9000,
+        "loitering_time": 5 * 60,
+        "cruise_h": 100,
+        "cruise_speed": 15,
+        "payload_mass": 2.5,
+        "TO_speed": 3,
+        "LD_speed": 5,
+    },
+]
 
 
 mission_profile_2 = [
@@ -89,9 +91,9 @@ db = get_data_from_database()
 V_takeoff = 6.3  # m/s, vertical takeoff speed
 V_land = 6.3  # m/s, vertical landing speed
 takeoff_time = (
-    mission_profile["cruise_h"] / V_takeoff
+    mission_profile[0]["cruise_h"] / V_takeoff
 )  # seconds, time to reach cruise height
-range_at_max_payload = mission_profile["cruise_MTOW"] / 1000
+# range_at_max_payload = mission_profile[0]["cruise_MTOW"] / 1000
 
 
 # Efficiency Constants
@@ -115,7 +117,7 @@ def drag(S, V, CD):
 
 def payload_mass_to_mtow(payload_mass):
     # [A, B], C = get_regression_plane(db, db_filter_max_payload, db_filter_max_range)
-    [A], C = get_regression_plane(db, db_filter_max_payload, db_filter_max_range)
+    [A], C = get_regression_plane(db_filter_max_payload, db_filter_max_range)
 
     # mtow = A * payload_mass + B * range + C  # Example conversion factor
     mtow = A * payload_mass + C  # Example conversion factor
@@ -124,7 +126,7 @@ def payload_mass_to_mtow(payload_mass):
 
 
 def calculate_wing_surface_area(weight):
-    V_cruise = mission_profile["cruise_speed"]
+    V_cruise = mission_profile[0]["cruise_speed"]
     S = weight / (0.5 * ρ * V_cruise**2 * CL_cruise)
     return S
 
@@ -140,7 +142,7 @@ def calculate_thrust_cruise(D):
 
 
 def calculate_power_cruise(T, V_cruise):
-    V_cruise = mission_profile["cruise_speed"]
+    V_cruise = mission_profile[0]["cruise_speed"]
     P_cruise = T * V_cruise  # Power = Thrust * Velocity
     return P_cruise
 
@@ -266,7 +268,7 @@ def plot_takeoff_energy_vs_speed(S, speed_range=None):
 
 
 def perform_calc_mission(
-    mission_profile3, mtow, OEW, pct_wing_lift=1, PLOT=True, PRINT=False
+    mission_profile, mtow, OEW, pct_wing_lift=1, PLOT=False, PRINT=False
 ):
     total_energy = 0
     total_TO_energy = 0
@@ -277,7 +279,7 @@ def perform_calc_mission(
     power_provided_by_props = []
     wing_surfaces = []
 
-    for mission_phase in mission_profile3:
+    for mission_phase in mission_profile:
         payload_weight = mission_phase["payload_mass"] * g
         wing_surface = calculate_wing_surface_area(
             (OEW + payload_weight) * pct_wing_lift
@@ -291,7 +293,7 @@ def perform_calc_mission(
     print("\n")
 
     i = 0
-    for mission_phase in mission_profile3:
+    for mission_phase in mission_profile:
         payload_weight = mission_phase["payload_mass"] * g
         D = calculate_drag_cruise(wing_surface, mission_phase["cruise_speed"])  # [N]
         T = calculate_thrust_cruise(D)
@@ -318,12 +320,13 @@ def perform_calc_mission(
             mission_phase["TO_speed"],
             CD_flat_plate,
         )
-        P_prop_TO = calculate_prop_power((OEW + payload_weight) + drag_TO)
+        P_prop_TO = calculate_prop_power(
+            (OEW + payload_weight) + drag_TO
+        )  # This formula should not be used here as this is the available power and not the required power.
         power_provided_by_props.append(P_prop_TO)
         E_prop_TO = P_prop_TO * time_TO
         total_energy += E_prop_TO
         total_TO_energy += E_prop_TO
-        # print(f"thrust req for TO {OEW + payload_weight + drag_TO}")
 
         time_LD = mission_phase["cruise_h"] / mission_phase["LD_speed"]
         drag_LD = drag(
@@ -346,7 +349,10 @@ def perform_calc_mission(
         total_energy += E_prop_loitering
         total_loitering_energy += E_prop_loitering
 
-        total_phase_energy = E_cruise_wing + E_cruise_prop + E_prop_TO + E_prop_LD
+        total_phase_energy = (
+            E_cruise_wing + E_cruise_prop + E_prop_TO + E_prop_LD + E_prop_loitering
+        )
+
         phase_battery_mass = size_battery(total_phase_energy)
         if PRINT:
             print(f"MISSION PHASE {i}")
@@ -438,14 +444,14 @@ if __name__ == "__main__":
     pct_wing_lift_array = [1]
     mtow = payload_mass_to_mtow(design_payload)  # kg
     OEW = mtow - design_payload * g
-    battery_mass = perform_calc_mission(mission_profile_2, mtow, OEW)
+    battery_mass = perform_calc_mission(mission_profile, mtow, OEW, PRINT=True)
     for pct_wing_lift in pct_wing_lift_array:
         print(f"wing lift fraction {pct_wing_lift}")
         mtows = iterations(
             mission_profile_2,
             pct_wing_lift=pct_wing_lift,
             design_payload=design_payload,
-            iterations=10,
+            iterations=1,
             PLOT=PLOT,
         )
         print("Final MTOW", mtows[-1] / g)

@@ -1,46 +1,35 @@
+from __future__ import annotations
+import os
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
 import numpy as np
+import matplotlib.pyplot as plt
 from constants import g
+from prelim_des.utils.import_toml import load_toml
+from prelim_des.utils.unit_converter import ImperialConverter
+
+toml = load_toml()
 
 
 class Wing:
     """Class for a wing."""
-
+    S:float
+    mac:float
     def __init__(
         self,
-        S,
-        span,
-        taper_ratio,
-        tip_over_chord,
-        Γ,
-        Λ_c4,
-        mac=None,
+        drone: Drone
     ):
-        """Wing class.
-
-        :param S: Wing surface area [m2]
-        :type S: float
-        :param span: Wing span [m]
-        :type span: float
-        :param tip_over_chord: thickness over chord ratio [-]
-        :type tip_over_chord: float
-        :param Γ: Wing dihedral angle [rad]
-        :type Γ: float
-        :param Λ_c4: Sweep angle at quarter chord [rad]
-        :type Λ_c4: float
-        :param mac: Mean aerodynamic chord length [m], defaults to None
-        :type mac: float, optional
-        """
-        self.S = S
-        self.span = span
-        self.tip_over_chord = tip_over_chord
-        self.Γ = np.deg2rad(Γ)
-        self.Λ_c4 = np.deg2rad(Λ_c4)
-        self.mac = mac
-
+        self.drone = drone
+        self.span = toml["config"]["wing"]["wing_span"]
+        self.thick_over_chord = toml["config"]["wing"]["thickness_over_chord"]
+        self.Γ = toml["config"]["wing"]["dihedral"]
+        self.Λ_c4 = np.deg2rad(toml["config"]["wing"]["quarter_chord_sweep"])
+    
     @property
     def c_root(self):
         """Wing surface [m2]"""
-        return 2 * self.S / (self.b * (1 + self.taper))
+        return 2 * self.S / (self.span * (1 + self.taper))
 
     @property
     def c_tip(self):
@@ -50,7 +39,7 @@ class Wing:
     @property
     def geom_AR(self):
         """Geometric aspect ratio [-]"""
-        return self.span**2 / self.area
+        return self.span**2 / self.S
 
     def sweep(self, x):
         """Sweep angle [rad] at a given chord fraction [-]"""
@@ -131,6 +120,164 @@ class Wing:
         """
         assert y0 >= 0 and y1 >= 0 and y1 > y0, "Specify correct bounds!"
         return (self.chord(y0) + self.chord(y1)) / 2 * (y1 - y0)
+
+    def weight(self):
+        """Estimate the wing weight using Cessna method from Roskam V: 
+        https://research.tudelft.nl/files/144857482/6.2022_1485.pdf.
+
+        :return: Wing weight [kg]
+        :rtype: float
+        """
+        # Roskam Chapter 5 page 67
+        n_ult = self.drone.structure.calc_n_ult()
+        roskam_w = ImperialConverter.mass_lbs_kg(
+            0.04674 * (ImperialConverter.mass_kg_lbs(self.drone.MTOW))**0.397 
+            * (ImperialConverter.area_m2_ft2(self.S))**0.360 
+            * n_ult**0.397 * self.geom_AR**1.712)
+        
+        # Placeholder estimate for the wing weight based
+        return (0.4 * self.S + 0.06 * self.drone.MTOW)
+    
+    def plot_planform(self, saveplot=False, filename='wing_planform.png'):
+        """
+        Plot the wing planform and display key parameters in a box.
+        """
+        span = self.span
+        c_root = self.c_root[0]
+        c_tip = self.c_tip[0]
+        sweep_LE = self.sweep(0)[0]  # radians
+        MAC = self.MAC[0]
+        xLEMAC = self.xLEMAC
+        yLEMAC = self.yLEMAC
+        AR = self.geom_AR
+        taper = self.taper
+
+        fig, ax = plt.subplots(figsize=(14, 8))
+
+        # Wing boundary (half-span, right side)
+        y = [0, span/2, span/2, 0]
+        x = [0, (span/2)*np.tan(sweep_LE), (span/2)*np.tan(sweep_LE)+c_tip, c_root]
+        ax.fill(y, x, facecolor='grey', alpha=0.1)
+        ax.fill(y, x, facecolor='none', edgecolor='black', linewidth=2, label="Wing Outline")
+
+        # Leading and trailing edge spars (example at 15% and 60% chord)
+        for spar_frac, label in zip([0.15, 0.6], ["LE Spar", "TE Spar"]):
+            spar_x = [c_root * spar_frac, (span/2)*np.tan(sweep_LE) + c_tip * spar_frac]
+            spar_y = [0, span/2]
+            ax.plot(spar_y, spar_x, linestyle=':', color='blue', lw=1, label=label)
+
+        # MAC line
+        ax.plot([yLEMAC, yLEMAC], [xLEMAC, xLEMAC + MAC], 'r-', lw=3, label="MAC")
+
+        # Axis settings
+        ax.set_xlabel('y [m]')
+        ax.set_ylabel('x [m]')
+        ax.set_title("Wing Planform with Key Parameters")
+        ax.set_aspect('equal')
+        ax.grid(True, alpha=0.2)
+
+        # Place legend in upper left, outside the plot area
+        ax.legend(loc='upper left', fontsize=10, frameon=True, bbox_to_anchor=(0.0, 1.0))
+
+        # Set y-limits to leave space for the info box
+        ax.set_ylim(-0.1 * span, 0.6 * span)
+
+        # Key parameters box in upper right
+        param_text = (
+            f"Area (S): {self.S[0]:.2f} m²\n"
+            f"Span: {span:.2f} m\n"
+            f"Root chord: {c_root:.2f} m\n"
+            f"Tip chord: {c_tip:.2f} m\n"
+            f"MAC: {MAC:.2f} m\n"
+            f"Aspect Ratio: {AR[0]:.2f}\n"
+            f"Taper Ratio: {taper:.2f}\n"
+            f"Sweep (Λ_LE): {np.degrees(sweep_LE):.1f}°"
+        )
+        props = dict(boxstyle='round', facecolor='white', edgecolor='black', alpha=0.95)
+        ax.text(0.98, 0.98, param_text, transform=ax.transAxes, fontsize=11,
+                verticalalignment='top', horizontalalignment='right', bbox=props)
+
+        plt.tight_layout()
+        if saveplot:
+            folder = os.path.join("prelim_des", "plots", "weight_estimate")
+            os.makedirs(folder, exist_ok=True)
+            plt.savefig(os.path.join(folder, filename), dpi=300, bbox_inches='tight')
+        plt.show()
+
+
+class Fuselage:
+    def __init__(self, drone: Drone):
+        """Fuselage class."""
+        self.drone = drone
+
+    @property
+    def length(self):
+        """Fuselage length [m]"""
+        return self.drone.structure.fuselage_length()
+    
+    @property
+    def diameter(self):
+        """Fuselage diameter [m]"""
+        return self.drone.structure.fuselage_diameter()
+    @property
+    def perimeter(self):
+        """Fuselage perimeter [m]"""
+        return self.drone.structure.fuselage_max_perimeter()
+    
+    def weight(self):
+        """Estimate the fuselage weight using Cessna method from Roskam V: 
+        https://research.tudelft.nl/files/144857482/6.2022_1485.pdf.
+
+        :return: Fuselage weight [kg]
+        :rtype: float
+        """
+        # Roskam Chapter 5 page 76
+        N_pax = toml["config"]["payload"]["n_pax"]
+        n_box = toml["config"]["payload"]["n_box"]
+        N_pax = max(N_pax, n_box)
+        
+        return ImperialConverter.mass_lbs_kg(
+            14.86 * ImperialConverter.mass_kg_lbs(self.drone.MTOW**0.144)
+            * (self.length/self.perimeter)**0.778 
+            * ImperialConverter.len_m_ft(self.length)**0.383 
+            * (N_pax**0.455)) * (0.5/100) + self.drone.structure.delivery_mechanism_weight()
+        # Assuming that a pax weighs 100kg and that a pizza weighs 300 g.
+    
+
+class LandingGear:
+    def __init__(self, drone: Drone):
+        """Landing gear class."""
+        self.drone = drone
+        # self.n_legs = toml["config"]["landing_gear"]["n_legs"]
+        # self.wheel_diameter = toml["config"]["landing_gear"]["wheel_diameter"]
+        # self.wheel_width = toml["config"]["landing_gear"]["wheel_width"]
+    @property
+    def l_s_m(self):
+        """Length of the landing gear strut [m]"""
+        # Placeholder: replace with real calculation
+        return toml["config"]["landing_gear"]["shock_strut_length_MG"]
+    def weight(self):
+        """Estimate the landing gear weight using Cessna method from Roskam V: 
+        Placeholder method used: Update with better method once design is more clear.
+        """
+        # Roskam Chapter 5 page 81
+        n_ult = self.drone.structure.calc_n_ult()
+        box_weight = toml["config"]["payload"]["box_weight"]  # kg
+        design_landing_weight = self.drone.MTOW - box_weight  # kg
+        wheel_tire_assembly_weight = 0.1  # kg, placeholder value
+        
+        # ImperialConverter.mass_lbs_kg(
+            # 0.013 * ImperialConverter.mass_kg_lbs(self.drone.MTOW) + 
+            # 0.146 * ImperialConverter.mass_kg_lbs(design_landing_weight**0.417) * n_ult**0.95 
+            # * ImperialConverter.len_m_ft(self.l_s_m)**0.183 
+            # + ImperialConverter.mass_kg_lbs(wheel_tire_assembly_weight)
+        # Placeholder estimate for the landing gear weight based on MTOW and wheel assembly weight, the design landing weight term has been omitted
+        return (
+            ImperialConverter.mass_lbs_kg(
+            0.013 * ImperialConverter.mass_kg_lbs(self.drone.MTOW) +  
+            + ImperialConverter.mass_kg_lbs(wheel_tire_assembly_weight))
+        )
+        
 
 
 # class HorizontalTail(Wing):

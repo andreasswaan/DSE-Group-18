@@ -1,5 +1,6 @@
 from typing import Literal
 from utils.import_toml import load_toml
+from utils.unit_converter import ImperialConverter
 
 toml = load_toml()
 
@@ -24,8 +25,8 @@ class MissionPhase:
         TO_speed: float,
         LD_speed: float,
         distance: float,
-        cruise_h: float = 200,
-        cruise_speed: float = 15,
+        cruise_h: float = ImperialConverter.len_ft_m(toml["config"]["mission"]["cruise_height"]),
+        cruise_speed: float = toml["config"]["mission"]["cruise_speed"],
     ):
         self.TO_str = TO_str
         self.LD_str = LD_str
@@ -61,9 +62,10 @@ class Mission:
         self.TO_speed = toml["config"]["mission"]["TO_speed"]
         self.LD_speed = toml["config"]["mission"]["LD_speed"]
         self.distances = toml["config"]["mission"]["distances"]
-        self.phases = self.phases_obj()
+        self.phases = self.legs_obj
 
-    def phases_obj(self) -> list[MissionPhase]:
+    @property
+    def legs_obj(self) -> list[MissionPhase]:
         """Recalculates the mission phases (to be used when a mission reset is needed)"""
         phases_str = self.phases_str
         phases = []
@@ -112,7 +114,7 @@ class Mission:
                 raise ValueError("Invalid mission phase")
 
     @property
-    def phases_dict(self) -> list[MissionPhase.__dict__]:  # type: ignore
+    def legs_dict(self) -> list[MissionPhase.__dict__]:  # type: ignore
         phases_dict = []
         for phase in self.phases:
             phases_dict.append(phase.__dict__)

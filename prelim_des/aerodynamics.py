@@ -1,63 +1,67 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import numpy as np
-from drone import Drone
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
 from constants import ρ
+from prelim_des.utils.import_toml import load_toml
 
+toml = load_toml()
 
 class Aerodynamics:
+    
+    S: float
+    
     def __init__(
         self,
-        CL_max: float = 2.0,
-        CL_cruise: float = 1.5,
-        CD_0: float = 0.05,
-        oswald_efficiency: float = 0.8,
-        S: float = 0.5,
+        drone: Drone,
     ):
         """
         Initialize the Aerodynamics class with default parameters.
 
         Parameters:
-        CL_max (float): Maximum lift coefficient.
-        CL_cruise (float): Lift coefficient at cruise.
-        C_D0 (float): Zero-lift drag coefficient.
-        oswald_efficiency (float): Oswald efficiency factor.
-        S (float): Wing surface area in m^2.
+        drone (Drone): The drone object to which this aerodynamics model belongs.
         """
-        self.CL_max = CL_max
-        self.CL_cruise = CL_cruise
-        self.CD_0 = CD_0
-        self.oswald_efficiency = oswald_efficiency
-        self.S = S
-        self.drone = Drone()
+        self.CL_max = toml["config"]["aero"]["CL_max"]
+        self.CL_cruise = toml["config"]["aero"]["CL_cruise"]
+        self.CD_0 = toml["config"]["aero"]["CD0"]
+        self.CD_flat_plate = toml["config"]["aero"]["CD_flat_plate"]
+        self.oswald_efficiency = toml["config"]["aero"]["oswald_efficiency"]
+        self.drone = drone
 
     @property
     def CD(self) -> float:
         return (
             self.CD_0
-            + (self.CL_max / (np.pi * self.oswald_efficiency * self.drone.wing.geom_AR))
-            ** 2
+            + (self.CL_cruise**2 / (np.pi * self.oswald_efficiency * self.drone.wing.geom_AR))
+    
         )
 
-    def estimate_drag(self, speed: float) -> float:
+    def lift(self, V: float, CL) -> float:
         """
-        Estimate the drag force on the drone at a given speed.
+        Estimate the lift force on the drone at a given velocity.
 
         Parameters:
-        speed (float): The speed of the drone in m/s.
-
-        Returns:
-        float: The drag force in Newtons.
-        """
-        return 0.5 * ρ * speed**2 * self.S * self.CD  # Drag force in N
-
-    def estimate_lift(self, speed: float, CL) -> float:
-        """
-        Estimate the lift force on the drone at a given speed.
-
-        Parameters:
-        speed (float): The speed of the drone in m/s.
+        velocity (float): The velocity of the drone in m/s.
 
         Returns:
         float: The lift force in Newtons.
         """
         # Placeholder: replace with real aerodynamic model
-        return 0.5 * ρ * speed**2 * self.S * CL
+        return 0.5 * ρ * V**2 * self.drone.wing.S * CL
+    
+    def drag(self, V: float, TO_or_LD: bool = False) -> float:
+        """
+        Estimate the drag force on the drone at a given velocity.
+
+        Parameters:
+        velocity (float): The velocity of the drone in m/s.
+        flat_plate (bool): If True, use the flat plate drag coefficient, otherwise use the standard drag coefficient.
+
+        Returns:
+        float: The drag force in Newtons.
+        """
+        if TO_or_LD:
+            return 0.5 * ρ * V**2 * (self.drone.wing.S + self.drone.structure.top_view_area) * self.CD_flat_plate  # Drag force in N
+        else:
+            return 0.5 * ρ * V**2 * self.drone.wing.S * self.CD # Drag force in N
