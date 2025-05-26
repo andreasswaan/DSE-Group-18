@@ -2,6 +2,9 @@ from prelim_des.power import PropulsionSystem
 from prelim_des.elems import Wing
 from prelim_des.structure import Structure
 from prelim_des.constants import *
+from utils.import_toml import load_toml
+
+toml = load_toml()
 
 
 class Drone:

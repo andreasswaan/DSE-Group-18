@@ -5,6 +5,7 @@ from database.read_databse import (
     get_data_from_database,
     get_regression_plane,
 )
+import os
 
 
 mission_profile = {
@@ -265,7 +266,7 @@ def plot_takeoff_energy_vs_speed(S, speed_range=None):
 
 
 def perform_calc_mission(
-    mission_profile3, mtow, OEW, pct_wing_lift=1, PLOT=False, PRINT=False
+    mission_profile3, mtow, OEW, pct_wing_lift=1, PLOT=True, PRINT=False
 ):
     total_energy = 0
     total_TO_energy = 0
@@ -379,7 +380,12 @@ def perform_calc_mission(
         plt.title(
             f"Energy Distribution per Mission, ({np.round(total_energy/1000,3)}kJ)"
         )
-        plt.show()
+        plot_folder = "src/initial_sizing/plots"
+        os.makedirs(plot_folder, exist_ok=True)
+        plt.savefig(
+            os.path.join(plot_folder, "energy_usage.svg"), format="svg", dpi=300
+        )
+        plt.close()
 
     return battery_mass
 
