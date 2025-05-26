@@ -67,6 +67,9 @@ class Drone:
             + self.propulsion.weight(mission_energy)
         )
         print(f"Mission Energy: {mission_energy[0]:.2f} J" if mission_energy is not None else "Mission Energy: Not calculated")
+        print(f"Battery Weight: {self.propulsion.battery.weight(energy_required=mission_energy)[0]:.2f} kg" if hasattr(self.propulsion, 'battery') else "Battery Weight: Not available")
+        print(f"Motor Weight: {self.propulsion.motor.weight():.2f} kg" if hasattr(self.propulsion, 'motor') else "Motor Weight: Not available")
+        print(f"Propeller Weight: {self.propulsion.ver_prop.weight():.2f} kg" if hasattr(self.propulsion, 'ver_prop') else "Propeller Weight: Not available")
         print(f"Component Weights: Wing = {self.wing.weight()[0]:.2f} kg, "
               f"Fuselage = {self.fuselage.weight()[0]:.5f} kg, "
                 f"Landing Gear = {self.landing_gear.weight()[0]:.2f} kg, "
