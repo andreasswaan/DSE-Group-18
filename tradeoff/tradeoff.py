@@ -4,26 +4,41 @@ import matplotlib.pyplot as plt
 from globals import main_dir
 
 
-plot_path =  os.path.join(main_dir, "tradeoff")
+plot_path = os.path.join(main_dir, "tradeoff")
 os.makedirs(plot_path, exist_ok=True)
 # Define the criteria and concepts
-criteria = ["Site and Setup cost", "Operational cost", "Safety", "Sustainability", "Payload handling"]
-concepts = ["Multicopter", "Fixed-wing slingshot", "Fixed wing with hor. & ver. propellers", "Tilt-rotor"]
- 
+criteria = [
+    "Site and Setup cost",
+    "Operational cost",
+    "Safety",
+    "Sustainability",
+    "Payload handling",
+]
+concepts = [
+    "Multicopter",
+    "Fixed-wing slingshot",
+    "Fixed wing with hor. & ver. propellers",
+    "Tilt-rotor",
+]
+
 # Scores for each concept on each criterion (rows: concepts, columns: criteria)
-scores = np.array([
-    [4, 3, 4, 2, 5],  # Concept A
-    [2, 4, 4, 3, 1],  # Concept B
-    [4, 4, 3, 4, 4],  # Concept C
-    [3, 3, 2, 4, 4]   # Concept D
-])
+scores = np.array(
+    [
+        [4, 3, 4, 2, 5],  # Concept A
+        [2, 4, 4, 3, 1],  # Concept B
+        [4, 4, 3, 4, 4],  # Concept C
+        [3, 3, 2, 4, 4],  # Concept D
+    ]
+)
 
 # Initial weights for the criteria (must sum to 1)
 weights = np.array([0.1, 0.25, 0.3, 0.1, 0.25])
 
+
 # Function to calculate the total score for each concept
 def calculate_scores(scores, weights):
     return np.dot(scores, weights)
+
 
 # Sensitivity study
 num_simulations = 1000
@@ -50,13 +65,15 @@ plt.figure(figsize=(8, 6))
 # Use a colormap to assign distinct colors to each bar
 colors = plt.cm.viridis(np.linspace(0, 1, len(concepts)))
 
-plt.bar(concepts, winner_counts, color=colors, edgecolor='black')
+plt.bar(concepts, winner_counts, color=colors, edgecolor="black")
 plt.xlabel("Concepts")
 plt.ylabel("Frequency of Winning")
 # plt.title("Sensitivity Study: Frequency of Winning Concepts")
-plt.grid(axis='y', linestyle='--', alpha=0.7)
+plt.grid(axis="y", linestyle="--", alpha=0.7)
 plt.tight_layout()
-plt.savefig(os.path.join(plot_path, "sensitivity_gaussian.png"), dpi=300, bbox_inches='tight')
+plt.savefig(
+    os.path.join(plot_path, "sensitivity_gaussian.png"), dpi=300, bbox_inches="tight"
+)
 
 
 # Calculate standard results (scores with original weights)
@@ -90,33 +107,47 @@ colors = plt.cm.Set2(np.linspace(0, 1, len(concepts)))  # Use a new colormap (Se
 # Plot standard results as the first group
 for j, concept in enumerate(concepts):
     plt.bar(
-        x[0] + j * width - (width * (len(concepts) - 1) / 2),  # Center the bars for standard results
+        x[0]
+        + j * width
+        - (width * (len(concepts) - 1) / 2),  # Center the bars for standard results
         [standard_scores[j]],  # Standard scores
         width,
         color=colors[j],
-        alpha=0.7  # Slight transparency for standard bars
+        alpha=0.7,  # Slight transparency for standard bars
     )
 
 # Plot perturbed results for each criterion
 for j, concept in enumerate(concepts):
     plt.bar(
-        x[1:] + j * width - (width * (len(concepts) - 1) / 2),  # Offset for perturbed bars
+        x[1:]
+        + j * width
+        - (width * (len(concepts) - 1) / 2),  # Offset for perturbed bars
         perturbed_scores[:, j],
         width,
         # label=f"{concept}" if j == 0 else None,  # Add label only once
         label=concept,
-        color=colors[j]
+        color=colors[j],
     )
 
 # Update x-axis labels
-plt.xlabel("Criteria", fontsize=14)
-plt.ylabel("Scores", fontsize=14)
+plt.xlabel("Criteria", fontsize=20)
+plt.ylabel("Scores", fontsize=20)
 # plt.title(f"Scores per Design (Standard vs. {margin*100} offset Sensitivity)")
 plt.xticks(x, ["Standard"] + criteria)  # Add "Standard" as the first label
-plt.legend(title="Designs", loc='lower left', bbox_to_anchor=(0, 0), borderaxespad=0.)
-plt.grid(axis='y', linestyle='--', alpha=0.7)
+plt.legend(
+    title="Designs",
+    loc="lower left",
+    bbox_to_anchor=(0, 0),
+    borderaxespad=0.0,
+    fontsize=16,
+)
+plt.grid(axis="y", linestyle="--", alpha=0.7)
 plt.tight_layout()
-plt.savefig(os.path.join(plot_path, "sensitivity_linear.svg"), dpi=300, bbox_inches='tight')
+plt.xticks(fontsize=13)
+plt.yticks(fontsize=13)
+plt.savefig(
+    os.path.join(plot_path, "sensitivity_linear.svg"), dpi=300, bbox_inches="tight"
+)
 plt.close()
 # Calculate the change in scores from the standard
 score_changes = perturbed_scores - standard_scores
@@ -131,19 +162,31 @@ for j, concept in enumerate(concepts):
         score_changes[:, j],
         width,
         label=concept,
-        color=colors[j]
+        color=colors[j],
     )
 
 # Update x-axis labels
-plt.xlabel("Criteria", fontsize=14)
-plt.ylabel("Change in Scores", fontsize=14)
+plt.xlabel("Criteria", fontsize=20)
+plt.ylabel("Change in Scores", fontsize=20)
 # plt.title(f"Change in Scores per Design ({margin}% Sensitivity)")
 plt.xticks(x[1:], criteria)  # Only show criteria labels (no "Standard")
-plt.axhline(0, color='black', linestyle='--', linewidth=1, alpha=0.7)  # Add a horizontal line at 0
+plt.axhline(
+    0, color="black", linestyle="--", linewidth=1, alpha=0.7
+)  # Add a horizontal line at 0
 
 # Move the legend to the top-right corner outside the plot
-plt.legend(title="Designs", loc='lower left', bbox_to_anchor=(0, 0), borderaxespad=0.)
-plt.grid(axis='y', linestyle='--', alpha=0.7)
+plt.legend(
+    title="Designs",
+    loc="lower left",
+    bbox_to_anchor=(0, 0),
+    borderaxespad=0.0,
+    fontsize=16,
+)
+plt.grid(axis="y", linestyle="--", alpha=0.7)
 plt.tight_layout()
-plt.savefig(os.path.join(plot_path, "sensitivity_change.svg"), dpi=300, bbox_inches='tight')
+plt.xticks(fontsize=13)
+plt.yticks(fontsize=13)
+plt.savefig(
+    os.path.join(plot_path, "sensitivity_change.svg"), dpi=300, bbox_inches="tight"
+)
 plt.close()
