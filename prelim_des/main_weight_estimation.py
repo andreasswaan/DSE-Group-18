@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 from mission import Mission
 from prelim_des.drone import Drone
 from prelim_des.performance import Performance
+import logging
+import utils.define_logging  # do not remove this line, it sets up logging configuration
+
+logging.info("Starting drone performance estimation...")
 
 
 mission = Mission("DRCCRCCRCCD")
@@ -26,4 +30,3 @@ drone.class_2_weight_estimate()
 drone.iterative_weight_estimate(plot=True, tolerance=0.0001)
 
 # drone.wing.plot_planform(saveplot=True)
-

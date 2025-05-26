@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from constants import g
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.utils.unit_converter import ImperialConverter
+import utils.define_logging  # do not remove this line, it sets up logging configuration
+import logging
 
 toml = load_toml()
 
@@ -20,6 +22,8 @@ class Wing:
     mac: float
 
     def __init__(self, drone: Drone):
+        logging.debug("Initializing Wing class...")
+
         self.drone = drone
         self.span = toml["config"]["wing"]["wing_span"]
         self.thick_over_chord = toml["config"]["wing"]["thickness_over_chord"]
@@ -231,6 +235,8 @@ class Wing:
 class Fuselage:
     def __init__(self, drone: Drone):
         """Fuselage class."""
+        logging.debug("Initializing Fuselage class...")
+
         self.drone = drone
 
     @property
@@ -277,6 +283,8 @@ class Fuselage:
 class LandingGear:
     def __init__(self, drone: Drone):
         """Landing gear class."""
+        logging.debug("Initializing LandingGear class...")
+
         self.drone = drone
         # self.n_legs = toml["config"]["landing_gear"]["n_legs"]
         # self.wheel_diameter = toml["config"]["landing_gear"]["wheel_diameter"]

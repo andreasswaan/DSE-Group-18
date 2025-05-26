@@ -9,6 +9,8 @@ from prelim_des.constants import *
 from prelim_des.performance import Performance
 from prelim_des.utils.import_toml import load_toml
 from src.initial_sizing.database.read_database import get_MTOW_from_payload
+import utils.define_logging  # do not remove this line, it sets up logging configuration
+import logging
 
 toml = load_toml()
 
@@ -24,7 +26,7 @@ class Drone:
     OEW: float
 
     def __init__(self):
-
+        logging.debug("Initializing Drone class...")
         # Subsystems
         self.aero = Aerodynamics(self)
         self.wing = Wing(self)
@@ -45,6 +47,9 @@ class Drone:
         self.MTOW = get_MTOW_from_payload(self.max_payload)
         self.OEW = self.MTOW - self.max_payload
         if self.OEW <= 0:
+            logging.error(
+                "OEW cannot be zero or negative. Check the payload and MTOW values."
+            )
             raise ValueError(
                 "OEW cannot be zero or negative. Check the payload and MTOW values."
             )
@@ -55,6 +60,9 @@ class Drone:
         Estimate the weight of the drone using a class 2 weight estimate.
         """
         if self.wing.S is None:
+            logging.error(
+                "Wing area (S) must be defined before performing class 2 weight estimate."
+            )
             raise ValueError(
                 "Wing area (S) must be defined before performing class 2 weight estimate."
             )
@@ -77,7 +85,7 @@ class Drone:
         
         self.max_payload = toml['config']['payload']['n_box'] * toml['config']['payload']['box_weight']
         self.MTOW = self.OEW + self.max_payload
-        print(
+        logging.info(
             f"Class 2 Weight Estimate: MTOW = {self.MTOW[0]:.2f} kg, OEW = {self.OEW[0]:.2f} kg"
         )
 
@@ -106,6 +114,9 @@ class Drone:
             if abs(self.MTOW - MTOW_prev) < tolerance * MTOW_prev:
                 break
         else:
+            logging.error(
+                "Weight estimate did not converge within the maximum number of iterations."
+            )
             raise ValueError(
                 "Weight estimate did not converge within the maximum number of iterations."
             )
