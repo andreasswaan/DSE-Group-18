@@ -25,5 +25,4 @@ drone.perf = perf
 
 drone.iterative_weight_estimate(plot=True, tolerance=0.0001)
 
-drone.wing.plot_planform(saveplot=True)
-
+drone.wing.plot_planform(save_plot=True)
