@@ -1,16 +1,33 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
-
-
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from mission_planning import MissionPlanning
 # pizza size to weight guide in kg
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
 
-class Restaurant:
+class point():
+    def __init__(self, x_pos: float, y_pos: float) -> None:
+        self.x_pos = x_pos
+        self.y_pos = y_pos
+
+    def distance(self, other: 'point') -> float:
+        return np.sqrt((self.x_pos - other.x_pos)**2 + (self.y_pos - other.y_pos)**2)
+    
+    def nearest(self, places: list['point']) -> 'point':
+        distance = 10000000
+        nearest_place = None
+        for i in places:
+            if self.distance(i) < distance:
+                distance = self.distance(i)
+                nearest_place = i
+        return nearest_place
+
+class Restaurant(point):
     def __init__(self,
                  restaurant_dict: dict):
-        self.xpos = restaurant_dict['xpos']
-        self.ypos = restaurant_dict['ypos']
+        super().__init__(restaurant_dict['xpos'], restaurant_dict['ypos'])
         self.restaurant_id = restaurant_dict['restaurant_id']
         self.name = restaurant_dict['name']
         self.mean_nr_orders = restaurant_dict['mean_nr_orders']
@@ -29,7 +46,7 @@ class Restaurant:
         return orders
 
 
-class Drone:
+class Drone(point):
     def __init__(self,
                  drone_dict: dict):
         self.drone_id = drone_dict['drone_id']
@@ -39,8 +56,7 @@ class Drone:
 
         # define static characteristics
 
-        self.xpos = self.depot.xpos
-        self.ypos = self.depot.ypos
+        super().__init__(self.depot.xpos, self.depot.ypos)
         self.xvel = 0
         self.yvel = 0
         self.xacc = 0
@@ -68,19 +84,13 @@ class Drone:
         self.battery_level -= 0.1 * (self.xvel**2 + self.yvel**2) * dt
 
 
-
-class Depot:
+class Depot(point):
     def __init__(self,
                  depot_dict: dict):
         self.depot_id = depot_dict['depot_id']
-        self.xpos = depot_dict['xpos']
-        self.ypos = depot_dict['ypos']
+        super().__init__(depot_dict['xpos'], depot_dict['ypos'])
         self.capacity = depot_dict['capacity']
-        self.current_drones = []
-    
-    def initialise_current_drones(self,
-                                  drones: list[Drone]):
-        self.current_drones = drones
+        self.current_drones = depot_dict['drones']
 
 class City:
     def __init__(self,
@@ -133,12 +143,14 @@ class Simulation:
         self.order_book = dict()
         self.total_time = 3600 * 4
         self.inv_total_time = 1 / self.total_time
+        self.drones = [depot.current_drones for depot in self.city.depots]
 
         self.dt = 5
-        self.mp_interval = 500
+        self.mp_interval = 100
         self.pp_interval = 50
-
+        self.mp = MissionPlanning(self)
         self.timestamp = 0
+
     
     def assign_drone_to_order(self, order_id: str):
         # assign a drone to the order
@@ -170,7 +182,15 @@ class Simulation:
                     logorder['order_id'] = order_id
                     del logorder['time']
                     self.logger.order_log[order['time']] = logorder
-        
+
+        if self.timestamp % self.mp_interval == 0:
+            # run mission planning
+            self.mp.basic_heuristic()
+            for depot in self.city.depots:
+                for order in depot.orders:
+                    order_id = f'ord{len(self.logger.order_log)}'
+                    order['order_id'] = order_id
+                    self.order_book[order_id] = order
 
         self.timestamp += self.dt
 
@@ -186,23 +206,21 @@ restaurant_dict1 = {
 
 Restaurant1 = Restaurant(restaurant_dict1)
 
+drone_dict1 = {
+    'drone_id': 'drone1',
+    'depot': 1
+}
 
+drone_list = [drone_dict1]
 
 depot_dict1 = {
-    'depot_id': 'depot1',
+    'depot_id': 1,
     'xpos': 10,
     'ypos': 20,
     'capacity': 10,
-}
+    'drones': [drone for drone in drone_list if drone['depot'] == 1]}
 
 Depot1 = Depot(depot_dict1)
-
-drone_dict1 = {
-    'drone_id': 'drone1',
-    'depot': Depot1
-}
-
-Drone1 = Drone(drone_dict1)
 
 city_dict = {
     'city_name': 'Delft',
@@ -219,8 +237,48 @@ my_sim = Simulation(
     logger=Logger()
 )
 
-for i in range(200):
-    my_sim.take_step()
-    print(my_sim.timestamp)
-    if i % 20 == 0:
-        print(len(my_sim.order_book))
+#for i in range(200):
+#    my_sim.take_step()
+#    print(my_sim.timestamp)
+#    if i % 20 == 0:
+#        print(len(my_sim.order_book))
+
+def animate_simulation(sim, steps=100, interval=200):
+    city = sim.city
+    fig, ax = plt.subplots(figsize=(6, 6))
+    im = ax.imshow(city.map[:, :, 0], cmap='Greys', alpha=0.3, origin='lower')
+    scat_orders = ax.scatter([], [], c='red', label='Orders', s=30)
+    scat_restaurants = ax.scatter(
+        [r.xpos for r in city.restaurants],
+        [r.ypos for r in city.restaurants],
+        c='blue', marker='s', label='Restaurants', s=60
+    )
+    scat_depots = ax.scatter(
+        [d.xpos for d in city.depots],
+        [d.ypos for d in city.depots],
+        c='green', marker='^', label='Depots', s=60
+    )
+    ax.set_xlim(0, city.reso)
+    ax.set_ylim(0, city.reso)
+    ax.legend(loc='upper right')
+    ax.set_title('Simulation Map Animation')
+
+    order_xs, order_ys = [], []
+
+    def update(frame):
+        sim.take_step()
+        # Collect all order locations
+        order_xs.clear()
+        order_ys.clear()
+        for order in sim.order_book.values():
+            order_xs.append(order['x_delivery_loc'])
+            order_ys.append(order['y_delivery_loc'])
+        scat_orders.set_offsets(np.c_[order_xs, order_ys])
+        ax.set_title(f'Simulation Map Animation\nTime: {sim.timestamp}s, Orders: {len(sim.order_book)}')
+        return scat_orders,
+
+    ani = animation.FuncAnimation(
+        fig, update, frames=steps, interval=interval, blit=False, repeat=False
+    )
+    plt.show()
+animate_simulation(my_sim, steps=200, interval=20)
