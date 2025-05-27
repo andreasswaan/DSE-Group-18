@@ -24,6 +24,8 @@ class PropulsionSystem:
         self.motor = Motor()
         self.hor_prop = HorPropeller()
         self.ver_prop = VertPropeller()
+        self.η_elec = toml["config"]["motor"]["eff_elec"]
+        self.η_prop = toml["config"]["propeller"]["eff_prop"]
 
     def weight(self, energy_required: float = None) -> float:
         return (
@@ -63,7 +65,9 @@ class Motor:
         Returns:
         int: Number of motors required.
         """
-        return 8
+        n_vert = 8
+        n_hor = 2
+        return n_vert + n_hor  # Total number of motors (8 vertical + 2 horizontal)
 
     def weight(self):
         """
@@ -74,6 +78,15 @@ class Motor:
         return (
             0.16 * self.n_motors()
         )  # Placeholder value, should be replaced with a real calculation
+    
+    def max_thrust(self) -> float:
+        """
+        Placeholder method to calculate the maximum thrust produced by the motor.
+        Returns:
+        float: Maximum thrust including all motors in Newtons.
+        """
+        T_motor_AS2820_KV880_max_thrust = 24.153779 # N
+        return T_motor_AS2820_KV880_max_thrust * self.n_motors()  # N
 
 
 class VertPropeller:

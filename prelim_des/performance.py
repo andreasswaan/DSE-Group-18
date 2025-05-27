@@ -1,13 +1,17 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-
+import logging
+import numpy as np
+import os
+import matplotlib.pyplot as plt
+import casadi as ca
 if TYPE_CHECKING:
     from prelim_des.drone import Drone
     from prelim_des.mission import Mission
 from constants import ρ, g
+from globals import main_dir
 from prelim_des.utils.import_toml import load_toml
 import utils.define_logging  # do not remove this line, it sets up logging configuration
-import logging
 
 toml = load_toml()
 
@@ -66,11 +70,9 @@ class Performance:
         return T
 
     def cruise_energy(self, range):
-        η_elec = toml["config"]["motor"]["eff_elec"]
-        η_prop = toml["config"]["propeller"]["eff_prop"]
-        L_over_D_cruise = toml["config"]["performance"]["L_over_D_cruise"]
+
         energy_cruise = (
-            self.drone.MTOW * range / (η_elec * η_prop * L_over_D_cruise / g)
+            self.drone.MTOW * range / (self.drone.propulsion.η_elec * self.drone.propulsion.η_prop * self.L_over_D_cruise / g)
         )  # Energy required for cruise
 
         return energy_cruise
@@ -128,3 +130,30 @@ class Performance:
         )  # Adjust for minimum battery level
 
         return mission_energy
+
+    def cruise_noise(self, baseline_noise=95, plot=False):
+        """
+        Calculate the noise level during cruise.
+        Parameters:
+        baseline_noise (float): Baseline noise level in dB at 1 m distance.
+        Returns:
+        float: Noise level during cruise in dB.
+        """
+        # Assuming a simple model where noise increases with speed
+        h = toml["config"]["mission"]["cruise_height"]
+        height_array = np.linspace(1, h, 100)
+        noise = 10*np.log10(10**(baseline_noise/10)/height_array**2)
+        
+        if plot:
+            plt.figure(figsize=(10, 6))
+            plt.plot(height_array, noise, label='Cruise Noise Level')
+            plt.title('Cruise Noise Level vs Height')
+            plt.xlabel('Height (m)')
+            plt.ylabel('Noise Level (dB)')
+            plt.grid()
+            plt.legend()
+            plt.tight_layout()
+            plot_path = os.path.join(main_dir, "prelim_des", "plots")
+            plt.savefig(os.path.join(plot_path, 'cruise_noise.png'), dpi=300)
+        return noise
+    

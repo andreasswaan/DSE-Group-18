@@ -27,6 +27,10 @@ drone.class_2_weight_estimate()
 # print("Drone MTOW after class 2 estimate:", drone.MTOW)
 # print("Drone OEW after class 2 estimate:", drone.OEW)
 
-drone.iterative_weight_estimate(plot=True, tolerance=0.0001)
+drone.iterative_weight_estimate(plot=True, tolerance=0.01)
+print("Drone MTOW after iterative estimate:", drone.MTOW)
+print(f"Wing surface area: {drone.wing.S}")
 
-# drone.wing.plot_planform(saveplot=True)
+drone.wing.plot_planform(save_plot=True)
+
+drone.perf.cruise_noise(plot=True)

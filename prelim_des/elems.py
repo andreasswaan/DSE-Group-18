@@ -142,8 +142,10 @@ class Wing:
             * self.geom_AR**1.712
         )
 
+        weight_folding = toml["config"]["wing"]["wing_folding_weight"]
+        
         # Placeholder estimate for the wing weight based
-        return 0.4 * self.S + 0.06 * self.drone.MTOW
+        return 0.4 * self.S + 0.06 * self.drone.MTOW + weight_folding
 
     def plot_planform(self, save_plot=False, filename="wing_planform.png"):
         """
@@ -229,7 +231,7 @@ class Wing:
             folder = os.path.join("prelim_des", "plots", "weight_estimate")
             os.makedirs(folder, exist_ok=True)
             plt.savefig(os.path.join(folder, filename), dpi=300, bbox_inches="tight")
-        plt.show()
+        plt.close()
 
 
 class Fuselage:

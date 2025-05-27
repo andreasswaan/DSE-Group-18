@@ -1,4 +1,5 @@
 import os
+import casadi as ca
 import matplotlib.pyplot as plt
 from globals import main_dir
 from prelim_des.power import PropulsionSystem
@@ -34,7 +35,6 @@ class Drone:
         self.landing_gear = LandingGear(self)
         self.structure = Structure(self)
         self.propulsion = PropulsionSystem(self)
-        # self.perf = Performance(self)
 
     def class_1_weight_estimate(self):
         """
@@ -148,3 +148,5 @@ class Drone:
             plt.close()
 
         return self.MTOW, self.OEW
+    
+

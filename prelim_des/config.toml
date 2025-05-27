@@ -17,7 +17,7 @@ CD_flat_plate = 1.30                      # [-]
 [config.mission]
 
 cruise_speed = 15                         # m/s
-cruise_height = 300                       # ft
+cruise_height = 200                       # ft
 
 [config.mission.loitering_times]
 R = 90                                    # s
@@ -52,10 +52,11 @@ CD = 1620                                 # m
 
 [config.wing]
 
-wing_span = 2.5                           # m
+wing_span = 3.0                           # m
 quarter_chord_sweep = 0                   # deg
 thickness_over_chord = 0.18               # -
 dihedral = 1                              # deg
+wing_folding_weight = 0.6                 # kg
 
 #-----------------------------------------------------------------------------------------------------------------------
 
@@ -70,7 +71,7 @@ eff_elec = 0.95
 
 [config.propeller]
 eff_prop = 0.8
-FM = 0.7
+FM = 0.75
 
 [config.performance]
 L_over_D_cruise = 10                      # -
