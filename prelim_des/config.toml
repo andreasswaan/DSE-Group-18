@@ -107,3 +107,19 @@ mat_delta_y = 145                           # MPa
 mat_delta_uts = 241                         # MPa
 mat_tau_max = 165                           # MPa
 mat_epsilon_max = 0.22                      # -
+
+# Carbon fibre: Zoltek™ PX35 UD900V Uni-Directional Carbon Fabric
+
+mat_rho = 0.9                               # g/cm
+mat_E_1 = 119                               # GPa (Tensile)
+mat_E_2 = 118                               # GPa (Compressive)
+mat_delta_y_1 = 1400                        # MPa (Tensile)
+mat_delta_y_2 = 980                         # MPa (Compressive)
+
+# Ensinger TECATEC SAN NAF45 T300 CP/IP/OS V01 natural SAN, 45% Flax Fibre Reinforced (55% thermoplastic, 45% flax fibre)
+
+mat_rho = 1.24                              # g/cm
+mat_E_1 = 19                                # GPa (Tensile)
+mat_E_2 = 16                                # GPa (Flexural)
+mat_delta_y_1 = 130                         # MPa (Tensile)
+mat_delta_y_2 = 180                         # MPa (Flexural)
