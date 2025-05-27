@@ -58,4 +58,4 @@ s_price = 10
 m_price = 13
 l_price = 16
 order_fee=0.25  # reimbursement per delivery
-order_volume_ratios = [0.786,0.857,0.929,1,1.494,1.67,1.494]
+order_volume_ratios = [0.786, 0.857, 0.929, 1, 1.494, 1.67, 1.494]

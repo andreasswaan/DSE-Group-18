@@ -47,15 +47,30 @@ class Restaurant(point):
             orders.append(order)
         return orders
 
+class Order(point):
+    def __init__(self,
+                 order_dict: dict):
+        super().__init__(order_dict['x_delivery_loc'], order_dict['y_delivery_loc'])
+        self.order_id = order_dict['order_id']
+        self.restaurant_id = order_dict['restaurant_id']
+        self.restaurant = order_dict['restaurant']
+        self.status = order_dict['status']  # True if delivered, False otherwise
+        self.time = order_dict['time']
+        self.s = order_dict['s']
+        self.m = order_dict['m']
+        self.l = order_dict['l']
 
 class Drone(point):
     def __init__(self,
                  drone_dict: dict):
         self.drone_id = drone_dict['drone_id']
-        self.depot = drone_dict['depot']
-
+        self.depot = depots[drone_dict['depot']]
+        self.depot.current_drones.append(self)
+        self.targets = []
+        self.target = None
         self.max_battery_level = 100
-
+        self.speed = 10*100/6000*5  # m/s, horizontal speed
+        self.distance_travelled = 0
         # define static characteristics
 
         super().__init__(self.depot.xpos, self.depot.ypos)
@@ -78,13 +93,50 @@ class Drone(point):
             weight += pizza_guide[size] * count
         return weight
     
+    def add_targets(self, targets: list[point]):
+        self.targets.append(targets)
+        if self.target is None:
+            self.target = targets[0]
+        if self.depot is not None:
+            self.depot.current_drones.remove(self)
+            self.depot = None
+    
+    def set_targets(self, targets: list[point]):
+        self.targets=(targets)
+        self.target = targets[0]
+        print(targets)
+        print(self.depot.current_drones)
+        if self.depot is not None:
+            self.depot.current_drones.remove(self)
+            self.depot = None
+
     def update_drone(self, dt):
-        self.xpos += 0.5 * self.xacc * dt**2 + self.xvel * dt
+        """self.xpos += 0.5 * self.xacc * dt**2 + self.xvel * dt
         self.ypos += 0.5 * self.yacc * dt**2 + self.yvel * dt
         self.xvel += self.xacc * dt
         self.yvel += self.yacc * dt
-        self.battery_level -= 0.1 * (self.xvel**2 + self.yvel**2) * dt
+        self.battery_level -= 0.1 * (self.xvel**2 + self.yvel**2) * dt"""
+        if self.target is None:
+            return
+        direction_vector = np.array([self.target.xpos - self.xpos, self.target.ypos - self.ypos])
+        step_vector = direction_vector / np.linalg.norm(direction_vector) * self.speed * dt
+        if np.linalg.norm(direction_vector) < np.linalg.norm(step_vector):
+            self.xpos, self.ypos = self.target.xpos, self.target.ypos
+            self.arrive()
+            self.distance_travelled += np.linalg.norm(direction_vector)
+        else:
+            self.xpos += step_vector[0]
+            self.ypos += step_vector[1]
+            self.distance_travelled += np.linalg.norm(step_vector)
 
+    def arrive(self):
+        if isinstance(self.target, Order):
+            self.target.status = True
+        self.targets.pop(0)
+        if isinstance(self.target, Depot):
+            self.target.current_drones.append(self)
+        if self.targets:
+            self.target = self.targets[0]
 
 class Depot(point):
     def __init__(self,
@@ -92,7 +144,7 @@ class Depot(point):
         self.depot_id = depot_dict['depot_id']
         super().__init__(depot_dict['xpos'], depot_dict['ypos'])
         self.capacity = depot_dict['capacity']
-        self.current_drones = depot_dict['drones']
+        self.current_drones = []
         self.energy_spent: float = 0.0 #kWh
 
 
@@ -131,10 +183,8 @@ class City:
         return x, y
     
     def reset(self):
-        self.depots = city_dict['depots']
-        self.restaurants = city_dict['restaurants']
-
-        
+        self.depots = [Depot(i) for i in depot_dict]
+        self.restaurants = [Restaurant(i) for i in restaurant_dict]     
 
 class Logger:
     def __init__(self):
@@ -157,12 +207,12 @@ class Simulation:
         self.order_book = dict()
         self.total_time = constants.time_window
         self.inv_total_time = 1 / self.total_time
-        self.drones = [depot.current_drones for depot in self.city.depots]
-
+        self.drones = [drone for depot in self.city.depots for drone in depot.current_drones]
+        self.financial_model = financial_model.FinancialModel(self)
         self.dt = 5
         self.mp_interval = 100
         self.pp_interval = 50
-        #self.mp = MissionPlanning(self)
+        self.mp = MissionPlanning(self)
         self.timestamp = 0
 
     
@@ -190,26 +240,25 @@ class Simulation:
             if orders:
                 for order in orders:
                     order['restaurant_id'] = restaurant.restaurant_id
+                    order['restaurant'] = restaurant
                     order['time'] = self.timestamp
                     order['x_delivery_loc'], order['y_delivery_loc'] = self.city.generate_order_location()
                     order['status'] = False # not delivered
                     order_id = f'ord{len(self.logger.order_log)}'
-                    self.order_book[order_id] = order
+                    order['order_id'] = order_id
+                    self.order_book[order_id] = Order(order)
 
                     logorder = copy.deepcopy(order)
                     logorder['order_id'] = order_id
                     del logorder['time']
                     self.logger.order_log[order['time']] = logorder
 
-        """if self.timestamp % self.mp_interval == 0:
+        if self.timestamp % self.mp_interval == 0:
             # run mission planning
             self.mp.basic_heuristic()
-            for depot in self.city.depots:
-                for order in depot.orders:
-                    order_id = f'ord{len(self.logger.order_log)}'
-                    order['order_id'] = order_id
-                    self.order_book[order_id] = order"""
 
+        for drone in self.drones:
+            drone.update_drone(self.dt)
         self.timestamp += self.dt
     
     def reset(self):
@@ -222,7 +271,7 @@ class Simulation:
 
 
 restaurant_dict = [{
-    'xpos': 10,
+    'xpos': 50,
     'ypos': 20,
     'restaurant_id': 'rest1',
     'name': 'Pizza Place',
@@ -230,39 +279,49 @@ restaurant_dict = [{
     'mean_order_size': {'small': 2, 'medium': 3, 'large': 1}
 }]
 
-Restaurant1 = Restaurant(restaurant_dict[0])
-
-drone_dict = [{
-    'drone_id': 'drone1',
-    'depot': 1
-}]
-
-drone_list = [drone_dict[0]]
+Restaurant0 = Restaurant(restaurant_dict[0])
+restaurants = [Restaurant0]
 
 depot_dict = [{
-    'depot_id': 1,
+    'depot_id': 0,
     'xpos': 10,
     'ypos': 20,
     'capacity': 10,
-    'drones': [drone for drone in drone_list if drone['depot'] == 1]}]
+    #'drones': [drone for drone in drone_list if drone['depot'] == 1]
+    }, {
+    'depot_id': 1,
+    'xpos': 90,
+    'ypos': 80,
+    'capacity': 10,
+    }]
 
-Depot1 = Depot(depot_dict[0])
+Depot0 = Depot(depot_dict[0])
+Depot1 = Depot(depot_dict[1])
+depots = [Depot0, Depot1]
+
+# Example: 8 drones at depot 0, 7 drones at depot 1
+drone_dict = [
+    {'drone_id': f'drone{i+1}', 'depot': 0 if i < 8 else 1}
+    for i in range(15)
+]
+
+drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))]
 
 city_dict = {
     'city_name': 'Delft',
-    'restaurants': [Restaurant(i) for i in restaurant_dict],
-    'depots': [Depot(i) for i in depot_dict],
+    'restaurants': restaurants,
+    'depots': depots,
     'tall_buildings': [],
     'silent_zones': [],
     'population': 10000
 }
-
 
 my_sim = Simulation(
     city=City(city_dict),
     logger=Logger()
 )
 
+#print(my_sim.financial_model.calculate_ROI())
 #for i in range(200):
 #    my_sim.take_step()
 #    print(my_sim.timestamp)
@@ -284,32 +343,42 @@ def animate_simulation(sim, steps=100, interval=200):
         [d.ypos for d in city.depots],
         c='green', marker='^', label='Depots', s=60
     )
+    scat_drones = ax.scatter([], [], c='orange', label='Drones', s=40, marker='o')
     ax.set_xlim(0, city.reso)
     ax.set_ylim(0, city.reso)
     ax.legend(loc='upper right')
     ax.set_title('Simulation Map Animation')
 
     order_xs, order_ys = [], []
+    drone_xs, drone_ys = [], []
 
     def update(frame):
         sim.take_step()
-        # Collect all order locations
+        # Collect undelivered order locations
         order_xs.clear()
         order_ys.clear()
         for order in sim.order_book.values():
-            order_xs.append(order['x_delivery_loc'])
-            order_ys.append(order['y_delivery_loc'])
+            if not order.status:
+                order_xs.append(order.xpos)
+                order_ys.append(order.ypos)
         scat_orders.set_offsets(np.c_[order_xs, order_ys])
-        ax.set_title(f'Simulation Map Animation\nTime: {sim.timestamp}s, Orders: {len(sim.order_book)}')
-        return scat_orders,
+
+        # Collect drone locations
+        drone_xs.clear()
+        drone_ys.clear()
+        for drone in sim.drones:
+            drone_xs.append(drone.xpos)
+            drone_ys.append(drone.ypos)
+        scat_drones.set_offsets(np.c_[drone_xs, drone_ys])
+
+        ax.set_title(f'Simulation Map Animation\nTime: {sim.timestamp}s, Orders: {len(order_xs)}')
+        return scat_orders, scat_drones
 
     ani = animation.FuncAnimation(
         fig, update, frames=steps, interval=interval, blit=False, repeat=False
     )
     plt.show()
-animate_simulation(my_sim, steps=200, interval=20)
-FinancialModel = financial_model.financial_model(my_sim)
-print(FinancialModel.calculate_initial_costs())
-print(FinancialModel.calculate_costs_per_month())
-print(FinancialModel.calculate_revenue())
+n_steps = int(constants.time_window / my_sim.dt)
+animate_simulation(my_sim, n_steps, interval=20)
+
 

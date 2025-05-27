@@ -1,7 +1,7 @@
 import constants
 import numpy as np
 
-class financial_model:
+class FinancialModel:
     def __init__(self, simulation):
         self.simulation = simulation
         self.city = simulation.city
@@ -91,8 +91,8 @@ class financial_model:
         weekly_costs = 0
         for day in range(7):  # Assuming weekly profit calculation
             self.simulation.change_order_volume(constants.order_volume_ratios[day])
-            for t in range(constants.time_window / self.simulation.timestep):
-                self.simulation.update(t)
+            for t in range(constants.time_window // self.simulation.dt):
+                self.simulation.take_step()
             daily_revenue = self.calculate_revenue()
             daily_costs = (
                 self.calculate_costs_per_delivery() * len(self.orders) +  # Costs per delivery
@@ -103,4 +103,17 @@ class financial_model:
             self.simulation.reset()
         weekly_profit = weekly_revenue - weekly_costs
         
-        return weekly_profit, weekly_revenue, weekly_costs
+        return weekly_profit
+    
+    def calculate_monthly_profit(self):
+        monthly_profit = self.calculate_weekly_profit() * 365 / 12 / 7
+        monthly_profit -= self.calculate_costs_per_month()  # Subtract monthly costs
+        return monthly_profit
+    
+    def calculate_ROI(self, time_period=5): #in years
+        # Calculate Return on Investment (ROI)
+        initial_costs = self.calculate_initial_costs()
+        monthly_profit = self.calculate_monthly_profit()
+        roi = (monthly_profit * 12 * time_period / initial_costs) * 100
+        profit = monthly_profit * 12 * time_period - initial_costs
+        return roi, profit
