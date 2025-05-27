@@ -100,7 +100,7 @@ shock_strut_length_MG = 0.15              # m Roskam page 81, update when design
 
 # Aluminium 6061-T4, price around 2.3 USD, https://www.alibaba.com/showroom/aluminum-6061-t4.html
 
-mat_rho = 2.7                               # g/cm
+mat_rho = 2.7                               # g/cm3
 mat_E = 68.9                                # GPa
 mat_G = 26.0                                # GPa
 mat_delta_y = 145                           # MPa
@@ -113,7 +113,7 @@ mat_epsilon_max = 0.22                      # -
 
 [config.material.carbon_fibre_uni]
 
-mat_rho = 0.9                               # g/cm
+mat_rho = 0.9                               # g/cm3
 mat_E_1 = 119                               # GPa (Tensile)
 mat_E_2 = 118                               # GPa (Compressive)
 mat_delta_y_1 = 1400                        # MPa (Tensile)
@@ -123,7 +123,7 @@ mat_delta_y_2 = 980                         # MPa (Compressive)
 
 [config.material.carbon_fibre_multi]
 
-mat_rho = 1.81                              # g/cm
+mat_rho = 1.81                              # g/cm3
 mat_E = 242                                 # GPa (Tensile)
 mat_delta_y = 4137                          # MPa (Tensile)
 
@@ -131,7 +131,7 @@ mat_delta_y = 4137                          # MPa (Tensile)
 
 [config.material.flax_composite]
 
-mat_rho = 1.24                              # g/cm
+mat_rho = 1.24                              # g/cm3
 mat_E_1 = 19                                # GPa (Tensile)
 mat_E_2 = 16                                # GPa (Flexural)
 mat_delta_y_1 = 130                         # MPa (Tensile)
