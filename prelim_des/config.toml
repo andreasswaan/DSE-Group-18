@@ -93,3 +93,17 @@ del_mech_weight = 0.8                     # kg
 [config.landing_gear]
 
 shock_strut_length_MG = 0.15              # m Roskam page 81, update when designed
+
+#-----------------------------------------------------------------------------------------------------------------------
+
+[config.material]
+
+# Aluminium 6061-T4
+
+mat_rho = 2.7                               # g/cm
+mat_E = 68.9                                # GPa
+mat_G = 26.0                                # GPa
+mat_delta_y = 145                           # MPa
+mat_delta_uts = 241                         # MPa
+mat_tau_max = 165                           # MPa
+mat_epsilon_max = 0.22                      # -
