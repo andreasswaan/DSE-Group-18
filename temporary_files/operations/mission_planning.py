@@ -30,7 +30,9 @@ class MissionPlanning:
     def basic_heuristic(self):
         self.orders = self.get_orders()
         for order in self.orders:
-            nearest_depot = self.get_nearest_depot(restaurantorder.
+            nearest_depot = self.get_nearest_depot(order)
+            
+
 
     # Approach 1: not time based
     # Output: for drone in drones:

@@ -1,0 +1,61 @@
+
+#time related constants
+velocity_hori=15
+velocity_climb=6
+velocity_descent=3
+cruise_height=50
+waiting_time_restaurant=90
+waiting_time_customer=90
+loading_time=60
+unloading_time_customer=60
+buffer_time=60
+battery_swap_time=300
+peak_order_volume=350
+time_window=3600*4 # time window to place orders
+
+# financial constants
+#initial costs
+# per drone cost
+cost_per_drone_production=10000
+cost_per_spare_parts=1500
+cost_per_drone_depot=2724
+cost_per_drone_equipment=140
+
+#fixed costs
+license_cost_initial=10000
+equipment_cost_initial=3000
+depot_construction_cost_=34050
+#second depot cost
+second_depot_construction_cost=20430
+second_depot_equipment_cost=1000
+
+#per month costs
+#fixed costs
+electricity_cost_fixed=113.45
+rent_cost = 2738.06
+rent_increase_per_meter=-0.85
+staff_cost = 11700
+licensing_cost = 68
+marketing_cost = 8334
+# second depot costs
+cost_for_second_depot=2131.46
+electricity_cost_per_month_second_depot=20.02
+staff_cost_second_depot=3300
+
+# per drone cost
+drone_insurance_per_month=67
+drone_facililities_per_month=19.92
+drone_staff_per_month=255
+
+# per delivery cost
+# drone_maintenance_per_delivery=0.65
+order_reimbursement_per_delivery=0.25
+electricity_cost_per_kWh=0.1 # constant for now, we can make it time dependent later
+maintenance_cost_per_kWh=0.1 # provisional
+
+# revenue constants
+s_price = 10
+m_price = 13
+l_price = 16
+order_fee=0.25  # reimbursement per delivery
+order_volume_ratios = [0.786,0.857,0.929,1,1.494,1.67,1.494]
