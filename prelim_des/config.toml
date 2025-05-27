@@ -98,7 +98,7 @@ shock_strut_length_MG = 0.15              # m Roskam page 81, update when design
 
 [config.material]
 
-# Aluminium 6061-T4
+# Aluminium 6061-T4, price around 2.3 USD, https://www.alibaba.com/showroom/aluminum-6061-t4.html
 
 mat_rho = 2.7                               # g/cm
 mat_E = 68.9                                # GPa
@@ -108,7 +108,10 @@ mat_delta_uts = 241                         # MPa
 mat_tau_max = 165                           # MPa
 mat_epsilon_max = 0.22                      # -
 
-# Carbon fibre: Zoltek™ PX35 UD900V Uni-Directional Carbon Fabric
+# Carbon fibre: Zoltek™ PX35 UD900V Uni-Directional Carbon Fabric, https://zoltek.com/wp-content/uploads/TDS_PX35_Uni-Directional_Fabric_V2.pdf
+# price around 30 USD, https://www.alibaba.com/trade/search?spm=a2700.7724857.the-new-header_fy23_pc_search_bar.keydown__Enter&tab=all&SearchText=carbon+fibre
+
+[config.material.carbon_fibre_uni]
 
 mat_rho = 0.9                               # g/cm
 mat_E_1 = 119                               # GPa (Tensile)
@@ -116,7 +119,17 @@ mat_E_2 = 118                               # GPa (Compressive)
 mat_delta_y_1 = 1400                        # MPa (Tensile)
 mat_delta_y_2 = 980                         # MPa (Compressive)
 
-# Ensinger TECATEC SAN NAF45 T300 CP/IP/OS V01 natural SAN, 45% Flax Fibre Reinforced (55% thermoplastic, 45% flax fibre)
+# Carbon fibre: Zoltek™ PX35 MD600 Multi-Directional Fabric, https://zoltek.com/wp-content/uploads/TDS_PX35_Multi-Directional_Fabric.pdf
+
+[config.material.carbon_fibre_multi]
+
+mat_rho = 1.81                              # g/cm
+mat_E = 242                                 # GPa (Tensile)
+mat_delta_y = 4137                          # MPa (Tensile)
+
+# Ensinger TECATEC SAN NAF45 T300 CP/IP/OS V01 natural SAN, 45% Flax Fibre Reinforced (55% thermoplastic, 45% flax fibre), https://www.ensingerplastics.com/en/composites/tecatec-san-naf45-t300-natural
+
+[config.material.flax_composite]
 
 mat_rho = 1.24                              # g/cm
 mat_E_1 = 19                                # GPa (Tensile)
