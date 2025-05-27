@@ -99,6 +99,7 @@ shock_strut_length_MG = 0.15              # m Roskam page 81, update when design
 [config.material]
 
 # Aluminium 6061-T4
+[config.material.al_6061_t4]
 
 mat_rho = 2.7                               # g/cm
 mat_E = 68.9                                # GPa
