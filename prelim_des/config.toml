@@ -99,6 +99,7 @@ shock_strut_length_MG = 0.15              # m Roskam page 81, update when design
 [config.material]
 
 # Aluminium 6061-T4, price around 2.3 USD, https://www.alibaba.com/showroom/aluminum-6061-t4.html
+
 [config.material.al_6061_t4]
 
 mat_rho = 2.7                               # g/cm3
