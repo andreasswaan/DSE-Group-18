@@ -143,17 +143,42 @@ class IdealizedSection:
         Ixy = sum(b.area * (b.x - x_c) * (b.y - y_c) for b in self.booms)
         return Ixx, Iyy, Ixy
 
-    def bending_stress(self, Mx: float, My: float) -> list[float]:
-        x_c, y_c = self.centroid_x, self.centroid_y
-        Ixx, Iyy, Ixy = self.Ixx, self.Iyy, self.Ixy
-        denom = Ixx * Iyy - Ixy**2
-        stresses = []
-        for b in self.booms:
-            y = b.y - y_c
-            x = b.x - x_c
-            sigma = -(My * Ixx * x - Mx * Ixy * x + Mx * Iyy * y - My * Ixy * y) / denom
-            stresses.append(sigma)
-        return stresses
+    def bending_stress_from_lift(
+        self, lift_distribution: list[float], dy: float
+    ) -> list[float]:
+        """
+        Computes bending stress at each boom due to distributed lift.
+        lift_distribution: list of lift values [N] at each section (same length as number of sections).
+        dy: distance between sections [m].
+        Returns: list of lists, each sublist is the stress at each boom for that section.
+        """
+        stresses_per_section = []
+        n_sections = len(lift_distribution)
+        # Calculate bending moment at each section (root to tip)
+        # M(y) = sum of lift * arm from y to tip
+        moments = []
+        for i in range(n_sections):
+            arm = np.arange(i, n_sections) * dy - (i * dy)
+            moment = np.sum(np.array(lift_distribution[i:]) * arm)
+            moments.append(moment)
+        # For each section, calculate stress at each boom
+        for moment in moments:
+            # Assume moment is about z-axis (bending in vertical plane, My)
+            My = moment
+            Mx = 0.0
+            x_c, y_c = self.centroid_x, self.centroid_y
+            Ixx, Iyy, Ixy = self.Ixx, self.Iyy, self.Ixy
+            denom = Ixx * Iyy - Ixy**2
+            stresses = []
+            for b in self.booms:
+                y = b.y - y_c
+                x = b.x - x_c
+                sigma = -(
+                    My * Ixx * x - Mx * Ixy * x + Mx * Iyy * y - My * Ixy * y
+                ) / denom
+                stresses.append(sigma)
+            stresses_per_section.append(stresses)
+        return stresses_per_section
 
     import matplotlib.pyplot as plt
 
@@ -424,12 +449,12 @@ if __name__ == "__main__":
     )
 
     dy = wing.dy
-    b = wing.span
+    b_half = wing.span / 2
     L_total = 100  # total lift in N, replace with actual value
 
     lift_per_section = []
     for y, _ in wing.sections:
-        L_prime = elliptical_lift_distribution(y, b, L_total)
+        L_prime = elliptical_lift_distribution(y, b_half, L_total)
         lift = L_prime * dy
         lift_per_section.append(lift)
 
