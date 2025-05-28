@@ -155,43 +155,42 @@ class IdealizedSection:
             stresses.append(sigma)
         return stresses
 
-
-    def bending_stress_from_lift(
-        self, lift_distribution: list[float], dy: float
-    ) -> list[float]:
-        """
-        Computes bending stress at each boom due to distributed lift.
-        lift_distribution: list of lift values [N] at each section (same length as number of sections).
-        dy: distance between sections [m].
-        Returns: list of lists, each sublist is the stress at each boom for that section.
-        """
-        stresses_per_section = []
-        n_sections = len(lift_distribution)
-        # Calculate bending moment at each section (root to tip)
-        # M(y) = sum of lift * arm from y to tip
-        moments = []
-        for i in range(n_sections):
-            arm = np.arange(i, n_sections) * dy - (i * dy)
-            moment = np.sum(np.array(lift_distribution[i:]) * arm)
-            moments.append(moment)
-        # For each section, calculate stress at each boom
-        for moment in moments:
-            # Assume moment is about z-axis (bending in vertical plane, My)
-            My = moment
-            Mx = 0.0
-            x_c, y_c = self.centroid_x, self.centroid_y
-            Ixx, Iyy, Ixy = self.Ixx, self.Iyy, self.Ixy
-            denom = Ixx * Iyy - Ixy**2
-            stresses = []
-            for b in self.booms:
-                y = b.y - y_c
-                x = b.x - x_c
-                sigma = -(
-                    My * Ixx * x - Mx * Ixy * x + Mx * Iyy * y - My * Ixy * y
-                ) / denom
-                stresses.append(sigma)
-            stresses_per_section.append(stresses)
-        return stresses_per_section
+    # def bending_stress_from_lift(
+    #     self, lift_distribution: list[float], dy: float
+    # ) -> list[float]:
+    #     """
+    #     Computes bending stress at each boom due to distributed lift.
+    #     lift_distribution: list of lift values [N] at each section (same length as number of sections).
+    #     dy: distance between sections [m].
+    #     Returns: list of lists, each sublist is the stress at each boom for that section.
+    #     """
+    #     stresses_per_section = []
+    #     n_sections = len(lift_distribution)
+    #     # Calculate bending moment at each section (root to tip)
+    #     # M(y) = sum of lift * arm from y to tip
+    #     moments = []
+    #     for i in range(n_sections):
+    #         arm = np.arange(i, n_sections) * dy - (i * dy)
+    #         moment = np.sum(np.array(lift_distribution[i:]) * arm)
+    #         moments.append(moment)
+    #     # For each section, calculate stress at each boom
+    #     for moment in moments:
+    #         # Assume moment is about z-axis (bending in vertical plane, My)
+    #         My = moment
+    #         Mx = 0.0
+    #         x_c, y_c = self.centroid_x, self.centroid_y
+    #         Ixx, Iyy, Ixy = self.Ixx, self.Iyy, self.Ixy
+    #         denom = Ixx * Iyy - Ixy**2
+    #         stresses = []
+    #         for b in self.booms:
+    #             y = b.y - y_c
+    #             x = b.x - x_c
+    #             sigma = -(
+    #                 My * Ixx * x - Mx * Ixy * x + Mx * Iyy * y - My * Ixy * y
+    #             ) / denom
+    #             stresses.append(sigma)
+    #         stresses_per_section.append(stresses)
+    #     return stresses_per_section
 
     import matplotlib.pyplot as plt
 
@@ -362,33 +361,37 @@ class WingStructure:
             sections.append((y, section))
 
         return sections
+    
+    def compute_bending_stresses(self, lift_per_section: list[float]) -> tuple[list[float], list[list[float]]]:
+        """
+        Returns:
+            moments_x: list of bending moments at each section
+            stresses_per_section: list of [stress at each boom] for each section
+        """
+        moments_x = []
+        for i, (y_pos, _) in enumerate(self.sections):
+            moment = 0
+            for j in range(i, len(self.sections)):
+                y_out, _ = self.sections[j]
+                arm = y_out - y_pos
+                moment += lift_per_section[j] * arm
+            moments_x.append(moment)
+        stresses_per_section = []
+        for i, (y_pos, section) in enumerate(self.sections):
+            stresses = section.bending_stress(Mx=moments_x[i], My=0)
+            stresses_per_section.append(stresses)
+        return moments_x, stresses_per_section
 
-    def plot_3d_wing(self, lift_per_section: list[float] = None):
+
+    def plot_3d_wing(self, stresses_per_section: list[list[float]], lift_per_section: list[float] = None):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
 
         from matplotlib import cm
         import matplotlib.colors as mcolors
 
-        # --- Compute moments at each section (simple cantilever assumption) ---
-        # Mx = 0 (no moment about x), My = sum of lift outboard * distance from section
-        moments_x = []
-        for i, (y_pos, _) in enumerate(self.sections):
-            if lift_per_section:
-                moment = 0
-                for j in range(i, len(self.sections)):
-                    y_out, _ = self.sections[j]
-                    arm = y_out - y_pos
-                    moment += lift_per_section[j] * arm
-                moments_x.append(moment)
-            else:
-                moments_x.append(0)
-
-        # --- Compute all stresses for color normalization ---
-        all_stresses = []
-        for i, (y_pos, section) in enumerate(self.sections):
-            stresses = section.bending_stress(Mx=moments_x[i], My=0)
-            all_stresses.extend(stresses)
+        # --- Flatten all stresses for color normalization ---
+        all_stresses = [stress for section_stresses in stresses_per_section for stress in section_stresses]
         min_stress = min(all_stresses)
         max_stress = max(all_stresses)
         norm = mcolors.Normalize(vmin=min_stress, vmax=max_stress)
@@ -396,7 +399,7 @@ class WingStructure:
 
         # --- Plot booms colored by stress ---
         for i, (y_pos, section) in enumerate(self.sections):
-            stresses = section.bending_stress(Mx=moments_x[i], My=0)
+            stresses = stresses_per_section[i]
             for boom, stress in zip(section.booms, stresses):
                 color = cmap(norm(stress))
                 x = boom.x
@@ -477,7 +480,10 @@ if __name__ == "__main__":
         lift - weight for lift, weight in zip(lift_per_section, weight_per_section)
     ]
 
-    wing.plot_3d_wing(lift_per_section)
+    moments_x, stresses_per_section = wing.compute_bending_stresses(lift_per_section)
+    wing.plot_3d_wing(stresses_per_section, lift_per_section)
+    
+    # wing.plot_3d_wing(lift_per_section)
 
     with open("wing_sections.csv", "w", newline="") as f:
         writer = csv.writer(f)
