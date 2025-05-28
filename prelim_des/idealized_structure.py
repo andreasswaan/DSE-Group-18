@@ -151,7 +151,7 @@ class IdealizedSection:
         for b in self.booms:
             y = b.y - y_c
             x = b.x - x_c
-            sigma = (My * Ixx * x - Mx * Ixy * x + Mx * Iyy * y - My * Ixy * y) / denom
+            sigma = -(My * Ixx * x - Mx * Ixy * x + Mx * Iyy * y - My * Ixy * y) / denom
             stresses.append(sigma)
         return stresses
 
@@ -329,31 +329,63 @@ class WingStructure:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
 
-        if lift_per_section:
-            from matplotlib import cm
-            import matplotlib.colors as mcolors
+        from matplotlib import cm
+        import matplotlib.colors as mcolors
 
-            # Normalize lift for color mapping
-            norm = mcolors.Normalize(
-                vmin=min(lift_per_section), vmax=max(lift_per_section)
-            )
-            cmap = cm.get_cmap("viridis")  # Choose any matplotlib colormap
-
-        for i, (y_pos, section) in enumerate(self.sections):
-            color = "gray"  # default
+        # --- Compute moments at each section (simple cantilever assumption) ---
+        # Mx = 0 (no moment about x), My = sum of lift outboard * distance from section
+        moments_x = []
+        for i, (y_pos, _) in enumerate(self.sections):
             if lift_per_section:
-                color = cmap(norm(lift_per_section[i]))
+                moment = 0
+                for j in range(i, len(self.sections)):
+                    y_out, _ = self.sections[j]
+                    arm = y_out - y_pos
+                    moment += lift_per_section[j] * arm
+                moments_x.append(moment)
+            else:
+                moments_x.append(0)
 
-            for boom in section.booms:
+        # --- Compute all stresses for color normalization ---
+        all_stresses = []
+        for i, (y_pos, section) in enumerate(self.sections):
+            stresses = section.bending_stress(Mx=moments_x[i], My=0)
+            all_stresses.extend(stresses)
+        min_stress = min(all_stresses)
+        max_stress = max(all_stresses)
+        norm = mcolors.Normalize(vmin=min_stress, vmax=max_stress)
+        cmap = cm.get_cmap("viridis")
+
+        # --- Plot booms colored by stress ---
+        for i, (y_pos, section) in enumerate(self.sections):
+            stresses = section.bending_stress(Mx=moments_x[i], My=0)
+            for boom, stress in zip(section.booms, stresses):
+                color = cmap(norm(stress))
                 x = boom.x
-                z = boom.y  # in-plane vertical axis
-
+                z = boom.y
                 ax.scatter(
                     x,
                     y_pos,
                     z,
                     color=color,
                     s=boom.area * 1e6 * 50,
+                )
+        
+        # --- Add load arrows (lift) ---
+        if lift_per_section:
+            arrow_scale = max(lift_per_section) / 0.1  # Adjust denominator for arrow length scaling
+
+            for i, (y_pos, section) in enumerate(self.sections):
+                # Compute centroid of section for arrow base
+                x_c = np.mean([boom.x for boom in section.booms])
+                upper_boom = max(section.booms, key=lambda b: b.y)
+                z_c = upper_boom.y
+                lift = lift_per_section[i]
+                # Arrow points in +z (vertical) direction
+                ax.quiver(
+                    x_c, y_pos, z_c,   # base position
+                    0, 0, lift / arrow_scale,  # direction vector (scaled)
+                    color="red", arrow_length_ratio=0.2, linewidth=2, alpha=0.7
                 )
 
         ax.set_title("3D Wing Structure (Color-coded by Local Lift)")
@@ -362,12 +394,11 @@ class WingStructure:
         ax.set_zlabel("z [m] (vertical)")
         ax.grid(True)
 
-        # Optional: add color bar
-        if lift_per_section:
-            mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
-            mappable.set_array(lift_per_section)
-            cbar = plt.colorbar(mappable, ax=ax, pad=0.1)
-            cbar.set_label("Lift per section [N]")
+        # Add color bar for stress
+        mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
+        mappable.set_array(all_stresses)
+        cbar = plt.colorbar(mappable, ax=ax, pad=0.1)
+        cbar.set_label("Bending Stress [Pa]")
 
         plt.tight_layout()
         plt.show()
