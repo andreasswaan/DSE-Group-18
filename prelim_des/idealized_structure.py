@@ -142,6 +142,19 @@ class IdealizedSection:
         Iyy = sum(b.area * (b.x - x_c) ** 2 for b in self.booms)
         Ixy = sum(b.area * (b.x - x_c) * (b.y - y_c) for b in self.booms)
         return Ixx, Iyy, Ixy
+    
+    def bending_stress(self, Mx: float, My: float) -> list[float]:
+        x_c, y_c = self.centroid_x, self.centroid_y
+        Ixx, Iyy, Ixy = self.Ixx, self.Iyy, self.Ixy
+        denom = Ixx * Iyy - Ixy**2
+        stresses = []
+        for b in self.booms:
+            y = b.y - y_c
+            x = b.x - x_c
+            sigma = -(My * Ixx * x - Mx * Ixy * x + Mx * Iyy * y - My * Ixy * y) / denom
+            stresses.append(sigma)
+        return stresses
+
 
     def bending_stress_from_lift(
         self, lift_distribution: list[float], dy: float
@@ -449,12 +462,13 @@ if __name__ == "__main__":
     )
 
     dy = wing.dy
-    b_half = wing.span / 2
+    # b_half = wing.span / 2
+    b = wing.span
     L_total = 100  # total lift in N, replace with actual value
 
     lift_per_section = []
     for y, _ in wing.sections:
-        L_prime = elliptical_lift_distribution(y, b_half, L_total)
+        L_prime = elliptical_lift_distribution(y, b, L_total)
         lift = L_prime * dy
         lift_per_section.append(lift)
 
