@@ -362,11 +362,9 @@ class WingStructure:
 
         return sections
     
-    def compute_bending_stresses(self, lift_per_section: list[float]) -> tuple[list[float], list[list[float]]]:
+    def compute_bending_moments(self, lift_per_section: list[float]) -> list[float]:
         """
-        Returns:
-            moments_x: list of bending moments at each section
-            stresses_per_section: list of [stress at each boom] for each section
+        Returns a list of bending moments at each section (about x-axis).
         """
         moments_x = []
         for i, (y_pos, _) in enumerate(self.sections):
@@ -376,11 +374,37 @@ class WingStructure:
                 arm = y_out - y_pos
                 moment += lift_per_section[j] * arm
             moments_x.append(moment)
+        return moments_x
+    
+    def compute_bending_stresses(self, lift_per_section: list[float]) -> tuple[list[float], list[list[float]]]:
+        moments_x = self.compute_bending_moments(lift_per_section)
         stresses_per_section = []
         for i, (y_pos, section) in enumerate(self.sections):
             stresses = section.bending_stress(Mx=moments_x[i], My=0)
             stresses_per_section.append(stresses)
         return moments_x, stresses_per_section
+    
+    def compute_vertical_deflections(self, lift_per_section: list[float]) -> list[float]:
+        """
+        Returns the vertical deflection at each section along the span.
+        Assumes constant EI (uses root section Ixx and material E).
+        """
+        E = self.root_section.booms[0].material.E  # Pa
+        Ixx = self.root_section.Ixx  # m^4
+        dy = self.dy
+
+        moments_x = self.compute_bending_moments(lift_per_section)
+
+        # Integrate twice to get deflection (Euler-Bernoulli, discrete)
+        theta = [0.0]  # slope at root
+        for i in range(1, len(moments_x)):
+            dtheta = moments_x[i-1] * dy / (E * Ixx)
+            theta.append(theta[-1] + dtheta)
+        w = [0.0]  # deflection at root
+        for i in range(1, len(theta)):
+            dw = theta[i-1] * dy
+            w.append(w[-1] + dw)
+        return w
 
 
     def plot_3d_wing(self, stresses_per_section: list[list[float]], lift_per_section: list[float] = None):
@@ -429,7 +453,7 @@ class WingStructure:
                     color="red", arrow_length_ratio=0.2, linewidth=2, alpha=0.7
                 )
 
-        ax.set_title("3D Wing Structure (Color-coded by Local Lift)")
+        ax.set_title("3D Wing Structure (Color-coded by Local Stress)")
         ax.set_xlabel("x [m] (chordwise)")
         ax.set_ylabel("y [m] (spanwise)")
         ax.set_zlabel("z [m] (vertical)")
@@ -440,6 +464,43 @@ class WingStructure:
         mappable.set_array(all_stresses)
         cbar = plt.colorbar(mappable, ax=ax, pad=0.1)
         cbar.set_label("Bending Stress [Pa]")
+
+        plt.tight_layout()
+        plt.show()
+        
+    def plot_deformed_wing(self, vertical_deflections: list[float]):
+        import matplotlib.colors as mcolors
+        from matplotlib import cm
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+
+        # Normalize deflections for coloring
+        min_defl = min(vertical_deflections)
+        max_defl = max(vertical_deflections)
+        norm = mcolors.Normalize(vmin=min_defl, vmax=max_defl)
+        cmap = cm.get_cmap("plasma")
+
+        for i, (y_pos, section) in enumerate(self.sections):
+            dz = vertical_deflections[i]
+            color = cmap(norm(dz))
+            for boom in section.booms:
+                x = boom.x
+                y = y_pos
+                z = boom.y + dz  # add deflection to original z
+                ax.scatter(x, y, z, color=color, s=boom.area * 1e6 * 50)
+
+        ax.set_title("Vertical Deflection of Wing Structure (Booms colored by Deflection)")
+        ax.set_xlabel("x [m] (chordwise)")
+        ax.set_ylabel("y [m] (spanwise)")
+        ax.set_zlabel("z [m] (vertical)")
+        ax.grid(True)
+
+        # Add color bar for deflection
+        mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
+        mappable.set_array(vertical_deflections)
+        cbar = plt.colorbar(mappable, ax=ax, pad=0.1)
+        cbar.set_label("Vertical Deflection [m]")
 
         plt.tight_layout()
         plt.show()
@@ -484,6 +545,9 @@ if __name__ == "__main__":
     wing.plot_3d_wing(stresses_per_section, lift_per_section)
     
     # wing.plot_3d_wing(lift_per_section)
+    
+    vertical_deflections = wing.compute_vertical_deflections(lift_per_section)
+    wing.plot_deformed_wing(vertical_deflections)
 
     with open("wing_sections.csv", "w", newline="") as f:
         writer = csv.writer(f)
