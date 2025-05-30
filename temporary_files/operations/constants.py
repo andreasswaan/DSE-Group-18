@@ -1,4 +1,4 @@
-
+import numpy as np
 #time related constants
 velocity_hori=15
 velocity_climb=6
@@ -12,6 +12,12 @@ buffer_time=60
 battery_swap_time=300
 peak_order_volume=350
 time_window=3600*4 # time window to place orders
+min_order_delay=60*30
+scale=90*60 # scale for order time distribution
+pizza_cooling_time=30*60
+time_to_consider_order=60*90
+max_waiting_time=60*3 # maximum waiting time at restaurant or customer location
+max_extra_travel_time=60*2
 
 # financial constants
 #initial costs
@@ -59,3 +65,38 @@ m_price = 13
 l_price = 16
 order_fee=0.25  # reimbursement per delivery
 order_volume_ratios = [0.786, 0.857, 0.929, 1, 1.494, 1.67, 1.494]
+
+class Point():
+    def __init__(self, xpos: float, ypos: float) -> None:
+        self.xpos = xpos
+        self.ypos = ypos
+
+    def distance(self, other: 'Point') -> float:
+        return np.sqrt((self.xpos - other.xpos)**2 + (self.ypos - other.ypos)**2)
+    
+    def nearest(self, places: list['Point']) -> 'Point':
+        distance = 10000000
+        nearest_place = None
+        for i in places:
+            if self.distance(i) < distance:
+                distance = self.distance(i)
+                nearest_place = i
+        return nearest_place
+
+class Order(Point):
+    def __init__(self,
+                 order_dict: dict):
+        super().__init__(order_dict['x_delivery_loc'], order_dict['y_delivery_loc'])
+        self.order_id = order_dict['order_id']
+        self.name = self.order_id
+        self.restaurant_id = order_dict['restaurant_id']
+        self.restaurant = order_dict['restaurant']
+        self.status = order_dict['status']  # True if delivered, False otherwise
+        self.time = order_dict['time']
+        self.s = order_dict['s']
+        self.m = order_dict['m']
+        self.l = order_dict['l']
+        self.being_delivered = False  # True if a drone is currently delivering this order
+        self.demand = self.s + self.m + self.l
+        self.arrival_time = order_dict['arrival_time']
+        self.waiting_time = waiting_time_customer  # seconds

@@ -6,18 +6,20 @@ import matplotlib.animation as animation
 from temporary_files.operations.mission_planning import MissionPlanning
 import financial_model
 import constants
+import scipy.stats as stats
 # pizza size to weight guide in kg
+np.random.seed(42)  # for reproducibility
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
-
-class point():
+n_drones = 2
+class Point():
     def __init__(self, xpos: float, ypos: float) -> None:
         self.xpos = xpos
         self.ypos = ypos
 
-    def distance(self, other: 'point') -> float:
+    def distance(self, other: 'Point') -> float:
         return np.sqrt((self.xpos - other.xpos)**2 + (self.ypos - other.ypos)**2)
     
-    def nearest(self, places: list['point']) -> 'point':
+    def nearest(self, places: list['Point']) -> 'Point':
         distance = 10000000
         nearest_place = None
         for i in places:
@@ -26,7 +28,7 @@ class point():
                 nearest_place = i
         return nearest_place
 
-class Restaurant(point):
+class Restaurant(Point):
     def __init__(self,
                  restaurant_dict: dict):
         super().__init__(restaurant_dict['xpos'], restaurant_dict['ypos'])
@@ -34,6 +36,7 @@ class Restaurant(point):
         self.name = restaurant_dict['name']
         self.mean_nr_orders = restaurant_dict['mean_nr_orders']
         self.mean_order_size = restaurant_dict['mean_order_size']
+        self.waiting_time = constants.waiting_time_restaurant  # seconds
     
     def generate_orders(self, dt, inv_total_time):
         mean_nr_orders = self.mean_nr_orders * dt * inv_total_time
@@ -47,11 +50,12 @@ class Restaurant(point):
             orders.append(order)
         return orders
 
-class Order(point):
+class Order(Point):
     def __init__(self,
                  order_dict: dict):
         super().__init__(order_dict['x_delivery_loc'], order_dict['y_delivery_loc'])
         self.order_id = order_dict['order_id']
+        self.name = self.order_id
         self.restaurant_id = order_dict['restaurant_id']
         self.restaurant = order_dict['restaurant']
         self.status = order_dict['status']  # True if delivered, False otherwise
@@ -59,18 +63,29 @@ class Order(point):
         self.s = order_dict['s']
         self.m = order_dict['m']
         self.l = order_dict['l']
+        self.being_delivered = False  # True if a drone is currently delivering this order
+        self.demand = self.s + self.m + self.l
+        self.arrival_time = order_dict['arrival_time']
+        self.waiting_time = constants.waiting_time_customer  # seconds
 
-class Drone(point):
+class Drone(Point):
     def __init__(self,
                  drone_dict: dict):
         self.drone_id = drone_dict['drone_id']
         self.depot = depots[drone_dict['depot']]
         self.depot.current_drones.append(self)
         self.targets = []
+        self.mission = None
         self.target = None
         self.max_battery_level = 100
         self.speed = 10*100/6000*5  # m/s, horizontal speed
         self.distance_travelled = 0
+        self.max_capacity = 10 # max number of pizzas it can carry
+        self.battery = 100  # battery level in percentage
+        self.departure_times = []  # list of departure times for each mission
+        self.arrival_times = []  # list of arrival times for each mission
+        self.simulation = None  # reference to the simulation object
+        self.state = 'idle'  # state of the drone, can be 'idle', 'charging', 'delivering', etc.
         # define static characteristics
 
         super().__init__(self.depot.xpos, self.depot.ypos)
@@ -86,6 +101,25 @@ class Drone(point):
         self.current_payload_weight = self.calculate_payload_weight()
         self.is_delivering = False
     
+
+    def get_target(self):
+        if self.targets:
+            # If there are scheduled departures and the next departure is now or in the past
+            #if self.departure_times and self.departure_times[0] <= self.simulation.timestamp:
+            for target in self.targets:
+                if isinstance(target, Order):
+                    target.being_delivered = True  #ToDo: we might want to remove this restriction later
+                else:
+                    break
+            if isinstance(self.targets[0], Order):
+                self.state = 'delivering'
+            else:
+                self.state = 'other'
+            return self.targets[0]        
+            #else:
+            #    return None
+        else:
+            return None
     def calculate_payload_weight(self):
         # calculate the weight of the current payload
         weight = 0
@@ -93,7 +127,7 @@ class Drone(point):
             weight += pizza_guide[size] * count
         return weight
     
-    def add_targets(self, targets: list[point]):
+    def add_targets(self, targets: list[Point]):
         self.targets.append(targets)
         if self.target is None:
             self.target = targets[0]
@@ -101,11 +135,12 @@ class Drone(point):
             self.depot.current_drones.remove(self)
             self.depot = None
     
-    def set_targets(self, targets: list[point]):
-        self.targets=(targets)
-        self.target = targets[0]
-        print(targets)
-        print(self.depot.current_drones)
+    def set_targets(self, targets: list[Point]):
+        """self.targets=targets
+        if self.target is None:
+            self.target = targets[0]"""
+        self.targets = targets
+        self.target = self.get_target()
         if self.depot is not None:
             self.depot.current_drones.remove(self)
             self.depot = None
@@ -116,11 +151,18 @@ class Drone(point):
         self.xvel += self.xacc * dt
         self.yvel += self.yacc * dt
         self.battery_level -= 0.1 * (self.xvel**2 + self.yvel**2) * dt"""
+        self.move_to_target(dt)
+    
+    def move_to_target(self, dt):
         if self.target is None:
             return
         direction_vector = np.array([self.target.xpos - self.xpos, self.target.ypos - self.ypos])
-        step_vector = direction_vector / np.linalg.norm(direction_vector) * self.speed * dt
-        if np.linalg.norm(direction_vector) < np.linalg.norm(step_vector):
+        norm = np.linalg.norm(direction_vector)
+        if norm == 0:
+            step_vector = np.array([0.0, 0.0])
+        else:
+            step_vector = direction_vector / norm * self.speed * dt
+        if np.linalg.norm(direction_vector) <= np.linalg.norm(step_vector):
             self.xpos, self.ypos = self.target.xpos, self.target.ypos
             self.arrive()
             self.distance_travelled += np.linalg.norm(direction_vector)
@@ -132,13 +174,18 @@ class Drone(point):
     def arrive(self):
         if isinstance(self.target, Order):
             self.target.status = True
-        self.targets.pop(0)
         if isinstance(self.target, Depot):
             self.target.current_drones.append(self)
-        if self.targets:
-            self.target = self.targets[0]
+            self.depot = self.target
+        self.targets.pop(0)
+        #if len(self.departure_times) > 1:
+        #    self.departure_times.pop(0)   ToDo: decide if we want this
+        self.departure_times.pop(0)
+        self.arrival_times.pop(0)
+        self.target = self.get_target()
 
-class Depot(point):
+
+class Depot(Point):
     def __init__(self,
                  depot_dict: dict):
         self.depot_id = depot_dict['depot_id']
@@ -146,7 +193,7 @@ class Depot(point):
         self.capacity = depot_dict['capacity']
         self.current_drones = []
         self.energy_spent: float = 0.0 #kWh
-
+        self.name = f'Depot {self.depot_id}'
 
 class City:
     def __init__(self,
@@ -208,43 +255,31 @@ class Simulation:
         self.total_time = constants.time_window
         self.inv_total_time = 1 / self.total_time
         self.drones = [drone for depot in self.city.depots for drone in depot.current_drones]
+        for drone in self.drones:
+            drone.simulation = self
         self.financial_model = financial_model.FinancialModel(self)
         self.dt = 5
         self.mp_interval = 100
-        self.pp_interval = 50
         self.mp = MissionPlanning(self)
         self.timestamp = 0
 
-    
-    def assign_drone_to_order(self, order_id: str):
-        # assign a drone to the order
-        # check if there are any drones available
-        for depot in self.city.depots:
-            if depot.current_drones:
-                drone = depot.current_drones[0]
-                # assign the drone to the order
-                drone.is_delivering = True
-                drone.current_payload = self.order_book[order_id]
-                drone.current_payload_weight = drone.calculate_payload_weight()
-                return drone
-        return None
     
     def change_order_volume(self, order_volume_ratio: float):
         for restaurant in self.city.restaurants:
             restaurant.mean_nr_orders *= order_volume_ratio
 
-    def take_step(self):
-        
+    def take_step(self):        
         for restaurant in self.city.restaurants:
             orders = restaurant.generate_orders(self.dt, self.inv_total_time)
             if orders:
                 for order in orders:
                     order['restaurant_id'] = restaurant.restaurant_id
+                    order['arrival_time'] = self.calculate_arrival_time()
                     order['restaurant'] = restaurant
                     order['time'] = self.timestamp
                     order['x_delivery_loc'], order['y_delivery_loc'] = self.city.generate_order_location()
                     order['status'] = False # not delivered
-                    order_id = f'ord{len(self.logger.order_log)}'
+                    order_id = len(self.logger.order_log)
                     order['order_id'] = order_id
                     self.order_book[order_id] = Order(order)
 
@@ -255,7 +290,8 @@ class Simulation:
 
         if self.timestamp % self.mp_interval == 0:
             # run mission planning
-            self.mp.basic_heuristic()
+            self.mp.solve_mission_planning()
+            #self.mp.basic_heuristic()
 
         for drone in self.drones:
             drone.update_drone(self.dt)
@@ -269,14 +305,22 @@ class Simulation:
         self.city.reset()
         self.drones = [depot.current_drones for depot in self.city.depots]
 
+    def calculate_arrival_time(self):
+        min_order_time: int = self.timestamp + constants.min_order_delay
+        loc: float = ((min_order_time) * 2 + constants.time_window) / 3
+        a_trunc, b_trunc = min_order_time, constants.time_window
+        a, b = (a_trunc - loc) / constants.scale, (b_trunc - loc) / constants.scale
+        order_time: float = stats.truncnorm.rvs(a, b, loc=loc, scale=constants.scale, size=1)[0]
+        order_time = int(np.round(order_time / 300) * 300)
+        return order_time
 
 restaurant_dict = [{
     'xpos': 50,
     'ypos': 20,
-    'restaurant_id': 'rest1',
+    'restaurant_id': 0,
     'name': 'Pizza Place',
     'mean_nr_orders': 400,
-    'mean_order_size': {'small': 2, 'medium': 3, 'large': 1}
+    'mean_order_size': {'small': 0, 'medium': 3, 'large': 0}
 }]
 
 Restaurant0 = Restaurant(restaurant_dict[0])
@@ -301,8 +345,8 @@ depots = [Depot0, Depot1]
 
 # Example: 8 drones at depot 0, 7 drones at depot 1
 drone_dict = [
-    {'drone_id': f'drone{i+1}', 'depot': 0 if i < 8 else 1}
-    for i in range(15)
+    {'drone_id': i, 'depot': 0 if i <n_drones//2 else 1}
+    for i in range(n_drones)
 ]
 
 drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))]
@@ -379,6 +423,5 @@ def animate_simulation(sim, steps=100, interval=200):
     )
     plt.show()
 n_steps = int(constants.time_window / my_sim.dt)
+my_sim.change_order_volume(1)
 animate_simulation(my_sim, n_steps, interval=20)
-
-

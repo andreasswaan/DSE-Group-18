@@ -1,0 +1,14 @@
+\ Model DARP_copy
+\ LP format - for model browsing. Use MPS format to capture full model detail.
+Minimize
+ 
+Subject To
+ start_at_current_0: x[0,1,0] + x[0,2,0] >= 1
+ flow_2_0: x[0,2,0] + x[1,2,0] - x[2,0,0] - x[2,1,0] = 0
+Bounds
+ x[0,1,0] = 0
+ x[2,0,0] = 0
+ x[2,1,0] = 0
+Binaries
+ x[0,1,0] x[0,2,0] x[1,2,0] x[2,0,0] x[2,1,0]
+End
