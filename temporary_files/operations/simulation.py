@@ -86,6 +86,7 @@ class Drone(Point):
         self.arrival_times = []  # list of arrival times for each mission
         self.simulation = None  # reference to the simulation object
         self.state = 'idle'  # state of the drone, can be 'idle', 'charging', 'delivering', etc.
+        self.load = 0  # current load of the drone, in number of pizzas
         # define static characteristics
 
         super().__init__(self.depot.xpos, self.depot.ypos)
@@ -151,7 +152,8 @@ class Drone(Point):
         self.xvel += self.xacc * dt
         self.yvel += self.yacc * dt
         self.battery_level -= 0.1 * (self.xvel**2 + self.yvel**2) * dt"""
-        self.move_to_target(dt)
+        if self.departure_times and self.departure_times[0] <= self.simulation.timestamp:
+            self.move_to_target(dt)
     
     def move_to_target(self, dt):
         if self.target is None:
@@ -194,6 +196,7 @@ class Depot(Point):
         self.current_drones = []
         self.energy_spent: float = 0.0 #kWh
         self.name = f'Depot {self.depot_id}'
+        self.waiting_time = constants.battery_swap_time
 
 class City:
     def __init__(self,

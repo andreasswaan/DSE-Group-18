@@ -30,16 +30,16 @@ class MissionPlanning:
     def setup_problem(self):
         drones=self.drones
         depots=self.depots
-        restaurants=self.restaurants
         orders = self.get_orders()
         orders_to_deliver = [order for order in orders if order.arrival_time < self.simulation.timestamp + constants.time_to_consider_order]
         orders = [order for order in orders_to_deliver if not order.being_delivered]    
+        restaurants = [order.restaurant for order in orders]
         drone_start_nodes = []
         drone_earliest_dep = []
-        nodes = [*depots, *restaurants, *orders]
         orders_being_delivered = [order for order in orders if order.being_delivered]
+        nodes = [*depots, *depots, *restaurants, *orders, *orders_being_delivered]
         for drone in drones:
-            being_delivered_orders = [t for t in drone.targets if isinstance(t, Order) and t.being_delivered]
+            being_delivered_orders = [t for t in drone.targets if hasattr(t, "being_delivered") and t.being_delivered]
             if being_delivered_orders:
                 nodes.append(being_delivered_orders[-1])
                 drone_start_nodes.append(nodes.index(being_delivered_orders[-1]))
@@ -53,6 +53,7 @@ class MissionPlanning:
                 else:
                     drone_start_nodes.append(nodes.index(drone.depot))
                     drone_earliest_dep.append(self.simulation.timestamp)
+        nodes = [*nodes, *depots]
         print(f"Orders: {[order.name for order in orders]}")
         print(f"Orders being delivered: {[order.name for order in orders_being_delivered]}")
         drone_batteries = np.array([drone.battery for drone in drones])
@@ -71,53 +72,59 @@ class MissionPlanning:
         n_orders = len(orders)
         n_restaurants = len(restaurants)
         n_depots = len(depots)
-        waiting_times = []
-        for i in range(n_nodes):
-            if i < n_depots:
-                waiting_times.append(constants.battery_swap_time)
-            elif i < n_depots + n_restaurants:
-                waiting_times.append(constants.waiting_time_restaurant)
-            else:
-                waiting_times.append(constants.waiting_time_customer)
+        waiting_times = [node.waiting_time for node in nodes]  # waiting times at each node
         model = gp.Model("DARP")
         model.Params.OutputFlag = 0
         model.Params.TimeLimit = 10
+        q = []
+        for i in range(len(nodes)):
+            if i < n_depots * 2:
+                q.append(0)
+            elif i < n_depots * 2 + n_orders:
+                q.append(int(orders[i - n_depots * 2].demand))
+            elif i < n_depots * 2 + n_orders * 2:
+                q.append(int(-orders[i - n_depots * 2 - n_orders].demand))
+            else:
+                q.append(0)
         # Decision variables
         x = model.addVars(n_nodes, n_nodes, n_drones, vtype=GRB.BINARY, name="x")  # route selection
         t_dep = model.addVars(n_nodes, n_drones, vtype=GRB.CONTINUOUS, name="t_dep", ub=2e4, lb=0)  # departure times
         t_arr = model.addVars(n_nodes, n_drones, vtype=GRB.CONTINUOUS, name="t_arr", ub=2e4, lb=0)  # arrival times
+        l = model.addVars(n_nodes, n_drones, vtype=GRB.INTEGER, name="l", lb=0, ub = drones[0].max_capacity)  # load at each node for each drone
 
         # 1. Each drone ends at a depot
         #for k in range(n_drones):
         #   model.addConstr(gp.quicksum(x[i, d, k] for d in range(n_depots) for i in range(n_nodes)) == 1, name=f"end_depot_{k}")
 
         for k in range(n_drones):
-            for d in range(n_depots):
+            for d in range(n_nodes-n_depots, n_nodes):
                 for j in range(n_nodes):
                     if j != d:
                         model.addConstr(
                             t_arr[d, k] >= t_arr[j, k] - M * (1 - x[j, d, k]),
                             name=f"depot_arrival_last_{k}_{d}_{j}"
                         )
+                        x[d, j, k].ub = 0  # no direct depot->node routes
         
         # 1a. No direct depot->depot routes
         for k in range(n_drones):
-            for d1 in range(n_depots):
-                for d2 in range(n_depots):
+            for d1 in range(n_depots * 2):
+                for d2 in range(n_depots * 2):
                     if d1 != d2:
                         x[d1, d2, k].ub = 0
         
         # 1. Each drone starts at its current node
-        for k in range(n_drones):
+        for k, drone in enumerate(drones):
             s = drone_start_nodes[k]
             #print(f"Drone {k} starts at node {s} (node name: {nodes[s].name})")
-            model.addConstr(gp.quicksum(x[s, j, k] for j in range(n_nodes) if s!=j) >= 1, name=f"start_at_current_{k}")
+            model.addConstr(gp.quicksum(x[s, j, k] for j in range(n_nodes) if s!=j) == 1, name=f"start_at_current_{k}")
             for j in range(n_nodes):
                 if j != s:
                     model.addConstr(
-                        t_dep[s, k] <= t_dep[j, k] + M * (1 - x[s, j, k]),
+                        t_dep[s, k] <= t_arr[j, k],
                         name=f"start_departure_first_{k}_{j}"
             )
+            #model.addConstr(l[s,k] == drone.load, name=f"start_load_{k}")
 
         # 1b. Drone can only leave its start node after it arrives there
         for k in range(n_drones):
@@ -126,12 +133,12 @@ class MissionPlanning:
 
         # 2. Each order is served by exactly one drone
         for o, order in enumerate(orders):
-            cust = n_depots + n_restaurants + o  # index of the order node in nodes
+            cust = n_depots * 2 + n_restaurants + o  # index of the order node in nodes
             model.addConstr(gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i != cust for k in range(n_drones)) == 1, name=f"serve_order_{o}")
 
         # 3. Drones must arrive at customer after order time
         for o, order in enumerate(orders):
-            cust = n_depots + n_restaurants + o
+            cust = n_depots * 2 + n_restaurants + o
             order_time = order.arrival_time
             for k in range(n_drones):
                 model.addConstr(t_arr[cust, k] >= order_time - M * (1 - gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i != cust)), name=f"arr_after_order_{o}_{k}")
@@ -141,25 +148,12 @@ class MissionPlanning:
             s = drone_start_nodes[k]
             print(f"Drone {k} start node: {s} (node name: {nodes[s].name})")
             for v in range(n_nodes):
-                if v >= n_depots and v!=s:  # not a depot
+                if v < n_nodes-n_depots and v!=s:  # not a depot
                     model.addConstr(
                         gp.quicksum(x[i, v, k] for i in range(n_nodes) if i != v) ==
                         gp.quicksum(x[v, j, k] for j in range(n_nodes) if j != v),
                         name=f"flow_{v}_{k}"
                     )
-            if s < n_depots:
-                # If the start node is a depot, it can only leave if it has arrived there
-                model.addConstr(
-                    gp.quicksum(x[d, j, k] for d in range(n_depots) for j in range(n_nodes) if j != d) ==
-                    gp.quicksum(x[i, d, k] for d in range(n_depots) for i in range(n_nodes) if i != d),
-                    name=f"flow_start_depot_{k}"
-                )
-            else:
-                model.addConstr(
-                    gp.quicksum(x[d, j, k] for d in range(n_depots) for j in range(n_nodes) if j != d) ==
-                    gp.quicksum(x[i, d, k] for d in range(n_depots) for i in range(n_nodes) if i != d) - 1,
-                    name=f"flow_start_depot_{k}"
-                )
 
         # 5. Battery constraints
         for k, drone in enumerate(drones):
@@ -171,18 +165,23 @@ class MissionPlanning:
 
         # 6. Capacity constraints
         for k, drone in enumerate(drones):
-            for o, order in enumerate(orders):
-                rest = n_depots + order.restaurant.restaurant_id  # index of restaurant node
-                demand = order.demand
-                model.addConstr(
-                    demand * gp.quicksum(x[i, rest, k] for i in range(n_nodes) if i != rest) <= drone.max_capacity,
-                    name=f"capacity_{o}_{k}"
-                )
+            for i in range(n_nodes):
+                for j in range(n_nodes):
+                    if i != j:
+                        model.addConstr(
+                            l[j, k] >= l[i, k] + q[j] - M * (1 - x[i, j, k]),
+                            name=f"capacity_{i}_{j}_{k}"
+                        )
 
+        depot_ids = [n for n, node in enumerate(nodes) if hasattr(node, "depot_id")]
+        for k in range(n_drones):
+            for j in depot_ids:
+                l[j, k].ub = 0  # load at depots is 0
+        
         # 7. Restaurant before customer
         for o, order in enumerate(orders):
-            rest = n_depots + order.restaurant.restaurant_id
-            cust = n_depots + n_restaurants + o
+            rest = n_depots * 2 + o 
+            cust = n_depots * 2 + n_restaurants + o
             for k in range(n_drones):
                 model.addConstr(
                     t_arr[cust, k] >= t_arr[rest, k] - M * (1 - gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i != cust)),
@@ -197,8 +196,8 @@ class MissionPlanning:
 
         # 8. Delivery time limit (30 min from pickup at restaurant to delivery at customer)
         for o, order in enumerate(orders):
-            rest = n_depots + order.restaurant.restaurant_id
-            cust = n_depots + n_restaurants + o
+            rest = n_depots * 2 + o 
+            cust = n_depots * 2 + n_restaurants + o
             for k in range(n_drones):
                 travel_time = distance_matrix[rest, cust] / drones[k].speed
                 model.addConstr(
@@ -208,12 +207,12 @@ class MissionPlanning:
 
         # 9. No direct depot->customer or restaurant->depot
         for k in range(n_drones):
-            for d in range(n_depots):
+            for d in range(n_depots * 2):
                 for o in range(n_orders):
-                    cust = n_depots + n_restaurants + o
+                    cust = n_depots * 2 + n_restaurants + o
                     x[d, cust, k].ub = 0
                 for r in range(n_restaurants):
-                    rest = n_depots + r
+                    rest = n_depots * 2 + r
                     x[rest, d, k].ub = 0
 
         # 10. Time propagation (if drone k travels i->j, arrival at j >= departure at i + travel_time)
@@ -233,28 +232,34 @@ class MissionPlanning:
             for i in range(n_nodes):
                 model.addConstr(t_dep[i, k] >= t_arr[i, k] + waiting_times[i]
                                 - M * (1 - gp.quicksum(x[j, i, k] for j in range(n_nodes) if j != i)), name=f"dep_after_arr_{i}_{k}")
-                if i >= n_depots:  # if it's not a depot
+                if i >= n_depots * 2 and i < n_nodes - n_depots:  # if it's not a depot
                     model.addConstr(t_dep[i, k] <=t_arr[i,k] + constants.max_waiting_time
                                     + M * (1 - gp.quicksum(x[j, i, k] for j in range(n_nodes) if j != i)), name=f"dep_before_max_wait_{i}_{k}")
         # Objective: Minimize weighted sum of total distance and total delay
-        weight_dist = 0.5
+        weight_dist = 0.0
         weight_delay = 0.5
-        weight_finish_time = 0.01
+        weight_finish_time = 0.001
+        weight_travel_time = 0.5
 
+        total_travel_time = gp.quicksum(
+            (t_arr[j, k] - t_dep[i, k]) * x[i,j,k] for i in range(n_nodes) for j in range(n_nodes) if i != j for k in range(n_drones))
         total_distance = gp.quicksum(distance_matrix[i, j] * x[i, j, k] for i in range(n_nodes) for j in range(n_nodes) if i != j for k in range(n_drones))
         total_delay = gp.quicksum(
-            (t_arr[n_depots + n_restaurants + o, k] - orders[o].arrival_time) *
-            gp.quicksum(x[i, n_depots + n_restaurants + o, k] for i in range(n_nodes) if i != n_depots + n_restaurants + o)
+            (t_arr[n_depots * 2 + n_restaurants + o, k] - orders[o].arrival_time) *
+            gp.quicksum(x[i, n_depots * 2 + n_restaurants + o, k] for i in range(n_nodes) if i != n_depots * 2 + n_restaurants + o)
             for o in range(n_orders)
             for k in range(n_drones)
         )
         total_finish_time = 0
-        total_finish_time = gp.quicksum(x[i, d, k] * t_arr[d, k] for i in range(n_nodes) for d in range(n_depots) for k in range(n_drones) if i != d)
-        model.setObjective(weight_dist * total_distance + weight_delay * total_delay + total_finish_time * weight_finish_time, GRB.MINIMIZE)
+        total_finish_time = gp.quicksum(x[i, d, k] * t_arr[d, k] for i in range(n_nodes) for d in range(n_nodes-n_depots, n_nodes) for k in range(n_drones) if i != d)
+        model.setObjective(weight_travel_time * total_travel_time + weight_dist * total_distance + weight_delay * total_delay + total_finish_time * weight_finish_time, GRB.MINIMIZE)
 
         model.optimize()
         if model.status == GRB.OPTIMAL:
             self.assign_routes(x, t_dep, t_arr, drones, nodes, waiting_times)
+            #print(f"total distance: {model.ObjVal:.2f} m")
+            #print(f"total delay: {sum((t_arr[n_depots + n_restaurants + o, k].X - orders[o].arrival_time) * x[i, n_depots + n_restaurants + o, k].X for o in range(n_orders) for k in range(n_drones) for i in range(n_nodes) if i != n_depots + n_restaurants + o):.2f} s")
+            #print(f"total finish time: {sum(x[i, d, k].X * t_arr[d, k].X for i in range(n_nodes) for d in range(n_depots) for k in range(n_drones) if i != d):.2f} s")
         else:
             print("No optimal solution found")
         if model.status == GRB.INFEASIBLE:
@@ -269,6 +274,7 @@ class MissionPlanning:
             for i in range(len(nodes)):
                 for j in range(len(nodes)):
                     if i != j and x[i, j, k].X > 0.5:
+                        print(f"Drone {drone.drone_id} leg: {i} -> {j}, arr: {t_arr[i, k].X}, dep: {t_dep[i, k].X},")
                         legs.append((
                             i, j,
                             t_arr[i, k].X,
@@ -277,12 +283,19 @@ class MissionPlanning:
             # Sort legs by departure time
             legs.sort(key=lambda leg: leg[3])
 
-            # Build the ordered route
-            routes = []
-            arrival_times = []
-            departure_times = []
-
             if legs:
+
+                if drone.targets:
+                    if hasattr(drone.targets[0], "order_id"):
+                        being_delivered_orders = [t for t in drone.targets if hasattr(t, "order_id") and t.being_delivered]
+                        n_being_delivered_orders = len(being_delivered_orders)
+                        routes = being_delivered_orders
+                        departure_times = [drone.departure_times[i] for i in range(n_being_delivered_orders)]
+                        arrival_times = [drone.arrival_times[i] for i in range(n_being_delivered_orders)]
+                else:
+                    routes = [drone.targets[0]]
+                    departure_times = [drone.departure_times[0]] 
+                    arrival_times = [drone.arrival_times[0]]
 
                 for leg in legs:
                     print(f"Drone {drone.drone_id} leg: {nodes[leg[0]].name} -> {nodes[leg[1]].name}, arr: {leg[2]}, dep: {leg[3]}")
@@ -295,23 +308,9 @@ class MissionPlanning:
                 arrival_times.append(t_arr[legs[-1][1], k].X)
                 departure_times.append(arrival_times[-1] + waiting_times[legs[-1][1]])
 
-             #   print(f"Drone {drone.drone_id} route: {[node.name for node in routes]}")
-                if drone.targets:
-                    if isinstance(drone.targets[0], Order):
-                        being_delivered_orders = [t for t in drone.targets if isinstance(t, Order) and t.being_delivered]
-                        n_being_delivered_orders = len(being_delivered_orders)
-                        routes = being_delivered_orders + routes
-                        drone.departure_times = [drone.departure_times[i] for i in range(n_being_delivered_orders)] + departure_times
-                        drone.arrival_times = [drone.arrival_times[i] for i in range(n_being_delivered_orders)] + arrival_times
-                    else:
-                        routes = [drone.targets[0]] + routes
-                        drone.departure_times = [drone.departure_times[0]] + departure_times
-                        drone.arrival_times = [drone.arrival_times[0]] + arrival_times
-                else:
-                    drone.departure_times = departure_times
-                    drone.arrival_times = arrival_times
                 #print(f"Drone {drone.drone_id} assigned targets: {[node.name for node in drone.targets]}")
                 drone.set_targets(routes)
             print(f"Drone {drone.drone_id} assigned targets: {[node.name for node in drone.targets]}")
-            print(f"Departure times: {drone.departure_times}")
             print(f"Arrival times: {drone.arrival_times}")
+            print(f"Departure times: {drone.departure_times}")
+

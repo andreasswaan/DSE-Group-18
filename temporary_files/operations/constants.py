@@ -15,7 +15,7 @@ time_window=3600*4 # time window to place orders
 min_order_delay=60*30
 scale=90*60 # scale for order time distribution
 pizza_cooling_time=30*60
-time_to_consider_order=60*90
+time_to_consider_order=60*60
 max_waiting_time=60*3 # maximum waiting time at restaurant or customer location
 max_extra_travel_time=60*2
 
