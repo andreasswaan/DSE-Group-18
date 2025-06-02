@@ -18,4 +18,5 @@ dependencies:
   - networkx
   - scikit-learn
   - openap
+  - casadi
 

@@ -1,5 +1,4 @@
 import os
-import casadi as ca
 import matplotlib.pyplot as plt
 from globals import main_dir
 from prelim_des.power import PropulsionSystem
@@ -74,16 +73,36 @@ class Drone:
             + self.landing_gear.weight()
             + self.propulsion.weight(mission_energy)
         )
-        print(f"Mission Energy: {mission_energy[0]:.2f} J" if mission_energy is not None else "Mission Energy: Not calculated")
-        print(f"Battery Weight: {self.propulsion.battery.weight(energy_required=mission_energy)[0]:.2f} kg" if hasattr(self.propulsion, 'battery') else "Battery Weight: Not available")
-        print(f"Motor Weight: {self.propulsion.motor.weight():.2f} kg" if hasattr(self.propulsion, 'motor') else "Motor Weight: Not available")
-        print(f"Propeller Weight: {self.propulsion.ver_prop.weight():.2f} kg" if hasattr(self.propulsion, 'ver_prop') else "Propeller Weight: Not available")
-        print(f"Component Weights: Wing = {self.wing.weight()[0]:.2f} kg, "
-              f"Fuselage = {self.fuselage.weight()[0]:.5f} kg, "
-                f"Landing Gear = {self.landing_gear.weight()[0]:.2f} kg, "
-                f"Propulsion = {self.propulsion.weight(mission_energy)[0]:.2f} kg")
-        
-        self.max_payload = toml['config']['payload']['n_box'] * toml['config']['payload']['box_weight']
+        print(
+            f"Mission Energy: {mission_energy[0]:.2f} J"
+            if mission_energy is not None
+            else "Mission Energy: Not calculated"
+        )
+        print(
+            f"Battery Weight: {self.propulsion.battery.weight(energy_required=mission_energy)[0]:.2f} kg"
+            if hasattr(self.propulsion, "battery")
+            else "Battery Weight: Not available"
+        )
+        print(
+            f"Motor Weight: {self.propulsion.motor.weight():.2f} kg"
+            if hasattr(self.propulsion, "motor")
+            else "Motor Weight: Not available"
+        )
+        print(
+            f"Propeller Weight: {self.propulsion.ver_prop.weight():.2f} kg"
+            if hasattr(self.propulsion, "ver_prop")
+            else "Propeller Weight: Not available"
+        )
+        print(
+            f"Component Weights: Wing = {self.wing.weight()[0]:.2f} kg, "
+            f"Fuselage = {self.fuselage.weight()[0]:.5f} kg, "
+            f"Landing Gear = {self.landing_gear.weight()[0]:.2f} kg, "
+            f"Propulsion = {self.propulsion.weight(mission_energy)[0]:.2f} kg"
+        )
+
+        self.max_payload = (
+            toml["config"]["payload"]["n_box"] * toml["config"]["payload"]["box_weight"]
+        )
         self.MTOW = self.OEW + self.max_payload
         logging.info(
             f"Class 2 Weight Estimate: MTOW = {self.MTOW[0]:.2f} kg, OEW = {self.OEW[0]:.2f} kg"
@@ -148,5 +167,3 @@ class Drone:
             plt.close()
 
         return self.MTOW, self.OEW
-    
-

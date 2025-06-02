@@ -1,0 +1,196 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+from scipy.interpolate import CubicSpline
+from scipy.optimize import minimize
+
+# Constants and drone parameters
+g = 9.81  # m/s^2
+rho = 1.225  # air density, kg/m^3
+
+# Drone parameters
+m = 1.5  # mass (kg)
+S = 0.25  # wing area (m^2)
+CL_alpha = 5.7  # per rad
+CD = 0.05  # constant drag coefficient
+T_max = 50.0  # max combined thrust (N)
+
+# Target conditions
+Vc = 15.0  # cruise velocity in m/s
+hc = 50.0  # cruise altitude in m
+gamma_c = np.radians(20)  # cruise flight path angle in radians
+t_final = 600.0  # seconds
+N_sim = 6000  # number of time steps
+N_control = 40  # number of control points for thrust
+t_control = np.linspace(0, t_final, N_control)
+t_vec = np.linspace(0, t_final, N_sim)
+dt = t_final / (N_sim - 1)  # time step for simulation
+
+
+# Function to compute L and D
+def compute_aero(V, gamma):
+    alpha = np.clip(gamma, -np.radians(5), np.radians(15))
+    CL = CL_alpha * alpha
+    L = 0.5 * rho * V**2 * S * CL
+    D = 0.5 * rho * V**2 * S * CD
+    return L, D
+
+
+def simulate_transition(thrust_params):
+    cs_Tv = CubicSpline(t_control, thrust_params[:N_control])
+    cs_Tf = CubicSpline(t_control, thrust_params[N_control:])
+
+    def dynamics(t, state):
+        V, gamma, y = state
+        gamma = np.clip(gamma, -np.radians(5), np.radians(35))
+        V = max(V, 0.1)  # prevent division by zero
+        y = max(y, 0.0)  # prevent negative altitude
+        Tv = np.clip(cs_Tv(t), 0, T_max)
+        Tf = np.clip(cs_Tf(t), 0, T_max)
+        T_total = Tv + Tf
+        if T_total > T_max:
+            scale = T_max / T_total
+            Tv *= scale
+            Tf *= scale
+        alpha_t = gamma  # thrust aligned with flight path
+        L, D = compute_aero(V, gamma)
+        dVdt = (
+            Tf - D - m * g * np.sin(gamma)
+        ) / m
+        dGammadt = (
+            Tv + L - m * g * np.cos(gamma)
+        ) / (m * V + 1e-3)
+        dGammadt = np.clip(dGammadt, -1.0, 5.0)  # Limit angular rate
+        dydt = V * np.sin(gamma)
+        
+        return np.array([dVdt, dGammadt, dydt])
+
+    # RK4 Integrator
+    state = np.zeros((len(t_vec), 3))
+    state[0] = [1, 0.0, 0.0]  # initial condition
+
+    for i in range(1, len(t_vec)):
+        t = t_vec[i - 1]
+        h = dt
+        s = state[i - 1]
+
+        k1 = dynamics(t, s)
+        k2 = dynamics(t + h / 2, s + h * k1 / 2)
+        k3 = dynamics(t + h / 2, s + h * k2 / 2)
+        k4 = dynamics(t + h, s + h * k3)
+        state[i] = s + (h / 6) * (k1 + 2 * k2 + 2 * k3 + k4)
+
+        if i % 100 == 0:
+            print(f"t={t:.2f}s: V={s[0]:.2f}, gamma={np.mod(np.degrees(s[1]), 360):.2f}, y={s[2]:.2f}")
+        
+        if np.any(np.isnan(state[i])) or np.any(np.abs(state[i]) > 1e6):
+            # Stop integration if states explode
+            state[i:] = state[i - 1]
+            break
+
+    class DummySolution:
+        def __init__(self, y):
+            self.y = y.T
+
+    return DummySolution(state), cs_Tv, cs_Tf
+
+def constraint_flight_envelope(thrust_params):
+    sol, _, _ = simulate_transition(thrust_params)
+    V, gamma, y = sol.y
+
+    # Flight constraints
+    V_max = 20.0
+    gamma_max = np.radians(15)
+    gamma_min = -np.radians(5)
+
+    constraints = []
+    constraints.extend(V_max - V)        # V <= V_max → V_max - V >= 0
+    constraints.extend(V - 0.0)          # V >= 0
+    constraints.extend(gamma_max - gamma)
+    constraints.extend(gamma - gamma_min)
+    constraints.extend(y - 0.0)          # y >= 0
+
+    return np.array(constraints)
+
+# Objective function: total energy + final state penalty
+def objective(thrust_params):
+    sol, cs_Tv, cs_Tf = simulate_transition(thrust_params)
+    V, gamma, y = sol.y
+    Tv = cs_Tv(t_vec)
+    Tf = cs_Tf(t_vec)
+    Power = Tv * V*np.sin(gamma) + Tf * V*np.sin(gamma)  # Power = Thrust * Velocity
+    Energy = np.trapezoid(Power, t_vec)
+    final_penalty = 1000 * ((V[-1] - Vc) ** 2 + (y[-1] - hc) ** 2 + (gamma[-1] - gamma_c) ** 2)
+    
+    penalty = 0
+
+    # Penalize large flight path angles (e.g., beyond ±20 deg)
+    gamma_deg = np.degrees(gamma)
+    penalty += 10 * np.sum((np.abs(gamma_deg) > 25) * (np.abs(gamma_deg) - 25)**2)
+
+    # Penalize very low or very high speeds
+    penalty += 100 * np.sum((V < 2) * (2 - V)**2)
+    penalty += 10 * np.sum((V > 40) * (V - 40)**2)
+
+    # Penalize negative altitudes (crash)
+    penalty += 100000 * np.sum(np.abs(np.where(y < 0, y, 0)))
+    
+    return Energy + final_penalty + penalty
+
+
+def progress_callback(xk):
+    current_obj = objective(xk)
+    print(f"Current objective: {current_obj:.2f}")
+
+nonlinear_constraints = {
+    'type': 'ineq',
+    'fun': constraint_flight_envelope,
+}
+
+# Initial guess: moderate thrust
+init_guess = np.concatenate(
+    [
+        np.ones(N_control) * (m * g * 1.2),  # Tv: enough to support most weight
+        np.ones(N_control) * (m * g * 0.7),  # Tf: enough to accelerate
+    ]
+)
+bounds = [(0, T_max)] * (2 * N_control)
+
+# Optimization
+result = minimize(
+    objective,
+    init_guess,
+    method="SLSQP",
+    bounds=bounds,
+    constraints=[nonlinear_constraints],
+    options={"maxiter": 500, "ftol": 1e-3, "disp": True},
+    callback=progress_callback,
+)
+sol_opt, cs_Tv_opt, cs_Tf_opt = simulate_transition(result.x)
+
+# Extract and plot results
+V, gamma, y = sol_opt.y
+Tv_opt = cs_Tv_opt(t_vec)
+Tf_opt = cs_Tf_opt(t_vec)
+Power_opt = Tv_opt * V + Tf_opt * V
+
+plt.figure(figsize=(12, 6))
+plt.subplot(2, 2, 1)
+plt.plot(t_vec, V)
+plt.title("Velocity (m/s)")
+
+plt.subplot(2, 2, 2)
+plt.plot(t_vec, np.degrees(gamma))
+plt.title("Flight Path Angle (deg)")
+
+plt.subplot(2, 2, 3)
+plt.plot(t_vec, y)
+plt.title("Altitude (m)")
+
+plt.subplot(2, 2, 4)
+plt.plot(t_vec, Power_opt)
+plt.title("Power Consumption (W)")
+
+plt.tight_layout()
+plt.savefig("transition_trajectory.png", dpi=300)
+plt.show()

@@ -20,9 +20,9 @@ cruise_speed = 15                         # m/s
 cruise_height = 200                       # ft
 
 [config.mission.loitering_times]
-R = 90                                    # s
-C = 90                                    # s
-D = 30                                    # s
+R = 30                                    # s
+C = 60                                    # s
+D = 10                                    # s
 
 [config.mission.payload_masses]
 DR = 0                                    # kg
