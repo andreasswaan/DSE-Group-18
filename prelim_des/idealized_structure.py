@@ -412,8 +412,31 @@ class FuselageStructure:
             stresses = section.bending_stress(Mx=Mz, My=My)
             stresses_per_section.append(stresses)
         return stresses_per_section
+    
+    def compute_bending_moments_with_point_loads(
+        self,
+        Mz_distributed: list[float],
+        point_loads: list[dict]
+    ) -> list[float]:
+        """
+        Returns a list of bending moments at each section (about z-axis),
+        including effects of point loads.
+        Mz_distributed: list of distributed moment (e.g. from distributed load)
+        point_loads: list of dicts, each with {"x": position, "P": load}
+        """
+        moments = []
+        section_positions = [x for x, _ in self.sections]
+        for i, x in enumerate(section_positions):
+            Mz = Mz_distributed[i] if Mz_distributed else 0
+            # Add effect of each point load
+            for pl in point_loads:
+                if pl["x"] >= x:
+                    arm = pl["x"] - x
+                    Mz += pl["P"] * arm
+            moments.append(Mz)
+        return moments
 
-    def plot_3d_fuselage(self, stresses_per_section: list[list[float]]):
+    def plot_3d_fuselage(self, stresses_per_section: list[list[float]], point_loads: list[dict] = None):
         import matplotlib.colors as mcolors
         from matplotlib import cm
 
@@ -437,6 +460,16 @@ class FuselageStructure:
                     boom.y,  # z: upwards
                     color=color,
                     s=boom.area * 1e6 * 50,
+                )
+                
+        # --- Plot point load arrows ---
+        if point_loads:
+            for pl in point_loads:
+                # Arrow at (sideways=0, fuselage x=pl["x"], upwards=0)
+                ax.quiver(
+                    pl["x"], 0, 0,        # base at center of section
+                    0, 0, pl["P"] / 1000, # direction: vertical, scaled for visibility
+                    color="red", arrow_length_ratio=0.2, linewidth=3, alpha=0.9, label="Point Load"
                 )
 
         ax.set_title("Fuselage Structure (Booms colored by Bending Stress)")
@@ -829,13 +862,25 @@ if __name__ == "__main__":
     taper_ratio=1.0,  # 1.0 for constant diameter, <1 for tapered
     )
     
-    Mz_fuselage = 5000  # Nm, example
-    Mz_per_section = [Mz_fuselage] * fuselage.n_sections
-    # (Optional) My_fuselage = ... if you want vertical bending as well
+    # Get fuselage section positions
+    section_positions = [x for x, _ in fuselage.sections]
 
-    # Compute and plot stresses
+    # If you have distributed moments, set them here (or use zeros)
+    Mz_distributed = [0] * fuselage.n_sections  # or your distributed moment
+
+    # Define point loads
+    point_loads = [
+        {"x": 3.0, "P": -2000}  # 2000 N downward at x=3.0 m
+    ]
+
+    # Compute moments including point loads
+    Mz_per_section = fuselage.compute_bending_moments_with_point_loads(
+    Mz_distributed, point_loads
+)
+
+    # Compute and plot stresses as before
     fuselage_stresses_per_section = fuselage.compute_bending_stresses(Mz_per_section)
-    fuselage.plot_3d_fuselage(fuselage_stresses_per_section)
+    fuselage.plot_3d_fuselage(fuselage_stresses_per_section, point_loads=point_loads)
     
     # Create root cross-section
     root_section = create_rectangular_section(
