@@ -312,6 +312,174 @@ def create_rectangular_section(
     return IdealizedSection(booms)
 
 
+
+def create_circular_section(
+    diameter: float,
+    n_booms: int,
+    boom_area: float,
+    material_name: str,
+    materials: dict[str, Material],
+    cap_area: float = None,  # Optional: area for top/bottom "caps"
+) -> IdealizedSection:
+    """
+    Creates an idealized circular section with booms evenly spaced around the circumference.
+    Optionally adds two "cap" booms at the top and bottom.
+    """
+    booms = []
+    radius = diameter / 2
+
+    # Place regular booms evenly around the circle
+    for i in range(n_booms):
+        theta = 2 * np.pi * i / n_booms
+        x = radius * np.cos(theta)
+        y = radius * np.sin(theta)
+        booms.append(
+            Boom(
+                x,
+                y,
+                boom_area,
+                boom_type="regular",
+                material_name=material_name,
+                materials=materials,
+            )
+        )
+
+    # Optionally add "cap" booms at top and bottom (y = +r, y = -r)
+    if cap_area is not None:
+        for y_cap in [radius, -radius]:
+            booms.append(
+                Boom(
+                    0.0,
+                    y_cap,
+                    cap_area,
+                    boom_type="cap",
+                    material_name=material_name,
+                    materials=materials,
+                )
+            )
+
+    return IdealizedSection(booms)
+
+class FuselageStructure:
+    def __init__(
+        self,
+        length: float,
+        n_sections: int,
+        root_section: IdealizedSection,
+        taper_ratio: float = 1.0,  # For constant-diameter, keep at 1.0
+    ):
+        self.length = length
+        self.n_sections = n_sections
+        self.taper_ratio = taper_ratio
+        self.root_section = root_section
+        self.dz = length / (n_sections - 1)
+        self.sections = self.generate_sections()
+
+    def generate_sections(self) -> list[tuple[float, IdealizedSection]]:
+        """
+        Returns a list of (x_position, IdealizedSection) from nose to tail.
+        """
+        sections = []
+        for i in range(self.n_sections):
+            x = (i / (self.n_sections - 1)) * self.length
+            scale = 1 - (1 - self.taper_ratio) * (i / (self.n_sections - 1))
+            scaled_booms = [
+                Boom(
+                    x=boom.x * scale,
+                    y=boom.y * scale,
+                    area=boom.area,
+                    boom_type=boom.type,
+                    material=boom.material,
+                )
+                for boom in self.root_section.booms
+            ]
+            section = IdealizedSection(scaled_booms)
+            sections.append((x, section))
+        return sections
+
+    def compute_bending_stresses(
+        self, Mz_per_section: list[float], My_per_section: list[float] = None
+    ) -> list[list[float]]:
+        """
+        Returns a list of [stress at each boom] for each section.
+        """
+        stresses_per_section = []
+        for i, (x_pos, section) in enumerate(self.sections):
+            Mz = Mz_per_section[i]
+            My = My_per_section[i] if My_per_section else 0
+            # Pass Mz as "Mx" and My as "My" to the section's bending_stress method,
+            # since the section method expects (Mx, My), but for fuselage, Mx = Mz (longitudinal axis)
+            stresses = section.bending_stress(Mx=Mz, My=My)
+            stresses_per_section.append(stresses)
+        return stresses_per_section
+
+    def plot_3d_fuselage(self, stresses_per_section: list[list[float]]):
+        import matplotlib.colors as mcolors
+        from matplotlib import cm
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+        ax.view_init(azim = 210)
+
+        # Flatten all stresses for color normalization
+        all_stresses = [s for section_stresses in stresses_per_section for s in section_stresses]
+        norm = mcolors.Normalize(vmin=min(all_stresses), vmax=max(all_stresses))
+        cmap = cm.get_cmap("viridis")
+
+        for i, (x_pos, section) in enumerate(self.sections):
+            stresses = stresses_per_section[i]
+            for boom, stress in zip(section.booms, stresses):
+                color = cmap(norm(stress))
+                # x: fuselage length, y: sideways, z: upwards
+                ax.scatter(
+                    x_pos,   # x: fuselage length
+                    boom.x,  # y: sideways
+                    boom.y,  # z: upwards
+                    color=color,
+                    s=boom.area * 1e6 * 50,
+                )
+
+        ax.set_title("Fuselage Structure (Booms colored by Bending Stress)")
+        ax.set_xlabel("x [m] (fuselage length)")
+        ax.set_ylabel("y [m] (sideways)")
+        ax.set_zlabel("z [m] (upwards)")
+        ax.grid(True)
+
+        mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
+        mappable.set_array(all_stresses)
+        cbar = plt.colorbar(mappable, ax=ax, pad=0.1)
+        cbar.set_label("Bending Stress [Pa]")
+
+        plt.tight_layout()
+        plt.show()
+
+# def plot_section_stress(section: IdealizedSection, stresses: list[float], title="Section Stress"):
+#     import matplotlib.pyplot as plt
+#     import matplotlib.colors as mcolors
+#     from matplotlib import cm
+#     fig, ax = plt.subplots()
+#     ax.set_aspect("equal")
+
+#     # Normalize for color
+#     norm = mcolors.Normalize(vmin=min(stresses), vmax=max(stresses))
+#     cmap = cm.get_cmap("viridis")
+
+#     for boom, stress in zip(section.booms, stresses):
+#         color = cmap(norm(stress))
+#         marker_size = boom.area * 1e6 * 100
+#         ax.plot(boom.x, boom.y, "o", color=color, markersize=np.sqrt(marker_size))
+
+#     ax.axhline(section.centroid_y, color="gray", linestyle="--", linewidth=1)
+#     ax.axvline(section.centroid_x, color="gray", linestyle="--", linewidth=1)
+#     ax.plot(section.centroid_x, section.centroid_y, "k+", markersize=10)
+#     ax.set_title(title)
+#     ax.set_xlabel("x [m]")
+#     ax.set_ylabel("y [m]")
+#     plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label="Bending Stress [Pa]")
+#     plt.grid(True)
+#     plt.tight_layout()
+#     plt.show()
+
 # if __name__ == "__main__":
 #     width = 0.2  # m
 #     height = 0.12  # m
@@ -556,6 +724,32 @@ class WingStructure:
 
 
 if __name__ == "__main__":
+    
+    # Create fuselage cross-section
+    fuselage_root_section = create_circular_section(
+    diameter=1.0,
+    n_booms=16,
+    boom_area=1e-5,
+    material_name="al_6061_t4",
+    materials=materials,
+    cap_area=2e-5,  # Optional, can omit if not needed
+    )
+    
+    fuselage = FuselageStructure(
+    length=5.0,  # total fuselage length
+    n_sections=20,
+    root_section=fuselage_root_section,
+    taper_ratio=1.0,  # 1.0 for constant diameter, <1 for tapered
+    )
+    
+    Mz_fuselage = 5000  # Nm, example
+    Mz_per_section = [Mz_fuselage] * fuselage.n_sections
+    # (Optional) My_fuselage = ... if you want vertical bending as well
+
+    # Compute and plot stresses
+    fuselage_stresses_per_section = fuselage.compute_bending_stresses(Mz_per_section)
+    fuselage.plot_3d_fuselage(fuselage_stresses_per_section)
+    
     # Create root cross-section
     root_section = create_rectangular_section(
         width=0.6,
