@@ -516,8 +516,9 @@ class WingStructure:
         self.n_sections = n_sections
         self.taper_ratio = taper_ratio
         self.root_section = root_section
-        self.dy = span / (n_sections - 1)
+        self.dy = span / 2 / (n_sections - 1)
         self.sections = self.generate_sections()
+        self.total_weight = None
 
     def generate_sections(self) -> list[tuple[float, IdealizedSection]]:
         """
@@ -546,7 +547,54 @@ class WingStructure:
 
         return sections
 
-    def compute_bending_moments(self, lift_per_section: list[float]) -> list[float]:
+    def compute_total_weight(self, g: float = 9.81) -> float:
+        """
+        Computes total structural weight of the wing based on boom areas, material densities, and span.
+        Assumes the total wing (not just half).
+        """
+        total_weight = 0.0
+        for _, section in self.sections:
+            for boom in section.booms:
+                volume = boom.area * self.dy  # dy is the section spacing
+                mass = volume * boom.material.density
+                total_weight += mass * g
+        return 2 * total_weight  # Full span (you model only half)
+
+    def compute_weight_distribution(self) -> list[float]:
+        """
+        Returns a list of weight per section [N] for half-wing.
+        """
+        if self.total_weight is None:
+            raise ValueError(
+                "Set self.total_weight before computing weight distribution."
+            )
+
+        weight_per_section = []
+        for y_pos, _ in self.sections:
+            w_y = constant_weight_distribution(y_pos, self.span, self.total_weight)
+            weight_per_section.append(w_y * self.dy)
+        return weight_per_section
+
+    def compute_net_vertical_load(
+        self, lift_per_section: list[float], weight_per_section: list[float]
+    ) -> list[float]:
+        """
+        Computes net vertical force per section (lift - weight).
+        """
+        return [L - W for L, W in zip(lift_per_section, weight_per_section)]
+
+    def compute_shear_forces(self, net_vertical_load: list[float]) -> list[float]:
+        """
+        Returns list of shear forces [N] at each section along span.
+        """
+        shear_forces = []
+        for i in range(len(net_vertical_load)):
+            shear = sum(net_vertical_load[i:])
+            shear_forces.append(shear)
+        return shear_forces
+
+    def compute_bending_moments(self, net_vertical_load: list[float]) -> list[float]:
+        # def compute_bending_moments(self, lift_per_section: list[float]) -> list[float]:
         """
         Returns a list of bending moments at each section (about x-axis).
         """
@@ -556,7 +604,7 @@ class WingStructure:
             for j in range(i, len(self.sections)):
                 y_out, _ = self.sections[j]
                 arm = y_out - y_pos
-                moment += lift_per_section[j] * arm
+                moment += net_vertical_load[j] * arm
             moments_x.append(moment)
 
         # # Plot the moment distribution along the span
@@ -572,9 +620,9 @@ class WingStructure:
         return moments_x
 
     def compute_bending_stresses(
-        self, lift_per_section: list[float]
+        self, net_vertical_load: list[float]
     ) -> tuple[list[float], list[list[float]]]:
-        moments_x = self.compute_bending_moments(lift_per_section)
+        moments_x = self.compute_bending_moments(net_vertical_load)
         stresses_per_section = []
         for i, (y_pos, section) in enumerate(self.sections):
             stresses = section.bending_stress(Mx=moments_x[i], My=0)
@@ -582,7 +630,7 @@ class WingStructure:
         return moments_x, stresses_per_section
 
     def compute_vertical_deflections(
-        self, lift_per_section: list[float]
+        self, net_vertical_load: list[float]
     ) -> list[float]:
         """
         Returns the vertical deflection at each section along the span.
@@ -592,7 +640,7 @@ class WingStructure:
         Ixx = self.root_section.Ixx  # m^4
         dy = self.dy
 
-        moments_x = self.compute_bending_moments(lift_per_section)
+        moments_x = self.compute_bending_moments(net_vertical_load)
 
         # Integrate twice to get deflection (Euler-Bernoulli, discrete)
         theta = [0.0]  # slope at root
@@ -609,6 +657,7 @@ class WingStructure:
         self,
         stresses_per_section: list[list[float]],
         lift_per_section: list[float] = None,
+        weight_per_section: list[float] = None,
     ):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
@@ -643,29 +692,58 @@ class WingStructure:
                 )
 
         # --- Add load arrows (lift) ---
+        arrow_scale = None
         if lift_per_section:
             arrow_scale = (
-                max(lift_per_section) / 0.1
-            )  # Adjust denominator for arrow length scaling
+                max(lift_per_section) / 0.1 if max(lift_per_section) != 0 else 1.0
+            )
 
             for i, (y_pos, section) in enumerate(self.sections):
-                # Compute centroid of section for arrow base
                 x_c = np.mean([boom.x for boom in section.booms])
                 upper_boom = max(section.booms, key=lambda b: b.y)
                 z_c = upper_boom.y
                 lift = lift_per_section[i]
-                # Arrow points in +z (vertical) direction
                 ax.quiver(
                     x_c,
                     y_pos,
-                    z_c,  # base position
+                    z_c,
                     0,
                     0,
-                    lift / arrow_scale,  # direction vector (scaled)
+                    lift / arrow_scale,
                     color="red",
                     arrow_length_ratio=0.2,
                     linewidth=2,
                     alpha=0.7,
+                    label="Lift" if i == 0 else None,
+                )
+
+        # --- Add load arrows (weight, downward) ---
+        if weight_per_section:
+            # Use the same arrow_scale as lift for direct comparison
+            if arrow_scale is None:
+                arrow_scale = (
+                    max(weight_per_section) / 0.1
+                    if max(weight_per_section) != 0
+                    else 1.0
+                )
+
+            for i, (y_pos, section) in enumerate(self.sections):
+                x_c = np.mean([boom.x for boom in section.booms])
+                lower_boom = min(section.booms, key=lambda b: b.y)
+                z_c = lower_boom.y
+                weight = weight_per_section[i]
+                ax.quiver(
+                    x_c,
+                    y_pos,
+                    z_c,
+                    0,
+                    0,
+                    -weight / arrow_scale,
+                    color="blue",
+                    arrow_length_ratio=0.2,
+                    linewidth=2,
+                    alpha=0.7,
+                    label="Weight" if i == 0 else None,
                 )
 
         ax.set_title("3D Wing Structure (Color-coded by Local Stress)")
@@ -679,6 +757,15 @@ class WingStructure:
         mappable.set_array(all_stresses)
         cbar = plt.colorbar(mappable, ax=ax, pad=0.1)
         cbar.set_label("Bending Stress [Pa]")
+
+        # Add legend for arrows
+        handles = []
+        if lift_per_section:
+            handles.append(plt.Line2D([0], [0], color="red", lw=2, label="Lift"))
+        if weight_per_section:
+            handles.append(plt.Line2D([0], [0], color="blue", lw=2, label="Weight"))
+        if handles:
+            ax.legend(handles=handles, loc="upper left")
 
         plt.tight_layout()
         plt.show()
@@ -784,12 +871,12 @@ if __name__ == "__main__":
         lift - weight for lift, weight in zip(lift_per_section, weight_per_section)
     ]
 
-    moments_x, stresses_per_section = wing.compute_bending_stresses(lift_per_section)
-    wing.plot_3d_wing(stresses_per_section, lift_per_section)
+    moments_x, stresses_per_section = wing.compute_bending_stresses(total_vertical_load)
+    wing.plot_3d_wing(stresses_per_section, lift_per_section, weight_per_section)
 
     # wing.plot_3d_wing(lift_per_section)
 
-    vertical_deflections = wing.compute_vertical_deflections(lift_per_section)
+    vertical_deflections = wing.compute_vertical_deflections(total_vertical_load)
     wing.plot_deformed_wing(vertical_deflections)
 
     with open("wing_sections.csv", "w", newline="") as f:
