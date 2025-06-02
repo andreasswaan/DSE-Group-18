@@ -416,25 +416,32 @@ class FuselageStructure:
     def compute_bending_moments_with_point_loads(
         self,
         Mz_distributed: list[float],
+        My_distributed: list[float],
         point_loads: list[dict]
-    ) -> list[float]:
+    ) -> tuple[list[float], list[float]]:
         """
-        Returns a list of bending moments at each section (about z-axis),
-        including effects of point loads.
-        Mz_distributed: list of distributed moment (e.g. from distributed load)
-        point_loads: list of dicts, each with {"x": position, "P": load}
+        Returns two lists: (Mz_per_section, My_per_section)
+        - Mz: bending moment about z-axis (from Px)
+        - My: bending moment about y-axis (from Pz)
+        Includes effects of distributed moments and point loads.
+        point_loads: list of dicts, each with {"x": position, "Px": ..., "Pz": ...}
         """
-        moments = []
+        Mz_list = []
+        My_list = []
         section_positions = [x for x, _ in self.sections]
         for i, x in enumerate(section_positions):
             Mz = Mz_distributed[i] if Mz_distributed else 0
-            # Add effect of each point load
+            My = My_distributed[i] if My_distributed else 0
             for pl in point_loads:
                 if pl["x"] >= x:
                     arm = pl["x"] - x
-                    Mz += pl["P"] * arm
-            moments.append(Mz)
-        return moments
+                    Px = pl.get("Px", 0)
+                    Pz = pl.get("Pz", 0)
+                    Mz += Px * arm
+                    My += Pz * arm
+            Mz_list.append(Mz)
+            My_list.append(My)
+        return Mz_list, My_list
 
     def plot_3d_fuselage(self, stresses_per_section: list[list[float]], point_loads: list[dict] = None):
         import matplotlib.colors as mcolors
@@ -465,10 +472,13 @@ class FuselageStructure:
         # --- Plot point load arrows ---
         if point_loads:
             for pl in point_loads:
+                # Default to 0 if not specified
+                Px = pl.get("Px", 0)
+                Pz = pl.get("Pz", 0)
                 # Arrow at (sideways=0, fuselage x=pl["x"], upwards=0)
                 ax.quiver(
-                    pl["x"], 0, 0,        # base at center of section
-                    0, 0, pl["P"] / 1000, # direction: vertical, scaled for visibility
+                    pl["x"], 0, 0,        # base: x=fuselage length, y=sideways, z=upwards
+                    0, Px / 1000, Pz / 1000, # direction: y=sideways, z=upwards, scaled for visibility
                     color="red", arrow_length_ratio=0.2, linewidth=3, alpha=0.9, label="Point Load"
                 )
 
@@ -866,22 +876,26 @@ if __name__ == "__main__":
     section_positions = [x for x, _ in fuselage.sections]
 
     # If you have distributed moments, set them here (or use zeros)
-    Mz_distributed = [0] * fuselage.n_sections  # or your distributed moment
+    Mz_distributed = [0] * fuselage.n_sections # or your distributed moment
+    My_distributed = [0] * fuselage.n_sections
 
     # Define point loads
     point_loads = [
-        {"x": 3.0, "P": -2000}  # 2000 N downward at x=3.0 m
+        {"x": 3.0, "Pz": -2000},  # 2000 N downward at x=3.0 m
+        {"x": 0.0, "Px": 1500},    # 1500 N sideways (positive x) at x=4.0 m
     ]
 
     # Compute moments including point loads
-    Mz_per_section = fuselage.compute_bending_moments_with_point_loads(
-    Mz_distributed, point_loads
-)
+    Mz_per_section, My_per_section = fuselage.compute_bending_moments_with_point_loads(
+    Mz_distributed, My_distributed, point_loads
+    )
 
     # Compute and plot stresses as before
-    fuselage_stresses_per_section = fuselage.compute_bending_stresses(Mz_per_section)
+    fuselage_stresses_per_section = fuselage.compute_bending_stresses(
+    Mz_per_section, My_per_section
+    )
     fuselage.plot_3d_fuselage(fuselage_stresses_per_section, point_loads=point_loads)
-    
+
     # Create root cross-section
     root_section = create_rectangular_section(
         width=0.6,
