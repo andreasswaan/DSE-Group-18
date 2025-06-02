@@ -25,6 +25,22 @@ def elliptical_lift_distribution(y: float, b: float, L_total: float) -> float:
     return (4 * L_total / (np.pi * b)) * np.sqrt(1 - (2 * y / b) ** 2)
 
 
+def constant_weight_distribution(y: float, b: float, W_total: float) -> float:
+    """
+    Computes weight per unit span (N/m) at spanwise position y from centerline.
+    Assumes constant weight distribution along the wing.
+
+    Parameters:
+        y (float): Position along span (from root, 0 ≤ y ≤ b/2)
+        b (float): Full wingspan
+        W_total (float): Total weight supported by the wing (N)
+
+    Returns:
+        float: Weight per unit span at y (N/m)
+    """
+    return W_total / (b / 2)  # Divide by half-span (you model half wing)
+
+
 class Material:
     def __init__(
         self,
@@ -142,7 +158,7 @@ class IdealizedSection:
         Iyy = sum(b.area * (b.x - x_c) ** 2 for b in self.booms)
         Ixy = sum(b.area * (b.x - x_c) * (b.y - y_c) for b in self.booms)
         return Ixx, Iyy, Ixy
-    
+
     def bending_stress(self, Mx: float, My: float) -> list[float]:
         x_c, y_c = self.centroid_x, self.centroid_y
         Ixx, Iyy, Ixy = self.Ixx, self.Iyy, self.Ixy
@@ -361,7 +377,7 @@ class WingStructure:
             sections.append((y, section))
 
         return sections
-    
+
     def compute_bending_moments(self, lift_per_section: list[float]) -> list[float]:
         """
         Returns a list of bending moments at each section (about x-axis).
@@ -374,17 +390,32 @@ class WingStructure:
                 arm = y_out - y_pos
                 moment += lift_per_section[j] * arm
             moments_x.append(moment)
+
+        # # Plot the moment distribution along the span
+        # y_positions = [y for y, _ in self.sections]
+        # plt.figure()
+        # plt.plot(y_positions, moments_x, marker="o")
+        # plt.xlabel("Spanwise Position y [m]")
+        # plt.ylabel("Bending Moment Mx [Nm]")
+        # plt.title("Bending Moment Distribution Along Wing Span")
+        # plt.grid(True)
+        # plt.tight_layout()
+        # plt.show()
         return moments_x
-    
-    def compute_bending_stresses(self, lift_per_section: list[float]) -> tuple[list[float], list[list[float]]]:
+
+    def compute_bending_stresses(
+        self, lift_per_section: list[float]
+    ) -> tuple[list[float], list[list[float]]]:
         moments_x = self.compute_bending_moments(lift_per_section)
         stresses_per_section = []
         for i, (y_pos, section) in enumerate(self.sections):
             stresses = section.bending_stress(Mx=moments_x[i], My=0)
             stresses_per_section.append(stresses)
         return moments_x, stresses_per_section
-    
-    def compute_vertical_deflections(self, lift_per_section: list[float]) -> list[float]:
+
+    def compute_vertical_deflections(
+        self, lift_per_section: list[float]
+    ) -> list[float]:
         """
         Returns the vertical deflection at each section along the span.
         Assumes constant EI (uses root section Ixx and material E).
@@ -398,16 +429,19 @@ class WingStructure:
         # Integrate twice to get deflection (Euler-Bernoulli, discrete)
         theta = [0.0]  # slope at root
         for i in range(1, len(moments_x)):
-            dtheta = moments_x[i-1] * dy / (E * Ixx)
+            dtheta = moments_x[i - 1] * dy / (E * Ixx)
             theta.append(theta[-1] + dtheta)
         w = [0.0]  # deflection at root
         for i in range(1, len(theta)):
-            dw = theta[i-1] * dy
+            dw = theta[i - 1] * dy
             w.append(w[-1] + dw)
         return w
 
-
-    def plot_3d_wing(self, stresses_per_section: list[list[float]], lift_per_section: list[float] = None):
+    def plot_3d_wing(
+        self,
+        stresses_per_section: list[list[float]],
+        lift_per_section: list[float] = None,
+    ):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
 
@@ -415,7 +449,11 @@ class WingStructure:
         import matplotlib.colors as mcolors
 
         # --- Flatten all stresses for color normalization ---
-        all_stresses = [stress for section_stresses in stresses_per_section for stress in section_stresses]
+        all_stresses = [
+            stress
+            for section_stresses in stresses_per_section
+            for stress in section_stresses
+        ]
         min_stress = min(all_stresses)
         max_stress = max(all_stresses)
         norm = mcolors.Normalize(vmin=min_stress, vmax=max_stress)
@@ -435,10 +473,12 @@ class WingStructure:
                     color=color,
                     s=boom.area * 1e6 * 50,
                 )
-        
+
         # --- Add load arrows (lift) ---
         if lift_per_section:
-            arrow_scale = max(lift_per_section) / 0.1  # Adjust denominator for arrow length scaling
+            arrow_scale = (
+                max(lift_per_section) / 0.1
+            )  # Adjust denominator for arrow length scaling
 
             for i, (y_pos, section) in enumerate(self.sections):
                 # Compute centroid of section for arrow base
@@ -448,9 +488,16 @@ class WingStructure:
                 lift = lift_per_section[i]
                 # Arrow points in +z (vertical) direction
                 ax.quiver(
-                    x_c, y_pos, z_c,   # base position
-                    0, 0, lift / arrow_scale,  # direction vector (scaled)
-                    color="red", arrow_length_ratio=0.2, linewidth=2, alpha=0.7
+                    x_c,
+                    y_pos,
+                    z_c,  # base position
+                    0,
+                    0,
+                    lift / arrow_scale,  # direction vector (scaled)
+                    color="red",
+                    arrow_length_ratio=0.2,
+                    linewidth=2,
+                    alpha=0.7,
                 )
 
         ax.set_title("3D Wing Structure (Color-coded by Local Stress)")
@@ -467,7 +514,7 @@ class WingStructure:
 
         plt.tight_layout()
         plt.show()
-        
+
     def plot_deformed_wing(self, vertical_deflections: list[float]):
         import matplotlib.colors as mcolors
         from matplotlib import cm
@@ -490,7 +537,9 @@ class WingStructure:
                 z = boom.y + dz  # add deflection to original z
                 ax.scatter(x, y, z, color=color, s=boom.area * 1e6 * 50)
 
-        ax.set_title("Vertical Deflection of Wing Structure (Booms colored by Deflection)")
+        ax.set_title(
+            "Vertical Deflection of Wing Structure (Booms colored by Deflection)"
+        )
         ax.set_xlabel("x [m] (chordwise)")
         ax.set_ylabel("y [m] (spanwise)")
         ax.set_zlabel("z [m] (vertical)")
@@ -543,9 +592,9 @@ if __name__ == "__main__":
 
     moments_x, stresses_per_section = wing.compute_bending_stresses(lift_per_section)
     wing.plot_3d_wing(stresses_per_section, lift_per_section)
-    
+
     # wing.plot_3d_wing(lift_per_section)
-    
+
     vertical_deflections = wing.compute_vertical_deflections(lift_per_section)
     wing.plot_deformed_wing(vertical_deflections)
 
