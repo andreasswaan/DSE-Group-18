@@ -86,7 +86,7 @@ class Performance:
         )  # Energy required for cruise
 
         return energy_cruise
-    
+
     def cruise_range(self, energy):
         """
         Calculate the range during cruise based on available energy.
@@ -184,21 +184,23 @@ class Performance:
             plt.savefig(os.path.join(plot_path, "cruise_noise.png"), dpi=300)
         return noise
 
-
     def payload_range_diagram(self, n_battery_max=8, E_total=5e6):
         """
         Plot a structured payload-range curve with mass breakdown.
         """
         n_pizza_max = toml["config"]["payload"]["n_box"]
         pizza_mass = toml["config"]["payload"]["box_weight"]
+        
         # E_density = TimeConverter.hours_to_sec(
         #     toml["config"]["battery"]["energy_density"]
         # )  # J/kg
 
         # E_battery = E_total / n_battery_max
         # battery_mass = E_battery / E_density
+        min_bat_lvl = self.drone.propulsion.battery.min_batt_lvl
         max_battery_mass = float(self.drone.propulsion.battery.weight)
         mass_per_battery = max_battery_mass / n_battery_max
+        energy_per_battery = self.mission_energy()[0] * (1-min_bat_lvl) / n_battery_max
         OEW_base = self.drone.OEW - max_battery_mass
 
         # Phase 1: Add batteries while keeping max pizzas
@@ -208,19 +210,39 @@ class Performance:
 
         for b in range(n_battery_max + 1):
             total_mass = OEW_base + n_pizza_max * pizza_mass + b * mass_per_battery
-            if total_mass > OEW_base + n_pizza_max * pizza_mass + n_battery_max * mass_per_battery:
+            if (
+                total_mass
+                > OEW_base + n_pizza_max * pizza_mass + n_battery_max * mass_per_battery
+            ):
                 break
-            r = b * 1.5  # Dummy range progression
+            # Calculate available energy for cruise (proportional to battery mass)
+            E_available = b * energy_per_battery  # Adjust for minimum battery level
+            
+            # Use cruise_range calculation for range
+            if total_mass > 0 and E_available > 0:
+                self.drone.MTOW = total_mass  # Temporarily set MTOW for calculation
+                r = float(self.cruise_range(E_available) / 1000)  # convert to km
+            else:
+                r = 0
             phase1_ranges.append(r)
             phase1_pizza.append(n_pizza_max * pizza_mass)
             phase1_battery.append(b * mass_per_battery)
+
         # Phase 2: Remove pizzas at full battery
         phase2_ranges = []
         phase2_pizza = []
         phase2_battery = []
 
         for p in range(n_pizza_max - 1, -1, -1):
-            r = (n_battery_max * 1.5) + (n_pizza_max - p) * 0.8  # Continue range
+            total_mass = OEW_base + p * pizza_mass + n_battery_max * mass_per_battery
+            # Calculate available energy for cruise (proportional to battery mass)
+            E_available = n_battery_max * energy_per_battery
+            
+            if total_mass > 0 and E_available > 0:
+                self.drone.MTOW = total_mass  # Temporarily set MTOW for calculation
+                r = float(self.cruise_range(E_available) / 1000)  # convert to km
+            else:
+                r = 0
             phase2_ranges.append(r)
             phase2_pizza.append(p * pizza_mass)
             phase2_battery.append(n_battery_max * mass_per_battery)
@@ -240,17 +262,21 @@ class Performance:
 
         # MTOW line at point B
         mtow_B = OEW_base + n_pizza_max * pizza_mass + n_battery_max * mass_per_battery
-        plt.axhline(mtow_B, color="black", linestyle="--", linewidth=1.2, label="MTOW (at B)")
+        plt.axhline(
+            mtow_B, color="black", linestyle="--", linewidth=1.2, label="MTOW (at B)"
+        )
 
         # Stacked breakdown (plot battery mass on top)
         plt.fill_between(ranges, 0, oews, color="lightgray", label="OEW")
-        plt.fill_between(ranges, oews, oews + pizza_masses, color="orange", label="Pizza Mass")
+        plt.fill_between(
+            ranges, oews, oews + pizza_masses, color="orange", label="Pizza Mass"
+        )
         plt.fill_between(
             ranges,
             oews + pizza_masses,
             oews + pizza_masses + battery_masses,
             color="cyan",
-            label="Battery Mass"
+            label="Battery Mass",
         )
 
         # Plot MTOW points
@@ -259,20 +285,41 @@ class Performance:
 
         # Annotate key points
         # Point A: first point
-        plt.annotate("A", xy=(ranges[0], mtows[0]), xytext=(5, 5), textcoords="offset points",
-                    fontsize=10, fontweight="bold", color="darkred",
-                    arrowprops=dict(arrowstyle="->", lw=1, color="gray"))
+        plt.annotate(
+            "A",
+            xy=(ranges[0], mtows[0]),
+            xytext=(5, 5),
+            textcoords="offset points",
+            fontsize=10,
+            fontweight="bold",
+            color="darkred",
+            arrowprops=dict(arrowstyle="->", lw=1, color="gray"),
+        )
 
         # Point B: end of phase 1
         B_index = n_battery_max
-        plt.annotate("B", xy=(ranges[B_index], mtows[B_index]), xytext=(5, 5), textcoords="offset points",
-                    fontsize=10, fontweight="bold", color="darkred",
-                    arrowprops=dict(arrowstyle="->", lw=1, color="gray"))
+        plt.annotate(
+            "B",
+            xy=(ranges[B_index], mtows[B_index]),
+            xytext=(5, 5),
+            textcoords="offset points",
+            fontsize=10,
+            fontweight="bold",
+            color="darkred",
+            arrowprops=dict(arrowstyle="->", lw=1, color="gray"),
+        )
 
         # Point C: last point
-        plt.annotate("C", xy=(ranges[-1], mtows[-1]), xytext=(5, 5), textcoords="offset points",
-                    fontsize=10, fontweight="bold", color="darkred",
-                    arrowprops=dict(arrowstyle="->", lw=1, color="gray"))
+        plt.annotate(
+            "C",
+            xy=(ranges[-1], mtows[-1]),
+            xytext=(5, 5),
+            textcoords="offset points",
+            fontsize=10,
+            fontweight="bold",
+            color="darkred",
+            arrowprops=dict(arrowstyle="->", lw=1, color="gray"),
+        )
 
         plt.xlabel("Range [km]")
         plt.ylabel("Total Weight [kg]")
@@ -281,4 +328,3 @@ class Performance:
         plt.grid(True)
         plt.tight_layout()
         plt.show()
-        
