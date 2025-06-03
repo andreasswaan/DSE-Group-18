@@ -477,6 +477,9 @@ def plot_weighted_grid(grid_data):
     cmap = plt.cm.viridis.copy()
     cmap.set_over('red', 1.0)  # Obstacles in red
     
+    finite_weights = masked_weights[~masked_weights.mask]
+    vmax = np.nanmax(finite_weights)
+    
     im = ax.imshow(
         #weights,
         masked_weights,
@@ -485,7 +488,7 @@ def plot_weighted_grid(grid_data):
         extent=[grid_data['bounds'][0], grid_data['bounds'][2],
                 grid_data['bounds'][1], grid_data['bounds'][3]],
         vmin=0.0,
-        vmax=0.5)
+        vmax=vmax)
     
         # — No-Fly Zones: oranje cirkels met 50m radius (op ware afstand) —
     try:
