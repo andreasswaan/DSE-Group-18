@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from mpl_toolkits.mplot3d import Axes3D
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
@@ -298,7 +299,10 @@ def create_rectangular_section(
                 )
             )
 
-    return IdealizedSection(booms)
+    section = IdealizedSection(booms)
+    section.width = width      # <-- Add this line
+    section.height = height    # <-- (optional, for symmetry)
+    return section
 
 def create_circular_section(
     diameter: float,
@@ -447,7 +451,7 @@ class FuselageStructure:
             s for section_stresses in stresses_per_section for s in section_stresses
         ]
         norm = mcolors.Normalize(vmin=min(all_stresses), vmax=max(all_stresses))
-        cmap = cm.get_cmap("viridis")
+        cmap = plt.colormaps["viridis"]
 
         for i, (x_pos, section) in enumerate(self.sections):
             stresses = stresses_per_section[i]
@@ -459,7 +463,7 @@ class FuselageStructure:
                     boom.x,  # y: sideways
                     boom.y,  # z: upwards
                     color=color,
-                    s=boom.area * 1e6 * 50,
+                    s=boom.area * 1e6 * 20,
                 )
 
         # --- Plot point load arrows ---
@@ -471,8 +475,8 @@ class FuselageStructure:
                 # Arrow at (sideways=0, fuselage x=pl["x"], upwards=0)
                 ax.quiver(
                     pl["x"],
-                    0,
-                    0,  # base: x=fuselage length, y=sideways, z=upwards
+                    pl["y"],
+                    pl["z"],  # base: x=fuselage length, y=sideways, z=upwards
                     0,
                     Px / 1000,
                     Pz
@@ -540,7 +544,7 @@ class WingStructure:
             sections.append((y, section))
 
         return sections
-
+    
     def compute_total_weight(self, g: float = 9.81) -> float:
         """
         Computes total structural weight of the wing based on boom areas, material densities, and span.
@@ -601,6 +605,34 @@ class WingStructure:
                 moment += net_vertical_load[j] * arm
             moments_x.append(moment)
         return moments_x
+    
+    def compute_bending_moments_with_point_loads(
+        self,
+        net_vertical_load: list[float],
+        point_loads: list[dict]
+    ) -> list[float]:
+        """
+        Returns a list of bending moments at each section (about x-axis),
+        including effects of point loads (e.g., payload, landing gear).
+        point_loads: list of dicts, each with {"y": position, "Pz": load}
+        """
+        moments_x = []
+        section_positions = [y for y, _ in self.sections]
+        for i, y in enumerate(section_positions):
+            moment = 0
+            # Distributed loads (as before)
+            for j in range(i, len(self.sections)):
+                y_out, _ = self.sections[j]
+                arm = y_out - y
+                moment += net_vertical_load[j] * arm
+            # Add point loads
+            for pl in point_loads:
+                if pl["y"] >= y:
+                    arm = pl["y"] - y
+                    Pz = pl.get("Pz", 0)
+                    moment += Pz * arm
+            moments_x.append(moment)
+        return moments_x
 
     def compute_bending_stresses(
         self, net_vertical_load: list[float]
@@ -641,6 +673,7 @@ class WingStructure:
         stresses_per_section: list[list[float]],
         lift_per_section: list[float] = None,
         weight_per_section: list[float] = None,
+        point_loads: list[dict] = None,
     ):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
@@ -657,7 +690,7 @@ class WingStructure:
         min_stress = min(all_stresses)
         max_stress = max(all_stresses)
         norm = mcolors.Normalize(vmin=min_stress, vmax=max_stress)
-        cmap = cm.get_cmap("viridis")
+        cmap = plt.colormaps["viridis"]
 
         # --- Plot booms colored by stress ---
         for i, (y_pos, section) in enumerate(self.sections):
@@ -671,7 +704,7 @@ class WingStructure:
                     y_pos,
                     z,
                     color=color,
-                    s=boom.area * 1e6 * 50,
+                    s=boom.area * 1e6 * 20,
                 )
 
         # --- Add load arrows (lift) ---
@@ -728,6 +761,18 @@ class WingStructure:
                     alpha=0.7,
                     label="Weight" if i == 0 else None,
                 )
+        
+        if point_loads:
+            for pl in point_loads:
+                x = pl.get("x", 0)
+                y = pl["y"]
+                z = pl.get("z", 0)
+                Pz = pl.get("Pz", 0)
+                ax.quiver(
+                    x, y, z,    # base at (x, y, z)
+                    0, 0, Pz / 1000,  # direction: vertical, scaled for visibility
+                    color="red", arrow_length_ratio=0.2, linewidth=3, alpha=0.9, label="Point Load"
+                )
 
         ax.set_title("3D Wing Structure (Color-coded by Local Stress)")
         ax.set_xlabel("x [m] (chordwise)")
@@ -749,6 +794,14 @@ class WingStructure:
             handles.append(plt.Line2D([0], [0], color="blue", lw=2, label="Weight"))
         if handles:
             ax.legend(handles=handles, loc="upper left")
+            
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
+        ax.zaxis.set_major_locator(ticker.MaxNLocator(4))
+
+        ax.set_xlim(-1, 1)
+        ax.set_ylim(0, b/2)
+        ax.set_zlim(-0.2, 0.2)
 
         plt.tight_layout()
         plt.show()
@@ -764,7 +817,7 @@ class WingStructure:
         min_defl = min(vertical_deflections)
         max_defl = max(vertical_deflections)
         norm = mcolors.Normalize(vmin=min_defl, vmax=max_defl)
-        cmap = cm.get_cmap("plasma")
+        cmap = plt.colormaps["plasma"]
 
         for i, (y_pos, section) in enumerate(self.sections):
             dz = vertical_deflections[i]
@@ -773,7 +826,7 @@ class WingStructure:
                 x = boom.x
                 y = y_pos
                 z = boom.y + dz  # add deflection to original z
-                ax.scatter(x, y, z, color=color, s=boom.area * 1e6 * 50)
+                ax.scatter(x, y, z, color=color, s=boom.area * 1e6 * 20)
 
         ax.set_title(
             "Vertical Deflection of Wing Structure (Booms colored by Deflection)"
@@ -788,6 +841,14 @@ class WingStructure:
         mappable.set_array(vertical_deflections)
         cbar = plt.colorbar(mappable, ax=ax, pad=0.1)
         cbar.set_label("Vertical Deflection [m]")
+
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
+        ax.zaxis.set_major_locator(ticker.MaxNLocator(4))
+
+        ax.set_xlim(-1, 1)
+        ax.set_ylim(0, b/2)
+        ax.set_zlim(-0.2, 0.2)
 
         plt.tight_layout()
         plt.show()
@@ -938,13 +999,23 @@ if __name__ == "__main__":
     SAFETY_FACTOR = 2.0
 
     # Create fuselage cross-section
-    fuselage_root_section = create_circular_section(
-        diameter=1.0,
-        n_booms=16,
-        boom_area=1e-5,
+    # fuselage_root_section = create_circular_section(
+    #     diameter=1.0,
+    #     n_booms=16,
+    #     boom_area=1e-5,
+    #     material_name="al_6061_t4",
+    #     materials=materials,
+    #     cap_area=2e-5,  # Optional, can omit if not needed
+    # )
+    
+    fuselage_root_section = create_rectangular_section(
+        width=0.6,                # Set your fuselage width [m]
+        height=0.3,               # Set your fuselage height [m]
+        n_regular_booms=12,       # Number of regular booms (adjust as needed)
+        spar_cap_area=2e-5,       # Area for each corner boom
+        regular_boom_area=1e-5,   # Area for each regular boom
         material_name="al_6061_t4",
         materials=materials,
-        cap_area=2e-5,  # Optional, can omit if not needed
     )
 
     fuselage = FuselageStructure(
@@ -963,8 +1034,8 @@ if __name__ == "__main__":
 
     # Define point loads
     point_loads = [
-        {"x": 3.0, "Pz": -2000},  # 2000 N downward at x=3.0 m
-        {"x": 0.0, "Px": 1500},  # 1500 N sideways (positive x) at x=4.0 m
+        {"x": 3.0, "y": 0.5, "z": -0.4, "Pz": -2000},  # 2000 N downward at x=3.0 m
+        {"x": 0.0, "y": 0.2, "z": 0.2, "Px": 1500},  # 1500 N sideways (positive x) at x=4.0 m
     ]
 
     # Compute moments including point loads
@@ -999,8 +1070,22 @@ if __name__ == "__main__":
     dy = wing.dy
     # b_half = wing.span / 2
     b = wing.span
-    L_total = 100  # total lift in N, replace with actual value
+    
+    wing_point_loads = [
+        {"x": 1.5 * root_section.width, "y": b / 2 / 3, "z": 0.0, "Pz": 450 / 4},   # 450 / 4 N upwards at (x=0.2, y=0.5, z=0.0)
+        {"x": -1.5 * root_section.width, "y": b / 2 / 3, "z": 0.0, "Pz": 450 / 4},    # 450 / 4 N upwards at (x=0.1, y=1.2, z=0.0)
+    ]
+    
+    # --- Banked flight option ---
+    banked = True  # Set to False for normal cruise, True for banked case
+    phi_deg = 30   # Bank angle in degrees
+    phi_rad = np.radians(phi_deg)
+    n_load = 1 / np.cos(phi_rad) if banked else 1.0
 
+    L_total = 250  # total lift in N (replace with actual value)
+    L_total_banked = L_total * n_load
+
+    # Use correct total lift for the selected case
     lift_per_section = []
     for y, _ in wing.sections:
         L_prime = elliptical_lift_distribution(y, b, L_total)
@@ -1027,8 +1112,13 @@ if __name__ == "__main__":
         )  # adjust thickness if needed
         shear_stresses_per_section.append(shear_stresses)
 
-    moments_x, stresses_per_section = wing.compute_bending_stresses(total_vertical_load)
-    wing.plot_3d_wing(stresses_per_section, lift_per_section, weight_per_section)
+    moments_x = wing.compute_bending_moments_with_point_loads(total_vertical_load, wing_point_loads)
+    stresses_per_section = []
+    for i, (y_pos, section) in enumerate(wing.sections):
+        stresses = section.bending_stress(Mx=moments_x[i], My=0)
+        stresses_per_section.append(stresses)
+        
+    wing.plot_3d_wing(stresses_per_section, lift_per_section, weight_per_section, point_loads=wing_point_loads)
 
     # wing.plot_3d_wing(lift_per_section)
 
