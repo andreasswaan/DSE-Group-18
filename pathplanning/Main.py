@@ -43,6 +43,9 @@ for _ in range(500):
 else:
     raise ValueError("❌ Could not find a valid endpoint near the center.")
 
+start = tuple([25,480])
+# end = tuple([180,585])
+
 print(f"Start point (restaurant): {start}")
 print(f"End point (near center): {end}")
 
@@ -50,7 +53,25 @@ print(f"End point (near center): {end}")
 path = a_star_search_8dir(start, end, walkable, density_map=grid['weight_grid'])
 if not path:
     raise RuntimeError("❌ A* could not find a path.")
-smoothed_path = smooth_path(path, walkable)
+# smoothed_path = smooth_path(path, walkable)
+
+paths_n = []
+alpha_step = 0.1
+alphas = np.arange(0.0, 1, alpha_step)
+num_runs = 2
+for i in range(num_runs):
+    np.random.seed(1)
+    print(f"------ Run {i+1}/{num_runs} ------")
+    start = tuple(restaurant_coords[np.random.randint(len(restaurant_coords))][::-1])
+    end = tuple([np.random.randint(0, width), np.random.randint(0, height)])
+    
+    paths = []
+    for i in alphas:
+        print(i)
+        alpha = i
+        paths.append(a_star_search_8dir(start, end, walkable, density_map=grid['weight_grid'], alpha=alpha))
+        
+    paths_n.append(paths)
 
 # ---------- 5. Visualize the result ----------
 # Normalize weights for background visualization
@@ -66,34 +87,65 @@ rgba = cmap(normalized)  # shape: (H, W, 4)
 img = rgba[:, :, :3].copy()
 img[~walkable] = [0, 0, 0]  # mask obstacles in black
 
-for x, y in path:
-    img[y, x] = [1, 0, 1]  # magenta for raw A* path
-for x, y in smoothed_path:
-    img[y, x] = [0, 1, 1]  # cyan for smoothed path
+# Apply a gradient to the line color depending on alpha used for the path in the loop
+from matplotlib.colors import to_rgb
 
-img[start[1], start[0]] = [0, 0, 1]  # blue for start
-img[end[1], end[0]] = [0, 1, 0]      # green for end
+# Use purple-to-lime gradient for maximum contrast with each other and the background
+start_color = np.array(to_rgb("purple"))    # low alpha
+end_color = np.array(to_rgb("lime"))        # high alpha
 
+for paths in paths_n:
+    for path_i, alpha in zip(paths, alphas):
+        color = (1 - alpha) * start_color + alpha * end_color  # linear interpolation
+        for x, y in path_i[0]:
+            img[y, x] = color
+        print(f"Path with alpha {np.round(alpha,2)} has distance {np.round(path_i[1],3)} and weight {np.round(path_i[2],3)}")
 
+# for x, y in path:
+#     img[y, x] = [1, 0, 1]  # blue for raw A* path
+# for x, y in smoothed_path:
+#     img[y, x] = [0, 1, 1]  # cyan for smoothed path
+
+img[start[1], start[0]] = [0, 0, 0.5]  # dark blue for start
+img[end[1], end[0]] = [0, 1, 0]        # green for end
 
 fig, ax = plt.subplots(figsize=(8, 8))
 ax.imshow(img, origin='lower')  
+
+# Plot big markers for start and end points
+ax.scatter(start[0], start[1], s=120, c='navy', edgecolors='white', linewidths=2, marker='o', label='Start (restaurant)', zorder=10)
+ax.scatter(end[0], end[1], s=120, c='lime', edgecolors='black', linewidths=2, marker='*', label='End point', zorder=10)
 
 cbar = plt.colorbar(cm.ScalarMappable(norm=mcolors.Normalize(vmin=0.0, vmax=max_weight), cmap=cmap), ax=ax)
 cbar.set_label("Navigation Cost (normalized)", fontsize=10)
 
 legend_elements = [
     Patch(facecolor='black', edgecolor='black', label='No-fly zones / obstacles'),
-    Patch(facecolor='magenta', edgecolor='black', label='A* path'),
-    Patch(facecolor='cyan', edgecolor='black', label='Smoothed path'),
-    Patch(facecolor='blue', edgecolor='black', label='Start (restaurant)'),
-    Patch(facecolor='green', edgecolor='black', label='End point')
+    Patch(facecolor='purple', edgecolor='black', label='A* path (low alpha)'),
+    Patch(facecolor='lime', edgecolor='black', label='A* path (high alpha)'),
+    Patch(facecolor='navy', edgecolor='white', label='Start (restaurant)'),
+    Patch(facecolor='lime', edgecolor='black', label='End point')
 ]
 
 ax.legend(handles=legend_elements, loc='upper right', frameon=True)
 
 ax.set_title("A* Path on Weighted Delft Grid")
 ax.axis("off")
+plt.tight_layout()
+plt.show()
+
+# Print Pareto-eque curve
+fig2, ax2 = plt.subplots()
+
+for paths in paths_n: 
+    distances = [p[1] for p in paths]
+    noises = [p[2] for p in paths]
+    ax2.plot(distances, noises, marker='o', label='Distance - Noise line')
+    
+ax2.set_xlabel('Distance')
+ax2.set_ylabel('Noise')
+ax2.set_title('Path Distance vs Weight at varying Alpha')
+ax2.legend()
 plt.tight_layout()
 plt.show()
 
