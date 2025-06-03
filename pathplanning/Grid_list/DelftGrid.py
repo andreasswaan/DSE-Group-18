@@ -160,7 +160,7 @@ def get_population_density(city_name: str) -> pd.DataFrame:
     :return: DataFrame with population density information.
     """
     # Load the GeoDataFrame with population density data
-    gdf = gpd.read_file("/Users/feliceverbeek/Documents/GitHub/DSE-Group-18/Images/wijkenbuurten_2024_v1.gpkg", layer="buurten")
+    gdf = gpd.read_file("pathplanning/wijkenbuurten_2024_v1.gpkg", layer="buurten")
 
     # Filter for the specified city and drop all other rows
     gdf_city = gdf[gdf['gemeentenaam'] == city_name].copy()
@@ -335,7 +335,7 @@ def create_navigation_grid(city_name: str, resolution: float = 10.0) -> dict:
     
     # Add height data if available
     try:
-        height_data = pd.read_csv('/Users/feliceverbeek/Documents/GitHub/DSE-Group-18/high_dsm_points.csv')
+        height_data = pd.read_csv('high_dsm_points.csv')
         for _, point in height_data.iterrows():
             x, y = point['x_rd'], point['y_rd']
             x_idx, y_idx = coord_to_index(x, y)
@@ -405,21 +405,25 @@ def create_weighted_grid(city_name: str, resolution: float = 10.0) -> dict:
     
     # Process population density (primary weight factor)
     for _, neighborhood in pop_dens.iterrows():
-        # Convert polygon to grid cells
-        minx, miny, maxx, maxy = neighborhood['geometry'].bounds
-        minx_idx, miny_idx = coord_to_index(minx, miny)
-        maxx_idx, maxy_idx = coord_to_index(maxx, maxy)
-        
-        # Apply population density weighting (normalized 0-1)
+        poly = neighborhood['geometry']
         density = neighborhood['bevolkingsdichtheid_inwoners_per_km2']
         norm_density = density / pop_dens['bevolkingsdichtheid_inwoners_per_km2'].max()
-        weight_grid[miny_idx:maxy_idx+1, minx_idx:maxx_idx+1] = norm_density
-    
+        # Get bounding box in grid indices
+        minx, miny, maxx, maxy = poly.bounds
+        minx_idx, miny_idx = coord_to_index(minx, miny)
+        maxx_idx, maxy_idx = coord_to_index(maxx, maxy)
+        # For each grid cell in the bounding box, check if its center is inside the polygon
+        for y_idx in range(miny_idx, maxy_idx + 1):
+            for x_idx in range(minx_idx, maxx_idx + 1):
+                if 0 <= y_idx < height and 0 <= x_idx < width:
+                    cell_center = Point(x_coords[x_idx], y_coords[y_idx])
+                    if poly.contains(cell_center):
+                        weight_grid[y_idx, x_idx] = norm_density
+
     # Add height data if available (secondary weight factor)
     # Add height data from clustered high points (assumed to be >50m)
-  # Add height data from clustered high points (assumed to be >50m)
     try:
-        height_data = pd.read_csv('/Users/feliceverbeek/Documents/GitHub/DSE-Group-18/cluster_centroids.csv')
+        height_data = pd.read_csv('cluster_centroids.csv')
         for _, point in height_data.iterrows():
             x, y = point['x_rd'], point['y_rd']
             x_idx, y_idx = coord_to_index(x, y)
@@ -531,7 +535,7 @@ def plot_weighted_grid(grid_data):
             zorder=7
         )
     
-    height_df = pd.read_csv("/Users/feliceverbeek/Documents/GitHub/DSE-Group-18/cluster_centroids.csv")
+    height_df = pd.read_csv("cluster_centroids.csv")
     # Helper om X,Y → gridindex om te rekenen (rij/kolom):
     x_coords = grid_data['x_coords']
     y_coords = grid_data['y_coords']
@@ -581,7 +585,7 @@ copy_dutch_city = ('Delft')
 plot_weighted_grid(grid_data)
 
 # --- EXPORT GRID TO DISK ---
-output_path = "/Users/feliceverbeek/Documents/GitHub/DSE-Group-18/pathplanning/data/delft_grid_data.npz"
+output_path = "pathplanning/data/delft_grid_data.npz"
 np.savez_compressed(output_path,
     weight_grid=grid_data['weight_grid'],
     obstacle_grid=grid_data['obstacle_grid'],
