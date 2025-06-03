@@ -93,6 +93,95 @@ def euler_buckling_stress(E, K, L, r):
     return (np.pi**2 * E) / ((K * L / r) ** 2)
 
 
+def size_wing_for_min_mass(
+    wing: "WingStructure",
+    lift_per_section: list[float],
+    weight_per_section: list[float],
+    shear_thickness: float = 0.002,
+    safety_factor: float = 2.0,
+    area_scale_start: float = 3.0,  # Start with a large, safe scale
+    area_scale_step: float = 0.02,
+    min_scale: float = 0.1,
+    max_iter: int = 200,
+):
+    original_areas = [
+        [boom.area for boom in section.booms] for _, section in wing.sections
+    ]
+    area_scale = area_scale_start
+    last_safe = None
+
+    for _ in range(max_iter):
+        # Reset all boom areas to original, then scale
+        for orig_areas, (_, section) in zip(original_areas, wing.sections):
+            for boom, orig_area in zip(section.booms, orig_areas):
+                boom.area = orig_area * area_scale
+
+        # Recompute loads and stresses
+        total_vertical_load = [
+            L - W for L, W in zip(lift_per_section, weight_per_section)
+        ]
+        moments_x, stresses_per_section = wing.compute_bending_stresses(
+            total_vertical_load
+        )
+
+        # Shear stresses
+        shear_forces = []
+        running_shear = 0.0
+        for net_load in reversed(total_vertical_load):
+            running_shear += net_load
+            shear_forces.insert(0, running_shear)
+        shear_stresses_per_section = []
+        for (y, sec), Vz in zip(wing.sections, shear_forces):
+            shear_stresses = sec.shear_stress(Vz=Vz, thickness=shear_thickness)
+            shear_stresses_per_section.append(shear_stresses)
+
+        # Find critical stress (yield/shear)
+        critical = find_critical_stress(
+            [sec for _, sec in wing.sections],
+            stresses_per_section,
+            shear_stresses_per_section,
+        )
+        allowable_with_sf = critical["allowable"] / safety_factor
+        utilization_with_sf = (
+            abs(critical["stress"]) / allowable_with_sf if allowable_with_sf else 0
+        )
+
+        # Buckling check for the critical boom
+        dy = wing.dy
+        critical_boom = wing.sections[critical["section_idx"]][1].booms[
+            critical["boom_idx"]
+        ]
+        E = critical_boom.material.E
+        K = 2.0  # free-fixed
+        L = dy
+        A = critical_boom.area
+        r = np.sqrt(A / np.pi)
+        sigma_cr = euler_buckling_stress(E, K, L, r)
+        sigma_cr_with_sf = sigma_cr / safety_factor
+        buckling_utilization = (
+            abs(critical["stress"]) / sigma_cr_with_sf if sigma_cr_with_sf else 0
+        )
+
+        # Check both criteria
+        if utilization_with_sf < 1.0 and buckling_utilization < 1.0:
+            last_safe = (area_scale, sum(sec.mass(dy) for _, sec in wing.sections) * 2)
+            area_scale -= area_scale_step
+            if area_scale < min_scale:
+                break
+        else:
+            # The previous scale was the last safe one
+            if last_safe is not None:
+                return last_safe[1], last_safe[0]
+            else:
+                raise RuntimeError(
+                    "Initial area is not strong enough! Increase area_scale_start."
+                )
+
+    if last_safe is not None:
+        return last_safe[1], last_safe[0]
+    raise RuntimeError("Failed to find a safe structure within max_iter iterations.")
+
+
 class Material:
     def __init__(
         self,
@@ -1061,6 +1150,7 @@ if __name__ == "__main__":
         abs(critical["stress"]) / allowable_with_sf if allowable_with_sf else 0
     )
 
+    """
     print("\n=== CRITICAL STRESS REPORT ===")
     print(f"Max utilization ratio (with SF={SAFETY_FACTOR}): {utilization_with_sf:.3f}")
     print(
@@ -1094,6 +1184,22 @@ if __name__ == "__main__":
         print("WARNING: Buckling failure at critical boom!")
     else:
         print("No buckling at critical boom (with safety factor).")
+        
+
+    """
+    # Sizing loop for minimal mass (automated)
+    min_mass, final_scale = size_wing_for_min_mass(
+        wing,
+        lift_per_section,
+        weight_per_section,
+        shear_thickness=0.002,
+        safety_factor=SAFETY_FACTOR,
+    )
+    print(f"\n=== OPTIMAL STRUCTURE FOUND ===")
+    print(
+        f"Minimal safe wing mass: {min_mass:.2f} kg (area scale factor: {final_scale:.2f})"
+    )
+    print("==============================\n")
 
     with open("wing_sections.csv", "w", newline="") as f:
         writer = csv.writer(f)
