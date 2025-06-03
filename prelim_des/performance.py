@@ -86,6 +86,23 @@ class Performance:
         )  # Energy required for cruise
 
         return energy_cruise
+    
+    def cruise_range(self, energy):
+        """
+        Calculate the range during cruise based on available energy.
+        Parameters:
+        energy (float): Available energy in Joules.
+        Returns:
+        float: Range in meters.
+        """
+        range_cruise = (
+            energy
+            * self.drone.propulsion.η_elec
+            * self.drone.propulsion.η_prop
+            * self.L_over_D_cruise
+            / (self.drone.MTOW * g)
+        )
+        return range_cruise
 
     def leg_energy(self, leg):
         """
@@ -168,327 +185,100 @@ class Performance:
         return noise
 
 
-
-    # def payload_range_diagram(self, n_battery_max=8, E_total=5e6, plot=True):
-    #     """
-    #     Plot payload-range diagram for discrete payloads and battery combinations,
-    #     with color-coded markers based on number of batteries.
-    #     """
-    #     payloads = []
-    #     ranges = []
-    #     battery_counts = []
-        
-    #     n_pizza_max = toml["config"]["payload"]["n_box"]
-    #     pizza_mass = toml["config"]["payload"]["box_weight"]
-    #     E_density = TimeConverter.hours_to_sec(toml["config"]["battery"]["energy_density"])  # J/kg
-
-    #     E_battery = E_total / n_battery_max
-    #     battery_mass = E_battery / E_density
-    #     max_battery_mass = battery_mass * n_battery_max
-
-    #     for n_pizzas in range(n_pizza_max + 1):
-    #         for n_batteries in range(1, n_battery_max + 1):
-    #             total_payload_mass = n_pizzas * pizza_mass
-    #             total_battery_mass = n_batteries * battery_mass
-    #             OEW = self.drone.OEW - max_battery_mass
-    #             MTOW = OEW + total_payload_mass + total_battery_mass
-
-    #             if MTOW > self.drone.MTOW:
-    #                 continue
-
-    #             E_total_combo = n_batteries * E_battery
-
-    #             dummy_leg = {
-    #                 "payload_mass": total_payload_mass,
-    #                 "distance": 0.1,
-    #                 "cruise_speed": 5,
-    #                 "cruise_h": ImperialConverter.len_ft_m(200),
-    #                 "TO_speed": 2,
-    #                 "LD_speed": 3,
-    #                 "loitering_time": 30.0,
-    #             }
-    #             dummy_leg["TO_time"] = dummy_leg["cruise_h"] / dummy_leg["TO_speed"]
-    #             dummy_leg["LD_time"] = dummy_leg["cruise_h"] / dummy_leg["LD_speed"]
-
-    #             _, _, takeoff_power, landing_power, hover_power = self.leg_energy(dummy_leg)
-
-    #             E_fixed = (
-    #                 takeoff_power * dummy_leg["TO_time"]
-    #                 + landing_power * dummy_leg["LD_time"]
-    #                 + hover_power * dummy_leg["loitering_time"]
-    #             )
-
-    #             E_cruise = E_total_combo - E_fixed
-    #             if E_cruise <= 0:
-    #                 continue
-
-    #             L_over_D = self.L_over_D_cruise
-    #             eta = self.drone.propulsion.η_elec * self.drone.propulsion.η_prop
-    #             range_km = E_cruise * eta * L_over_D / (MTOW * g) / 1000  # km
-
-    #             payloads.append(total_payload_mass)
-    #             ranges.append(range_km)
-    #             battery_counts.append(n_batteries)
-
-    #     if plot:
-    #         plt.figure(figsize=(8, 5))
-    #         cmap = plt.cm.rainbow
-    #         norm = colors.BoundaryNorm(np.arange(0.5, 9.5, 1), cmap.N)
-    #         # scatter = plt.scatter(ranges, payloads, c=battery_counts, cmap='viridis', marker='o')
-    #         scatter = plt.scatter(
-    #             ranges,
-    #             payloads,
-    #             c=battery_counts,
-    #             cmap=cmap,
-    #             norm=norm,
-    #             marker='o',
-    #             edgecolor='black',
-    #         )
-    #         cbar = plt.colorbar(scatter)
-    #         cbar.set_ticks(np.arange(1, n_battery_max + 1))
-    #         cbar.set_label("Number of Batteries")
-            
-    #         plt.xlabel("Range [km]")
-    #         plt.ylabel("Payload [kg]")
-    #         plt.title("Payload-Range Diagram (Colored by Battery Count)")
-    #         plt.grid(True)
-    #         plt.tight_layout()
-    #         plt.show()
-
-    #     return ranges, payloads, battery_counts
-
-
-    def payload_range_diagram(self, n_battery_max=8, E_total=5e6, plot=True):
+    def payload_range_diagram(self, n_battery_max=8, E_total=5e6):
         """
-        Plot a structured payload-range curve:
-        Phase 1: Max payload, increase batteries
-        Phase 2: Max batteries, decrease payload
-        Annotates key points: A (max payload), B (mid), C (max range)
+        Plot a structured payload-range curve with mass breakdown.
         """
-        # payloads = []
-        total_weights = []
-        ranges = []
-
         n_pizza_max = toml["config"]["payload"]["n_box"]
         pizza_mass = toml["config"]["payload"]["box_weight"]
-        E_density = TimeConverter.hours_to_sec(toml["config"]["battery"]["energy_density"])  # J/kg
+        # E_density = TimeConverter.hours_to_sec(
+        #     toml["config"]["battery"]["energy_density"]
+        # )  # J/kg
 
-        E_battery = E_total / n_battery_max
-        battery_mass = E_battery / E_density
-        max_battery_mass = battery_mass * n_battery_max
-
+        # E_battery = E_total / n_battery_max
+        # battery_mass = E_battery / E_density
+        max_battery_mass = float(self.drone.propulsion.battery.weight)
+        mass_per_battery = max_battery_mass / n_battery_max
         OEW_base = self.drone.OEW - max_battery_mass
 
-        point_labels = {}
+        # Phase 1: Add batteries while keeping max pizzas
+        phase1_ranges = []
+        phase1_pizza = []
+        phase1_battery = []
 
-        # Phase 1: Increase batteries at max pizzas
-        n_pizzas = n_pizza_max
-        for n_batteries in range(0, n_battery_max + 1):
-            total_payload_mass = n_pizzas * pizza_mass
-            total_battery_mass = n_batteries * battery_mass
-            OEW = OEW_base
-            MTOW = OEW + total_payload_mass + total_battery_mass
+        for b in range(n_battery_max + 1):
+            total_mass = OEW_base + n_pizza_max * pizza_mass + b * mass_per_battery
+            if total_mass > OEW_base + n_pizza_max * pizza_mass + n_battery_max * mass_per_battery:
+                break
+            r = b * 1.5  # Dummy range progression
+            phase1_ranges.append(r)
+            phase1_pizza.append(n_pizza_max * pizza_mass)
+            phase1_battery.append(b * mass_per_battery)
+        # Phase 2: Remove pizzas at full battery
+        phase2_ranges = []
+        phase2_pizza = []
+        phase2_battery = []
 
-            if MTOW > self.drone.MTOW:
-                continue
+        for p in range(n_pizza_max - 1, -1, -1):
+            r = (n_battery_max * 1.5) + (n_pizza_max - p) * 0.8  # Continue range
+            phase2_ranges.append(r)
+            phase2_pizza.append(p * pizza_mass)
+            phase2_battery.append(n_battery_max * mass_per_battery)
 
-            E_total_combo = n_batteries * E_battery
+        # Combine phases
+        ranges = np.array(phase1_ranges + phase2_ranges)
+        pizza_masses = np.array(phase1_pizza + phase2_pizza)
+        battery_masses = np.array(phase1_battery + phase2_battery)
+        oews = np.full_like(ranges, OEW_base)
+        mtows = oews + pizza_masses + battery_masses
 
-            dummy_leg = {
-                "payload_mass": total_payload_mass,
-                "distance": 0.1,
-                "cruise_speed": 5,
-                "cruise_h": ImperialConverter.len_ft_m(200),
-                "TO_speed": 2,
-                "LD_speed": 3,
-                "loitering_time": 30.0,
-            }
-            dummy_leg["TO_time"] = dummy_leg["cruise_h"] / dummy_leg["TO_speed"]
-            dummy_leg["LD_time"] = dummy_leg["cruise_h"] / dummy_leg["LD_speed"]
+        # Plot
+        plt.figure(figsize=(10, 6))
 
-            _, _, takeoff_power, landing_power, hover_power = self.leg_energy(dummy_leg)
+        # OEW line
+        plt.axhline(OEW_base, color="gray", linestyle="--", linewidth=1.2, label="OEW")
 
-            E_fixed = (
-                takeoff_power * dummy_leg["TO_time"]
-                + landing_power * dummy_leg["LD_time"]
-                + hover_power * dummy_leg["loitering_time"]
-            )
+        # MTOW line at point B
+        mtow_B = OEW_base + n_pizza_max * pizza_mass + n_battery_max * mass_per_battery
+        plt.axhline(mtow_B, color="black", linestyle="--", linewidth=1.2, label="MTOW (at B)")
 
-            E_cruise = E_total_combo - E_fixed
-            range_km = 0 if E_cruise <= 0 else (
-                E_cruise * self.drone.propulsion.η_elec * self.drone.propulsion.η_prop * self.L_over_D_cruise
-                / (MTOW * g) / 1000
-            )[0]
+        # Stacked breakdown (plot battery mass on top)
+        plt.fill_between(ranges, 0, oews, color="lightgray", label="OEW")
+        plt.fill_between(ranges, oews, oews + pizza_masses, color="orange", label="Pizza Mass")
+        plt.fill_between(
+            ranges,
+            oews + pizza_masses,
+            oews + pizza_masses + battery_masses,
+            color="cyan",
+            label="Battery Mass"
+        )
 
-            # payloads.append(total_payload_mass)
-            total_weights.append(MTOW)
-            ranges.append(range_km)
+        # Plot MTOW points
+        plt.plot(ranges, mtows, color="black", linewidth=1, label="MTOW")
+        plt.scatter(ranges, mtows, color="black", zorder=5)
 
-            if n_batteries == 0:
-                point_labels['A'] = (range_km, total_payload_mass)
-            elif n_batteries == n_battery_max:
-                point_labels['B'] = (range_km, total_payload_mass)
+        # Annotate key points
+        # Point A: first point
+        plt.annotate("A", xy=(ranges[0], mtows[0]), xytext=(5, 5), textcoords="offset points",
+                    fontsize=10, fontweight="bold", color="darkred",
+                    arrowprops=dict(arrowstyle="->", lw=1, color="gray"))
 
-        # Phase 2: Decrease pizzas at max batteries
-        n_batteries = n_battery_max
-        for n_pizzas in range(n_pizza_max - 1, -1, -1):  # avoid duplicate
-            total_payload_mass = n_pizzas * pizza_mass
-            total_battery_mass = n_batteries * battery_mass
-            OEW = OEW_base
-            MTOW = OEW + total_payload_mass + total_battery_mass
+        # Point B: end of phase 1
+        B_index = n_battery_max
+        plt.annotate("B", xy=(ranges[B_index], mtows[B_index]), xytext=(5, 5), textcoords="offset points",
+                    fontsize=10, fontweight="bold", color="darkred",
+                    arrowprops=dict(arrowstyle="->", lw=1, color="gray"))
 
-            if MTOW > self.drone.MTOW:
-                continue
+        # Point C: last point
+        plt.annotate("C", xy=(ranges[-1], mtows[-1]), xytext=(5, 5), textcoords="offset points",
+                    fontsize=10, fontweight="bold", color="darkred",
+                    arrowprops=dict(arrowstyle="->", lw=1, color="gray"))
 
-            E_total_combo = n_batteries * E_battery
-
-            dummy_leg = {
-                "payload_mass": total_payload_mass,
-                "distance": 0.1,
-                "cruise_speed": 5,
-                "cruise_h": ImperialConverter.len_ft_m(200),
-                "TO_speed": 2,
-                "LD_speed": 3,
-                "loitering_time": 30.0,
-            }
-            dummy_leg["TO_time"] = dummy_leg["cruise_h"] / dummy_leg["TO_speed"]
-            dummy_leg["LD_time"] = dummy_leg["cruise_h"] / dummy_leg["LD_speed"]
-
-            _, _, takeoff_power, landing_power, hover_power = self.leg_energy(dummy_leg)
-
-            E_fixed = (
-                takeoff_power * dummy_leg["TO_time"]
-                + landing_power * dummy_leg["LD_time"]
-                + hover_power * dummy_leg["loitering_time"]
-            )
-
-            E_cruise = E_total_combo - E_fixed
-            range_km = 0 if E_cruise <= 0 else (
-                E_cruise * self.drone.propulsion.η_elec * self.drone.propulsion.η_prop * self.L_over_D_cruise
-                / (MTOW * g) / 1000
-            )[0]
-
-            # payloads.append(total_payload_mass)
-            total_weights.append(MTOW)
-            ranges.append(range_km)
-
-            if n_pizzas == 0:
-                point_labels['C'] = (range_km, total_payload_mass)
-
-        if plot:
-            plt.figure(figsize=(8, 5))
-
-            # Combine both phases with color tags
-            phase_data = []
-
-            # Rebuild the data (needed to attach phase color and label)
-            # Phase 1: Increase batteries
-            n_pizzas = n_pizza_max
-            for n_batteries in range(0, n_battery_max + 1):
-                total_payload_mass = n_pizzas * pizza_mass
-                total_battery_mass = n_batteries * battery_mass
-                OEW = OEW_base
-                MTOW = OEW + total_payload_mass + total_battery_mass
-
-                if MTOW > self.drone.MTOW:
-                    continue
-
-                E_total_combo = n_batteries * E_battery
-
-                dummy_leg["payload_mass"] = total_payload_mass
-                _, _, takeoff_power, landing_power, hover_power = self.leg_energy(dummy_leg)
-
-                E_fixed = (
-                    takeoff_power * dummy_leg["TO_time"]
-                    + landing_power * dummy_leg["LD_time"]
-                    + hover_power * dummy_leg["loitering_time"]
-                )
-
-                E_cruise = E_total_combo - E_fixed
-                range_km = 0 if E_cruise <= 0 else (
-                    E_cruise * self.drone.propulsion.η_elec * self.drone.propulsion.η_prop * self.L_over_D_cruise
-                    / (MTOW * g) / 1000
-                )[0]
-
-                label = None
-                if n_batteries == 0:
-                    label = 'A'
-                elif n_batteries == n_battery_max:
-                    label = 'B'
-
-                if n_batteries == 0 and n_pizzas == 0:
-                    label = 'OEW'
-
-                phase_data.append((range_km, MTOW, 'batteries', label))
-
-            # Phase 2: Decrease pizzas
-            n_batteries = n_battery_max
-            for n_pizzas in range(n_pizza_max - 1, -1, -1):
-                total_payload_mass = n_pizzas * pizza_mass
-                total_battery_mass = n_batteries * battery_mass
-                OEW = OEW_base
-                MTOW = OEW + total_payload_mass + total_battery_mass
-
-                if MTOW > self.drone.MTOW:
-                    continue
-
-                E_total_combo = n_batteries * E_battery
-
-                dummy_leg["payload_mass"] = total_payload_mass
-                _, _, takeoff_power, landing_power, hover_power = self.leg_energy(dummy_leg)
-
-                E_fixed = (
-                    takeoff_power * dummy_leg["TO_time"]
-                    + landing_power * dummy_leg["LD_time"]
-                    + hover_power * dummy_leg["loitering_time"]
-                )
-
-                E_cruise = E_total_combo - E_fixed
-                range_km = 0 if E_cruise <= 0 else (
-                    E_cruise * self.drone.propulsion.η_elec * self.drone.propulsion.η_prop * self.L_over_D_cruise
-                    / (MTOW * g) / 1000
-                )[0]
-
-                label = 'C' if n_pizzas == 0 else None
-                phase_data.append((range_km, MTOW, 'pizzas', label))
-
-            # Sort and unpack
-            phase_data.sort(key=lambda x: x[0])
-            ranges_sorted = [x[0] for x in phase_data]
-            weights_sorted = [x[1] for x in phase_data]
-            colors = ['blue' if x[2] == 'batteries' else 'green' for x in phase_data]
-
-            # Plot
-            plt.scatter(ranges_sorted, weights_sorted, c=colors, label='Flight envelope', zorder=2)
-            plt.step(ranges_sorted, weights_sorted, color='gray', linestyle='--', zorder=1)
-
-            # Annotate key points
-            for range_km, weight, phase, label in phase_data:
-                if label:
-                    plt.annotate(
-                        f'{label}',
-                        xy=(range_km, weight),
-                        xytext=(5, 5),
-                        textcoords='offset points',
-                        fontsize=10,
-                        fontweight='bold',
-                        color='darkred',
-                        arrowprops=dict(arrowstyle='->', lw=1, color='gray')
-                    )
-
-            plt.xlabel("Range [km]")
-            plt.ylabel("Total Weight [kg]")
-            plt.ylim([min(weights_sorted) * 0.98, self.drone.MTOW * 1.02])
-            plt.title("Payload-Range Diagram")
-
-            plt.legend(handles=[
-                Patch(color='blue', label='Increasing batteries'),
-                Patch(color='green', label='Decreasing pizzas'),
-            ])
-
-            plt.grid(True)
-            plt.tight_layout()
-            plt.show()
-
-
-        return ranges, MTOW, #payloads
+        plt.xlabel("Range [km]")
+        plt.ylabel("Total Weight [kg]")
+        plt.title("Payload-Range Diagram with Mass Breakdown")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+        
