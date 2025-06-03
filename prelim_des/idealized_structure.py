@@ -101,7 +101,7 @@ def size_wing_for_min_mass(
     safety_factor: float = 2.0,
     area_scale_start: float = 3.0,  # Start with a large, safe scale
     area_scale_step: float = 0.02,
-    min_scale: float = 0.1,
+    min_scale: float = 0.01,
     max_iter: int = 200,
 ):
     original_areas = [
@@ -115,6 +115,9 @@ def size_wing_for_min_mass(
         for orig_areas, (_, section) in zip(original_areas, wing.sections):
             for boom, orig_area in zip(section.booms, orig_areas):
                 boom.area = orig_area * area_scale
+            # Recompute section properties after area change
+            section.centroid_x, section.centroid_y = section.calc_centroid()
+            section.Ixx, section.Iyy, section.Ixy = section.calc_moments()
 
         # Recompute loads and stresses
         total_vertical_load = [
@@ -177,9 +180,19 @@ def size_wing_for_min_mass(
                     "Initial area is not strong enough! Increase area_scale_start."
                 )
 
+        # print(
+        #     f"Area scale: {area_scale:.3f}, Utilization (yield): {utilization_with_sf:.3f}, "
+        #     f"Utilization (buckling): {buckling_utilization:.3f}"
+        # )
+
     if last_safe is not None:
         return last_safe[1], last_safe[0]
     raise RuntimeError("Failed to find a safe structure within max_iter iterations.")
+
+
+def compute_wing_area(span, root_chord, taper_ratio):
+    tip_chord = root_chord * taper_ratio
+    return 0.5 * span * (root_chord + tip_chord)
 
 
 class Material:
@@ -1079,7 +1092,7 @@ if __name__ == "__main__":
     fuselage_stresses_per_section = fuselage.compute_bending_stresses(
         Mz_per_section, My_per_section
     )
-    fuselage.plot_3d_fuselage(fuselage_stresses_per_section, point_loads=point_loads)
+    # fuselage.plot_3d_fuselage(fuselage_stresses_per_section, point_loads=point_loads)
 
     # Create root cross-section
     root_section = create_rectangular_section(
@@ -1131,12 +1144,10 @@ if __name__ == "__main__":
         shear_stresses_per_section.append(shear_stresses)
 
     moments_x, stresses_per_section = wing.compute_bending_stresses(total_vertical_load)
-    wing.plot_3d_wing(stresses_per_section, lift_per_section, weight_per_section)
-
-    # wing.plot_3d_wing(lift_per_section)
+    # wing.plot_3d_wing(stresses_per_section, lift_per_section, weight_per_section)
 
     vertical_deflections = wing.compute_vertical_deflections(total_vertical_load)
-    wing.plot_deformed_wing(vertical_deflections)
+    # wing.plot_deformed_wing(vertical_deflections)
 
     critical = find_critical_stress(
         [sec for _, sec in wing.sections],
@@ -1200,6 +1211,79 @@ if __name__ == "__main__":
         f"Minimal safe wing mass: {min_mass:.2f} kg (area scale factor: {final_scale:.2f})"
     )
     print("==============================\n")
+
+    # Define your parameter ranges
+    # mtow_list = [6]  # Example MTOWs in kg
+    # span_list = [2.0]  # Example spans in m
+    mtow_list = [6, 8, 10, 12, 14, 16, 18]  # Example MTOWs in kg
+    span_list = [1.5, 2.0, 2.5]  # Example spans in m
+    n_factor_list = [1.0, 2.5, 3.0, 3.5]  # Example load factors
+    root_chord = 0.6
+    taper_ratio = 0.4
+
+    area_list = []
+    wing_mass_list = []
+    mtow_reg = []
+    area_reg = []
+    n_factor_reg = []
+
+    for mtow in mtow_list:
+        for span in span_list:
+            for n_factor in n_factor_list:
+                wing_area = compute_wing_area(span, root_chord, taper_ratio)
+                # --- Set up your wing structure for this geometry ---
+                root_section = create_rectangular_section(
+                    width=0.6,
+                    height=0.072,
+                    n_regular_booms=12,
+                    spar_cap_area=2e-5,
+                    regular_boom_area=1e-5,
+                    material_name="al_6061_t4",
+                    materials=materials,
+                )
+                wing = WingStructure(
+                    span=span,
+                    n_sections=10,
+                    root_section=root_section,
+                    taper_ratio=taper_ratio,
+                )
+                dy = wing.dy
+                b = wing.span
+                # Use load factor in total lift
+                L_total = mtow * g * n_factor
+
+                lift_per_section = []
+                for y, _ in wing.sections:
+                    L_prime = elliptical_lift_distribution(y, b, L_total)
+                    lift = L_prime * dy
+                    lift_per_section.append(lift)
+
+                weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
+
+                # Sizing loop for minimal mass (automated)
+                min_mass, final_scale = size_wing_for_min_mass(
+                    wing,
+                    lift_per_section,
+                    weight_per_section,
+                    shear_thickness=0.002,
+                    safety_factor=SAFETY_FACTOR,
+                )
+                # Store for regression
+                mtow_reg.append(mtow)
+                area_reg.append(wing_area)
+                n_factor_reg.append(n_factor)
+                wing_mass_list.append(min_mass)
+                # print(
+                #     f"MTOW: {mtow}, Span: {span}, n_factor: {n_factor} -> Wing mass: {min_mass:.2f} kg"
+                # )
+
+    # --- Now fit A, B and C ---
+    X = np.column_stack((mtow_reg, area_reg, n_factor_reg))
+    coeffs, _, _, _ = np.linalg.lstsq(X, wing_mass_list, rcond=None)
+    A, B, C = coeffs
+    print(f"Coefficient A (MTOW): {A:.4f}")
+    print(f"Coefficient B (Wing surface): {B:.4f}")
+    print(f"Coefficient C (Load Factor): {C:.4f}")
 
     with open("wing_sections.csv", "w", newline="") as f:
         writer = csv.writer(f)
