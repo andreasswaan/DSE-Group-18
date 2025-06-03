@@ -14,6 +14,7 @@ from globals import main_dir
 from prelim_des.utils.import_toml import load_toml
 import utils.define_logging  # do not remove this line, it sets up logging configuration
 from utils.unit_converter import TimeConverter, ImperialConverter
+from matplotlib.patches import Patch
 
 toml = load_toml()
 
@@ -375,41 +376,119 @@ class Performance:
                 point_labels['C'] = (range_km, total_payload_mass)
 
         if plot:
-            # print(ranges, payloads)
-            print(MTOW)
             plt.figure(figsize=(8, 5))
-            # plt.plot(ranges, payloads, linestyle='-', marker='o', color='navy')
-            # Sort by range to ensure consistent step plotting
-            combined = sorted(zip(ranges, total_weights), key=lambda x: x[0])
-            step_x, step_y = [], []
-            for i in range(len(combined) - 1):
-                x1, y1 = combined[i]
-                x2, y2 = combined[i + 1]
-                step_x.extend([x1, x2])
-                step_y.extend([y1, y1 if y1 == y2 else y2])
 
-            plt.step(step_x, step_y, drawstyle='default', color='navy', marker='o')
+            # Combine both phases with color tags
+            phase_data = []
 
-            # Annotations
-            for label, (x, y) in point_labels.items():
-                plt.annotate(
-                    f'{label}',
-                    xy=(x, y),
-                    xytext=(5, 5),
-                    textcoords='offset points',
-                    fontsize=10,
-                    fontweight='bold',
-                    color='darkred',
-                    arrowprops=dict(arrowstyle='->', lw=1, color='gray')
+            # Rebuild the data (needed to attach phase color and label)
+            # Phase 1: Increase batteries
+            n_pizzas = n_pizza_max
+            for n_batteries in range(0, n_battery_max + 1):
+                total_payload_mass = n_pizzas * pizza_mass
+                total_battery_mass = n_batteries * battery_mass
+                OEW = OEW_base
+                MTOW = OEW + total_payload_mass + total_battery_mass
+
+                if MTOW > self.drone.MTOW:
+                    continue
+
+                E_total_combo = n_batteries * E_battery
+
+                dummy_leg["payload_mass"] = total_payload_mass
+                _, _, takeoff_power, landing_power, hover_power = self.leg_energy(dummy_leg)
+
+                E_fixed = (
+                    takeoff_power * dummy_leg["TO_time"]
+                    + landing_power * dummy_leg["LD_time"]
+                    + hover_power * dummy_leg["loitering_time"]
                 )
 
+                E_cruise = E_total_combo - E_fixed
+                range_km = 0 if E_cruise <= 0 else (
+                    E_cruise * self.drone.propulsion.η_elec * self.drone.propulsion.η_prop * self.L_over_D_cruise
+                    / (MTOW * g) / 1000
+                )[0]
+
+                label = None
+                if n_batteries == 0:
+                    label = 'A'
+                elif n_batteries == n_battery_max:
+                    label = 'B'
+
+                if n_batteries == 0 and n_pizzas == 0:
+                    label = 'OEW'
+
+                phase_data.append((range_km, MTOW, 'batteries', label))
+
+            # Phase 2: Decrease pizzas
+            n_batteries = n_battery_max
+            for n_pizzas in range(n_pizza_max - 1, -1, -1):
+                total_payload_mass = n_pizzas * pizza_mass
+                total_battery_mass = n_batteries * battery_mass
+                OEW = OEW_base
+                MTOW = OEW + total_payload_mass + total_battery_mass
+
+                if MTOW > self.drone.MTOW:
+                    continue
+
+                E_total_combo = n_batteries * E_battery
+
+                dummy_leg["payload_mass"] = total_payload_mass
+                _, _, takeoff_power, landing_power, hover_power = self.leg_energy(dummy_leg)
+
+                E_fixed = (
+                    takeoff_power * dummy_leg["TO_time"]
+                    + landing_power * dummy_leg["LD_time"]
+                    + hover_power * dummy_leg["loitering_time"]
+                )
+
+                E_cruise = E_total_combo - E_fixed
+                range_km = 0 if E_cruise <= 0 else (
+                    E_cruise * self.drone.propulsion.η_elec * self.drone.propulsion.η_prop * self.L_over_D_cruise
+                    / (MTOW * g) / 1000
+                )[0]
+
+                label = 'C' if n_pizzas == 0 else None
+                phase_data.append((range_km, MTOW, 'pizzas', label))
+
+            # Sort and unpack
+            phase_data.sort(key=lambda x: x[0])
+            ranges_sorted = [x[0] for x in phase_data]
+            weights_sorted = [x[1] for x in phase_data]
+            colors = ['blue' if x[2] == 'batteries' else 'green' for x in phase_data]
+
+            # Plot
+            plt.scatter(ranges_sorted, weights_sorted, c=colors, label='Flight envelope', zorder=2)
+            plt.step(ranges_sorted, weights_sorted, color='gray', linestyle='--', zorder=1)
+
+            # Annotate key points
+            for range_km, weight, phase, label in phase_data:
+                if label:
+                    plt.annotate(
+                        f'{label}',
+                        xy=(range_km, weight),
+                        xytext=(5, 5),
+                        textcoords='offset points',
+                        fontsize=10,
+                        fontweight='bold',
+                        color='darkred',
+                        arrowprops=dict(arrowstyle='->', lw=1, color='gray')
+                    )
+
             plt.xlabel("Range [km]")
-            # plt.ylabel("Payload [kg]")
             plt.ylabel("Total Weight [kg]")
-            plt.ylim([min(total_weights) * 0.98, self.drone.MTOW * 1.02])
+            plt.ylim([min(weights_sorted) * 0.98, self.drone.MTOW * 1.02])
             plt.title("Payload-Range Diagram")
+
+            plt.legend(handles=[
+                Patch(color='blue', label='Increasing batteries'),
+                Patch(color='green', label='Decreasing pizzas'),
+            ])
+
             plt.grid(True)
             plt.tight_layout()
             plt.show()
+
 
         return ranges, MTOW, #payloads
