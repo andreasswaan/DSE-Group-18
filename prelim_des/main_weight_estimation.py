@@ -34,4 +34,6 @@ print(f"Wing surface area: {drone.wing.S}")
 drone.wing.plot_planform(save_plot=True)
 print(f"Aspect ratio: {drone.wing.geom_AR}")
 
-drone.perf.cruise_noise(plot=True)
+# drone.perf.cruise_noise(plot=True)
+
+drone.perf.payload_range_diagram()
