@@ -19,6 +19,14 @@ from matplotlib.patches import Patch
 toml = load_toml()
 
 
+# Professional color palette
+OEW_COLOR = "#6C7A89"  # Slate gray-blue
+PIZZA_COLOR = "#F4A300"  # Ochre (muted orange)
+BATTERY_COLOR = "#3CB371"  # Medium sea green
+MTOW_COLOR = "#222222"  # Almost black
+POINT_COLOR = "#222222"  # Same as MTOW for points
+
+
 class Performance:
     def __init__(self, drone: Drone, mission: Mission):
         """
@@ -190,7 +198,7 @@ class Performance:
         """
         n_pizza_max = toml["config"]["payload"]["n_box"]
         pizza_mass = toml["config"]["payload"]["box_weight"]
-        
+
         # E_density = TimeConverter.hours_to_sec(
         #     toml["config"]["battery"]["energy_density"]
         # )  # J/kg
@@ -200,7 +208,9 @@ class Performance:
         min_bat_lvl = self.drone.propulsion.battery.min_batt_lvl
         max_battery_mass = float(self.drone.propulsion.battery.weight)
         mass_per_battery = max_battery_mass / n_battery_max
-        energy_per_battery = self.mission_energy()[0] * (1-min_bat_lvl) / n_battery_max
+        energy_per_battery = (
+            self.mission_energy()[0] * (1 - min_bat_lvl) / n_battery_max
+        )
         OEW_base = self.drone.OEW - max_battery_mass
 
         # Phase 1: Add batteries while keeping max pizzas
@@ -217,7 +227,7 @@ class Performance:
                 break
             # Calculate available energy for cruise (proportional to battery mass)
             E_available = b * energy_per_battery  # Adjust for minimum battery level
-            
+
             # Use cruise_range calculation for range
             if total_mass > 0 and E_available > 0:
                 self.drone.MTOW = total_mass  # Temporarily set MTOW for calculation
@@ -237,7 +247,7 @@ class Performance:
             total_mass = OEW_base + p * pizza_mass + n_battery_max * mass_per_battery
             # Calculate available energy for cruise (proportional to battery mass)
             E_available = n_battery_max * energy_per_battery
-            
+
             if total_mass > 0 and E_available > 0:
                 self.drone.MTOW = total_mass  # Temporarily set MTOW for calculation
                 r = float(self.cruise_range(E_available) / 1000)  # convert to km
@@ -266,22 +276,28 @@ class Performance:
             mtow_B, color="black", linestyle="--", linewidth=1.2, label="MTOW (at B)"
         )
 
-        # Stacked breakdown (plot battery mass on top)
-        plt.fill_between(ranges, 0, oews, color="lightgray", label="OEW")
+        # Stacked breakdown (plot battery mass on top) as stepwise bands
+        plt.fill_between(ranges, 0, oews, color=OEW_COLOR, label="OEW", step="pre")
         plt.fill_between(
-            ranges, oews, oews + pizza_masses, color="orange", label="Pizza Mass"
+            ranges,
+            oews,
+            oews + pizza_masses,
+            color=PIZZA_COLOR,
+            label="Pizza Mass",
+            step="pre",
         )
         plt.fill_between(
             ranges,
             oews + pizza_masses,
             oews + pizza_masses + battery_masses,
-            color="cyan",
+            color=BATTERY_COLOR,
             label="Battery Mass",
+            step="pre",
         )
-
-        # Plot MTOW points
-        plt.plot(ranges, mtows, color="black", linewidth=1, label="MTOW")
-        plt.scatter(ranges, mtows, color="black", zorder=5)
+        plt.step(
+            ranges, mtows, where="pre", color=MTOW_COLOR, linewidth=1.5, label="MTOW"
+        )
+        plt.scatter(ranges, mtows, color=POINT_COLOR, zorder=5)
 
         # Annotate key points
         # Point A: first point
