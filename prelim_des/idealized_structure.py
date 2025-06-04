@@ -424,6 +424,18 @@ class FuselageStructure:
             sections.append((x, section))
         return sections
 
+    def compute_weight_distribution(self) -> list[float]:
+        """
+        Returns a list of weight per section [N] for the fuselage,
+        based on actual structural mass distribution.
+        """
+        dz = self.dz
+        weight_per_section = []
+        for _, section in self.sections:
+            w_z = section.mass(dz) * g  # [N] for this section
+            weight_per_section.append(w_z)
+        return weight_per_section
+
     def compute_bending_stresses(
         self, Mz_per_section: list[float], My_per_section: list[float] = None
     ) -> list[list[float]]:
@@ -603,10 +615,11 @@ class WingStructure:
                 "Set self.total_weight before computing weight distribution."
             )
 
+        dy = self.dy
         weight_per_section = []
-        for y_pos, _ in self.sections:
-            w_y = constant_weight_distribution(y_pos, self.span, self.total_weight)
-            weight_per_section.append(w_y * self.dy)
+        for _, section in self.sections:
+            w_y = section.mass(dy) * g  # [N] for this section
+            weight_per_section.append(w_y)
         return weight_per_section
 
     def compute_net_vertical_load(
@@ -1186,7 +1199,7 @@ if __name__ == "__main__":
         lift = L_prime * dy
         lift_per_section.append(lift)
 
-    weight_per_section = [sec.mass(dy) * 9.81 for _, sec in wing.sections]
+    weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
     total_vertical_load = [
         lift - weight for lift, weight in zip(lift_per_section, weight_per_section)
     ]
@@ -1305,7 +1318,7 @@ if __name__ == "__main__":
     # span_list = [2.0]  # Example spans in m
     mtow_list = [6, 8, 10, 12, 14, 16, 18]  # Example MTOWs in kg
     span_list = [1.5, 2.0, 2.5]  # Example spans in m
-    n_factor_list = [1.0, 2.5, 3.0, 3.5]  # Example load factors
+    n_factor_list = [2.5, 3.0, 3.5]  # Example load factors
     root_chord = 0.6
     taper_ratio = 0.4
 
@@ -1361,9 +1374,9 @@ if __name__ == "__main__":
                 area_reg.append(wing_area)
                 n_factor_reg.append(n_factor)
                 wing_mass_list.append(min_mass)
-                # print(
-                #     f"MTOW: {mtow}, Span: {span}, n_factor: {n_factor} -> Wing mass: {min_mass:.2f} kg"
-                # )
+                print(
+                    f"MTOW: {mtow}, Span: {span}, n_factor: {n_factor} -> Wing mass: {min_mass:.2f} kg"
+                )
 
     # --- Now fit A, B and C ---
     X = np.column_stack((mtow_reg, area_reg, n_factor_reg))
