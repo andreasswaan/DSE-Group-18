@@ -1,6 +1,6 @@
 import numpy as np
 from constants import *
-from read_databse import get_data_from_database, get_regression_plane
+from read_database import get_data_from_database, get_regression_plane
 
 
 mission_profile = {
@@ -12,30 +12,30 @@ mission_profile = {
     "cruise_speed": 15,
 }
 """
-    cruise OEW length,
-    cruise MTOW length,
-    loitering time, 
-    #TO/landing, 
-    # cruise height, 
-    # cruise speed
+    cruise OEW length [m],
+    cruise MTOW length [m],
+    loitering time [s], 
+    #TO/landing [#], 
+    # cruise height [ft], 
+    # cruise speed [m/s]
 """
 
 V_stall = 10  # Stall speed in m/s (example value, adjust as needed)
 W_S = 110.25  # Wing loading in N/m²
 W_P = 0.163  # Power loading in N/W
 stat_miles_to_m = 1609.34  # Conversion factor from statute miles to meters
-η_p = 0.7
 c_p = 0.7
 m_s_to_mph = 2.23694  # Conversion factor from m/s to mph
 FF_startup = 0.999  # (adjusted to 0.999 from 0.998 as it is electric)
 FF_taxi = 1
-std_climb = 4000
+std_climb = 4000  # ft
 FF_descent = 1 - (1 - 0.998) / (std_climb / mission_profile["cruise_h"])
 FF_climb = 1 - (1 - 0.995) / (
     std_climb / mission_profile["cruise_h"]
 )  # Fuel flow during climb
 n_climb = 3
 n_descent = 3
+
 
 db_filter_max_payload = 4  # kg, maximum payload for database filter
 db_filter_max_range = 40  # km, maximum range for database filter
@@ -63,13 +63,11 @@ def payload_mass_to_mtow(payload_mass, R):
 def calc_cruise_FF():
     R_maxPL = mission_profile["cruise_MTOW"]
     FF_maxPL = 1 / np.exp(
-        R_maxPL / stat_miles_to_m * 1 / (375 * η_p / c_p * L_over_D_cruise)
+        R_maxPL / stat_miles_to_m * 1 / (375 * η_prop / c_p * L_over_D_cruise)
     )
+    R_zeroPL = mission_profile["cruise_OEW"]
     FF_0PL = 1 / np.exp(
-        mission_profile["cruise_OEW"]
-        / stat_miles_to_m
-        * 1
-        / (375 * η_p / c_p * L_over_D_cruise)
+        R_zeroPL / stat_miles_to_m * 1 / (375 * η_prop / c_p * L_over_D_cruise)
     )
     FF_cruise = FF_maxPL * FF_0PL
     return FF_cruise  # Fuel flow in kg/s
@@ -78,7 +76,7 @@ def calc_cruise_FF():
 def calc_loiter_FF():
     E_loiter = mission_profile["loitering_time"] / 3600
     V_s = V_stall * m_s_to_mph  # Convert stall speed to mph
-    FF_loiter = 1 / np.exp(E_loiter / (375 / V_s) / (η_p / c_p) / L_over_D_cruise)
+    FF_loiter = 1 / np.exp(E_loiter / (375 / V_s) / (η_prop / c_p) / L_over_D_cruise)
     return FF_loiter  # Fuel flow in kg/s
 
 
@@ -132,7 +130,9 @@ ratio_FF_others_to_FF_cruise = (
     FF_others_to_FF_cruise_ratio_used()
 )  # Calculate ratio of cruise fuel flow to total fuel flow
 
-W_bat_total = (1 + ratio_FF_others_to_FF_cruise) * W_bat_cruise  # Total battery mass
+W_bat_total = ((1 + ratio_FF_others_to_FF_cruise) * W_bat_cruise) / (
+    1 - battery_lowest_limit
+)  # Total battery mass
 
 S = MTOW * g / W_S  # Wing area in m²
 
