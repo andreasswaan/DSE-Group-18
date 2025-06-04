@@ -8,11 +8,11 @@ plot_path = os.path.join(main_dir, "tradeoff")
 os.makedirs(plot_path, exist_ok=True)
 # Define the criteria and concepts
 criteria = [
-    "Site and Setup cost",
-    "Operational cost",
+    "Site and Setup \ncost",
+    "Operational \ncost",
     "Safety",
     "Sustainability",
-    "Payload handling",
+    "Payload \nhandling",
 ]
 concepts = [
     "Multicopter",
@@ -133,7 +133,7 @@ for j, concept in enumerate(concepts):
 plt.xlabel("Criteria", fontsize=20)
 plt.ylabel("Scores", fontsize=20)
 # plt.title(f"Scores per Design (Standard vs. {margin*100} offset Sensitivity)")
-plt.xticks(x, ["Standard"] + criteria)  # Add "Standard" as the first label
+plt.xticks(x, ["Standard"] + criteria, fontsize=16)  # Add "Standard" as the first label
 plt.legend(
     title="Designs",
     loc="lower left",
@@ -143,8 +143,7 @@ plt.legend(
 )
 plt.grid(axis="y", linestyle="--", alpha=0.7)
 plt.tight_layout()
-plt.xticks(fontsize=13)
-plt.yticks(fontsize=13)
+plt.yticks(fontsize=16)
 plt.savefig(
     os.path.join(plot_path, "sensitivity_linear.svg"), dpi=300, bbox_inches="tight"
 )
@@ -169,7 +168,7 @@ for j, concept in enumerate(concepts):
 plt.xlabel("Criteria", fontsize=20)
 plt.ylabel("Change in Scores", fontsize=20)
 # plt.title(f"Change in Scores per Design ({margin}% Sensitivity)")
-plt.xticks(x[1:], criteria)  # Only show criteria labels (no "Standard")
+plt.xticks(x[1:], criteria, fontsize=16)  # Only show criteria labels (no "Standard")
 plt.axhline(
     0, color="black", linestyle="--", linewidth=1, alpha=0.7
 )  # Add a horizontal line at 0
@@ -184,8 +183,7 @@ plt.legend(
 )
 plt.grid(axis="y", linestyle="--", alpha=0.7)
 plt.tight_layout()
-plt.xticks(fontsize=13)
-plt.yticks(fontsize=13)
+plt.yticks(fontsize=16)
 plt.savefig(
     os.path.join(plot_path, "sensitivity_change.svg"), dpi=300, bbox_inches="tight"
 )
