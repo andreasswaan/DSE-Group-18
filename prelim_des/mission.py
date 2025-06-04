@@ -1,6 +1,8 @@
 from typing import Literal
 from utils.import_toml import load_toml
 from utils.unit_converter import ImperialConverter
+import utils.define_logging  # do not remove this line, it sets up logging configuration
+import logging
 
 toml = load_toml()
 
@@ -25,9 +27,13 @@ class MissionPhase:
         TO_speed: float,
         LD_speed: float,
         distance: float,
-        cruise_h: float = ImperialConverter.len_ft_m(toml["config"]["mission"]["cruise_height"]),
+        cruise_h: float = ImperialConverter.len_ft_m(
+            toml["config"]["mission"]["cruise_height"]
+        ),
         cruise_speed: float = toml["config"]["mission"]["cruise_speed"],
     ):
+        logging.debug("Initializing MissionPhase class...")
+
         self.TO_str = TO_str
         self.LD_str = LD_str
         self.loitering_time = loitering_time
@@ -56,6 +62,8 @@ class Mission:
         self,
         phases_str: str,
     ):
+        logging.debug("Initializing Mission class...")
+
         self.phases_str = phases_str
         self.loitering_times = toml["config"]["mission"]["loitering_times"]
         self.payload_masses = toml["config"]["mission"]["payload_masses"]

@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Exclude csv data
+prelim_des/utils/NACA_airfoil_database/*.csv
+prelim_des/utils/NACA_airfoil_database/**/*.csv
+prelim_des/utils/NACA_airfoil_database/*.dat
+prelim_des/utils/NACA_airfoil_database/**/*.dat
+
 # C extensions
 *.so
 

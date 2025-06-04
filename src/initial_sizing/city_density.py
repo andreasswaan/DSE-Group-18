@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal
@@ -87,9 +88,10 @@ class CityDensity:
                     origin="lower",
                     cmap="Reds",
                 )
-                ax[0].set_title("Restaurant Density")
-                ax[0].set_xlabel("km")
-                ax[0].set_ylabel("km")
+                ax[0].set_title("Restaurant Density", fontsize=18)
+                ax[0].set_xlabel("km", fontsize=15)
+                ax[0].set_ylabel("km", fontsize=15)
+                ax[0].tick_params(axis='both', labelsize=13)
                 ax[0].plot(depot[0], depot[1], "ko", markersize=10, label="Depot")
                 red_patch = mpatches.Patch(color="red", label="Restaurant Density")
                 ax[0].legend(
@@ -103,9 +105,10 @@ class CityDensity:
                     origin="lower",
                     cmap="Blues",
                 )
-                ax[1].set_title("Customer Density")
-                ax[1].set_xlabel("km")
-                ax[1].set_ylabel("km")
+                ax[1].set_title("Customer Density", fontsize=18)
+                ax[1].set_xlabel("km", fontsize=15)
+                ax[1].set_ylabel("km", fontsize=15)
+                ax[1].tick_params(axis='both', labelsize=13)
                 ax[1].plot(depot[0], depot[1], "ko", markersize=10, label="Depot")
                 blue_patch = mpatches.Patch(color="blue", label="Customer Density")
                 ax[1].legend(
@@ -113,30 +116,46 @@ class CityDensity:
                     loc="upper right",
                 )
 
-                plt.suptitle(f"Depot Location: {depot_label}")
-                plt.tight_layout(rect=[0, 0, 1, 0.96])
+                plt.suptitle(f"Depot Location: {depot_label}", fontsize=20)
+                plt.tight_layout(rect=[0, 0, 1, 1])
+                plt.savefig(os.path.join("src/initial_sizing/plots", f"city_density_{depot_label}.png"), dpi=300)
                 plt.show()
 
                 # Plotting distance histograms
                 fig, ax = plt.subplots(2, 2, figsize=(14, 10))
                 ax[0, 0].hist(RC, bins=30, color="orange", edgecolor="black")
-                ax[0, 0].set_title(f"RC Distance (avg: {RC.mean():.2f} km)")
+                ax[0, 0].set_title(f"RC Distance (avg: {RC.mean():.2f} km)", fontsize=16)
+                ax[0, 0].set_xlabel("Distance (km)", fontsize=14)
+                ax[0, 0].set_ylabel("Frequency", fontsize=14)
+                ax[0, 0].tick_params(axis='both', labelsize=12)
 
                 ax[0, 1].hist(CD, bins=30, color="green", edgecolor="black")
-                ax[0, 1].set_title(f"CD Distance (avg: {CD.mean():.2f} km)")
+                ax[0, 1].set_title(f"CD Distance (avg: {CD.mean():.2f} km)", fontsize=16)
+                ax[0, 1].set_xlabel("Distance (km)", fontsize=14)
+                ax[0, 1].set_ylabel("Frequency", fontsize=14)
+                ax[0, 1].tick_params(axis='both', labelsize=12)
 
                 ax[1, 0].hist(DR, bins=30, color="purple", edgecolor="black")
-                ax[1, 0].set_title(f"DR Distance (avg: {DR.mean():.2f} km)")
+                ax[1, 0].set_title(f"DR Distance (avg: {DR.mean():.2f} km)", fontsize=16)
+                ax[1, 0].set_xlabel("Distance (km)", fontsize=14)
+                ax[1, 0].set_ylabel("Frequency", fontsize=14)
+                ax[1, 0].tick_params(axis='both', labelsize=12)
 
                 ax[1, 1].hist(CC, bins=30, color="brown", edgecolor="black")
-                ax[1, 1].set_title(f"CC Distance ≤ 2 km (avg: {CC.mean():.2f} km)")
+                ax[1, 1].set_title(f"CC Distance ≤ 2 km (avg: {CC.mean():.2f} km)", fontsize=16)
+                ax[1, 1].set_xlabel("Distance (km)", fontsize=14)
+                ax[1, 1].set_ylabel("Frequency", fontsize=14)
+                ax[1, 1].tick_params(axis='both', labelsize=12)
 
                 for a in ax.ravel():
-                    a.set_xlabel("Distance (km)")
-                    a.set_ylabel("Frequency")
+                    a.set_xlabel("Distance (km)", fontsize=14)
+                    a.set_ylabel("Frequency", fontsize=14)
+                    a.tick_params(axis='both', labelsize=12)
 
-                plt.suptitle(f"Depot Location: {depot_label}")
-                plt.tight_layout(rect=[0, 0, 1, 0.96])
+                plt.suptitle(f"Depot Location: {depot_label}", fontsize=20)
+                plt.tight_layout(rect=[0, 0, 1, 1])
+                plt.subplots_adjust(hspace=0.35)
+                plt.savefig(os.path.join("src/initial_sizing/plots", f"city_density_hist_{depot_label}.png"), dpi=300)
                 plt.show()
 
         return output_dict
