@@ -40,7 +40,8 @@ def smooth_path(path, walkable):
 
 # ---------- A* ALGORITHM ----------
 
-def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=None):
+def a_star_search_8dir(start, end, walkable, density_map=None, 
+                       density_cost_map=None, alpha = 0.5):
     """
     start, end: (x, y)
     walkable: boolean 2D array
@@ -66,7 +67,7 @@ def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=
         for dx, dy in [(-1,0), (1,0), (0,-1), (0,1), (-1,-1), (-1,1), (1,-1), (1,1)]:
             nx, ny = x + dx, y + dy
             if 0 <= nx < width and 0 <= ny < height and walkable[ny, nx]:
-                step_cost = sqrt(dx**2 + dy**2)
+                step_cost = sqrt(dx**2 + dy**2) /sqrt (2) #devide over sqrt 2 to normalize
 
                 # Use numeric cost from weight grid (e.g., population density, height, etc.)
                 extra_cost = 0.0
@@ -75,9 +76,10 @@ def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=
                     if np.isinf(extra_cost):
                         continue  # skip impassable
 
-                total_cost = step_cost + extra_cost
+                total_cost = alpha * step_cost + (1-alpha) * extra_cost #high ALPHA mean density is neglect right ---> shortest path
+
                 heapq.heappush(open_set, (
-                    current_cost + total_cost + heuristic((nx, ny), end),
+                    current_cost + total_cost + heuristic((nx, ny), end)*(alpha+0.01),
                     current_cost + total_cost,
                     (nx, ny),
                     path
@@ -105,17 +107,4 @@ if __name__ == "__main__":
     path = a_star_search_8dir(start, end, walkable, densities)
     smoothed = smooth_path(path, walkable)
 
-    # Visualisatie
-    img = np.ones((height, width, 3))
-    img[~walkable] = [0, 0, 0]
-    for x, y in path:
-        img[y, x] = [1, 0, 1]
-    for x, y in smoothed:
-        img[y, x] = [0, 1, 1]
-    img[start[1], start[0]] = [0, 0, 1]
-    img[end[1], end[0]] = [0, 1, 0]
 
-    plt.imshow(img)
-    plt.title("A* test")
-    plt.axis("off")
-    plt.show()
