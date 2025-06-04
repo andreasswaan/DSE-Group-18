@@ -40,7 +40,7 @@ def smooth_path(path, walkable):
 
 # ---------- A* ALGORITHM ----------
 
-def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=None):
+def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=None, alpha=0.3):
     """
     start, end: (x, y)
     walkable: boolean 2D array
@@ -60,29 +60,43 @@ def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=
         visited.add(current)
         path = path + [current]
         if current == end:
-            return path
+            # Calculate total step cost and total weight cost for the found path
+            total_step_cost = 0.0
+            total_weight_cost = 0.0
+            for i in range(1, len(path)):
+                x0, y0 = path[i-1]
+                x1, y1 = path[i]
+                step_cost = sqrt((x1 - x0)**2 + (y1 - y0)**2)
+                total_step_cost += step_cost
+                if density_map is not None:
+                    w1 = float(density_map[y0, x0])
+                    w2 = float(density_map[y1, x1])
+                    avg_weight = 0.5 * (w1 + w2)
+                    total_weight_cost += avg_weight
+            return path, total_step_cost, total_weight_cost
 
         x, y = current
         for dx, dy in [(-1,0), (1,0), (0,-1), (0,1), (-1,-1), (-1,1), (1,-1), (1,1)]:
             nx, ny = x + dx, y + dy
             if 0 <= nx < width and 0 <= ny < height and walkable[ny, nx]:
-                step_cost = sqrt(dx**2 + dy**2)
+                step_cost = sqrt(dx**2 + dy**2) / sqrt(2)
 
-                # Use numeric cost from weight grid (e.g., population density, height, etc.)
-                extra_cost = 0.0
                 if density_map is not None:
                     extra_cost = float(density_map[ny, nx])
                     if np.isinf(extra_cost):
                         continue  # skip impassable
-
-                total_cost = step_cost + extra_cost
+                    total_cost = alpha * step_cost + (1-alpha) * extra_cost
+                    if extra_cost == 0:
+                        total_cost = alpha * step_cost
+                else:
+                    total_cost = alpha * step_cost
                 heapq.heappush(open_set, (
-                    current_cost + total_cost + heuristic((nx, ny), end),
+                    current_cost + total_cost + heuristic((nx, ny), end)*(alpha + 0.01),
                     current_cost + total_cost,
                     (nx, ny),
                     path
                 ))
-    return []
+    return [], 0, 0 
 
 
 # ---------- TEST ENTRY ----------
