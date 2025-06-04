@@ -82,7 +82,7 @@ materials = load_materials(toml)
 def elliptical_lift_distribution(y: float, b: float, L_total: float) -> float:
     """
     Computes lift per unit span (N/m) at spanwise position y from centerline.
-    Assumes elliptical distribution.
+    Assumes elliptical distribution. small change hello
 
     Parameters:
         y (float): Position along span (from root, 0 ≤ y ≤ b/2)
@@ -1417,3 +1417,5 @@ if __name__ == "__main__":
                     sec.mass(segment_length=dy),
                 ]
             )
+
+    return None
