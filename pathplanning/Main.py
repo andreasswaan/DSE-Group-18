@@ -56,14 +56,16 @@ if not path:
 # smoothed_path = smooth_path(path, walkable)
 
 paths_n = []
-alpha_step = 0.05
+alpha_step = 0.1
 alphas = np.arange(0.0, 1, alpha_step)
-num_runs = 1
+num_runs = 10
+np.random.seed(3)
+
 for i in range(num_runs):
-    np.random.seed(3)
     print(f"------ Run {i+1}/{num_runs} ------")
-    # start = tuple(restaurant_coords[np.random.randint(len(restaurant_coords))][::-1])
-    # end = tuple([np.random.randint(0, width), np.random.randint(0, height)])
+    start = tuple(restaurant_coords[np.random.randint(len(restaurant_coords))][::-1])
+    end = tuple([np.random.randint(0, width), np.random.randint(0, height)])
+    print(f"Start point: {start}, End point: {end}")
     
     paths = []
     for i in alphas:
@@ -72,6 +74,7 @@ for i in range(num_runs):
         paths.append(a_star_search_8dir(start, end, walkable, density_map=grid['weight_grid'], alpha=alpha))
         
     paths_n.append(paths)
+
 
 # ---------- 5. Visualize the result ----------
 # Normalize weights for background visualization
@@ -90,16 +93,14 @@ img[~walkable] = [0, 0, 0]  # mask obstacles in black
 # Apply a gradient to the line color depending on alpha used for the path in the loop
 from matplotlib.colors import to_rgb
 
-# Use purple-to-lime gradient for maximum contrast with each other and the background
-start_color = np.array(to_rgb("purple"))    # low alpha
-end_color = np.array(to_rgb("lime"))        # high alpha
+# Use purple-to-lime gradient for alpha within each run, but color each run differently
+run_colors = plt.cm.tab10(np.linspace(0, 1, num_runs))  # distinct color for each run
 
-for paths in paths_n:
+for run_idx, paths in enumerate(paths_n):
     for path_i, alpha in zip(paths, alphas):
-        color = (1 - alpha) * start_color + alpha * end_color  # linear interpolation
+        color = run_colors[run_idx][:3]  # use only RGB
         for x, y in path_i[0]:
             img[y, x] = color
-        print(f"Path with alpha {np.round(alpha,2)} has distance {np.round(path_i[1],3)} and weight {np.round(path_i[2],3)}")
 
 # for x, y in path:
 #     img[y, x] = [1, 0, 1]  # blue for raw A* path
@@ -137,10 +138,21 @@ plt.show()
 # Print Pareto-eque curve
 fig2, ax2 = plt.subplots()
 
+
+
 for paths in paths_n: 
     distances = [p[1] for p in paths]
     noises = [p[2] for p in paths]
-    ax2.plot(distances, noises, marker='o', label='Varying alpha line')
+    ax2.plot(distances, noises, marker='o', label='Varying alpha lines')
+    
+# Transpose paths_n so that each element is a list of results for a single alpha across runs
+paths_n_T = list(zip(*paths_n))  # shape: (num_alphas, num_runs)
+
+avg_distances = [np.mean([p[1] for p in alpha_group]) for alpha_group in paths_n_T]
+avg_noises = [np.mean([p[2] for p in alpha_group]) for alpha_group in paths_n_T]
+ax2.plot(avg_distances, avg_noises, color='black', linewidth=2, label='Average varying alpha line')
+    
+
     
 ax2.set_xlabel('Distance')
 ax2.set_ylabel('Public Disurbance (noise)')
