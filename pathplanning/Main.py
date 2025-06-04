@@ -56,14 +56,14 @@ if not path:
 # smoothed_path = smooth_path(path, walkable)
 
 paths_n = []
-alpha_step = 0.1
+alpha_step = 0.05
 alphas = np.arange(0.0, 1, alpha_step)
-num_runs = 2
+num_runs = 1
 for i in range(num_runs):
-    np.random.seed(1)
+    np.random.seed(3)
     print(f"------ Run {i+1}/{num_runs} ------")
-    start = tuple(restaurant_coords[np.random.randint(len(restaurant_coords))][::-1])
-    end = tuple([np.random.randint(0, width), np.random.randint(0, height)])
+    # start = tuple(restaurant_coords[np.random.randint(len(restaurant_coords))][::-1])
+    # end = tuple([np.random.randint(0, width), np.random.randint(0, height)])
     
     paths = []
     for i in alphas:
@@ -140,11 +140,11 @@ fig2, ax2 = plt.subplots()
 for paths in paths_n: 
     distances = [p[1] for p in paths]
     noises = [p[2] for p in paths]
-    ax2.plot(distances, noises, marker='o', label='Distance - Noise line')
+    ax2.plot(distances, noises, marker='o', label='Varying alpha line')
     
 ax2.set_xlabel('Distance')
-ax2.set_ylabel('Noise')
-ax2.set_title('Path Distance vs Weight at varying Alpha')
+ax2.set_ylabel('Public Disurbance (noise)')
+ax2.set_title('Path Distance vs Public Disturbance at varying Alpha')
 ax2.legend()
 plt.tight_layout()
 plt.show()

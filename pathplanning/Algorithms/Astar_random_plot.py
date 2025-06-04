@@ -82,14 +82,11 @@ def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=
                 step_cost = sqrt(dx**2 + dy**2) / sqrt(2)
 
                 if density_map is not None:
-                    w1 = float(density_map[y, x])
-                    w2 = float(density_map[ny, nx])
-                    if np.isinf(w2):
+                    extra_cost = float(density_map[ny, nx])
+                    if np.isinf(extra_cost):
                         continue  # skip impassable
-                    avg_weight = 0.5 * (w1 + w2)
-                    total_cost = alpha * step_cost + (1-alpha) * avg_weight
-                    # total_cost = total_cost*100
-                    if avg_weight == 0:
+                    total_cost = alpha * step_cost + (1-alpha) * extra_cost
+                    if extra_cost == 0:
                         total_cost = alpha * step_cost
                 else:
                     total_cost = alpha * step_cost
