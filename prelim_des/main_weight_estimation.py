@@ -6,6 +6,7 @@ from prelim_des.drone import Drone
 from prelim_des.performance import Performance
 import logging
 import utils.define_logging  # do not remove this line, it sets up logging configuration
+from prelim_des.idealized_structure import run_structure_analysis
 
 logging.info("Starting drone performance estimation...")
 
@@ -41,4 +42,6 @@ print(drone.wing.x_ac_lemac)
 
 # drone.perf.cruise_noise(plot=True)
 
-drone.perf.payload_range_diagram()
+# drone.perf.payload_range_diagram()
+
+run_structure_analysis(drone)
