@@ -4,7 +4,7 @@ import matplotlib.ticker as ticker
 from mpl_toolkits.mplot3d import Axes3D
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
-import csv
+from prelim_des.drone import Drone
 
 # === CONFIG & MATERIALS ===
 
@@ -92,6 +92,10 @@ def elliptical_lift_distribution(y: float, b: float, L_total: float) -> float:
     Returns:
         float: Lift per unit span at y (N/m)
     """
+    b = float(drone.wing.span)  # Use the drone's wing span
+    CL_max = drone.aero.CL_max
+    V_max = toml["config"]["mission"]["max_velocity"]
+    L_total = float(drone.aero.lift(V_max, CL_max))  # Total lift at max velocity
     return (4 * L_total / (np.pi * b)) * np.sqrt(1 - (2 * y / b) ** 2)
 
 
@@ -108,7 +112,15 @@ def constant_weight_distribution(y: float, b: float, W_total: float) -> float:
     Returns:
         float: Weight per unit span at y (N/m)
     """
-    return W_total / (b / 2)  # Divide by half-span (you model half wing)
+    return W_total / (b / 2)  # Divide by half-span (modelling half wing)
+
+
+def constant_drag_distribution(y: float, b: float, D_total: float) -> float:
+    """
+    Returns drag per unit span (N/m) at spanwise position y.
+    Assumes constant drag distribution along the wing.
+    """
+    return D_total / (b / 2)  # Divide by half-span (modelling half wing)
 
 
 # === STRUCTURAL CLASSES ===
@@ -557,11 +569,11 @@ class WingStructure:
         root_section: IdealizedSection,
         taper_ratio: float,
     ):
-        self.span = span
+        self.span = float(drone.wing.span)
         self.n_sections = n_sections
-        self.taper_ratio = taper_ratio
+        self.taper_ratio = float(drone.wing.taper)
         self.root_section = root_section
-        self.dy = span / 2 / (n_sections - 1)
+        self.dy = self.span / 2 / (n_sections - 1)
         self.sections = self.generate_sections()
         self.total_weight = None
 
@@ -809,6 +821,30 @@ class WingStructure:
                     label="Weight" if i == 0 else None,
                 )
 
+        # --- Add drag arrows (if provided) ---
+        if drag_per_section:
+            arrow_scale = (
+                max(drag_per_section) / 0.1 if max(drag_per_section) != 0 else 1.0
+            )
+            for i, (y_pos, section) in enumerate(self.sections):
+                # Place drag arrow at mean chordwise position (x), at y=y_pos, z=mean boom height
+                x_c = np.mean([boom.x for boom in section.booms])
+                z_c = np.mean([boom.y for boom in section.booms])
+                drag = drag_per_section[i]
+                ax.quiver(
+                    x_c,
+                    y_pos,
+                    z_c,
+                    drag / arrow_scale,
+                    0,
+                    0,  # Arrow in +x (chordwise) direction
+                    color="green",
+                    arrow_length_ratio=0.2,
+                    linewidth=2,
+                    alpha=0.7,
+                    label="Drag" if i == 0 else None,
+                )
+
         if point_loads:
             for pl in point_loads:
                 x = pl.get("x", 0)
@@ -855,7 +891,7 @@ class WingStructure:
         ax.zaxis.set_major_locator(ticker.MaxNLocator(4))
 
         ax.set_xlim(-1, 1)
-        ax.set_ylim(0, b / 2)
+        ax.set_ylim(0, self.span / 2)
         ax.set_zlim(-0.2, 0.2)
 
         plt.tight_layout()
@@ -902,7 +938,7 @@ class WingStructure:
         ax.zaxis.set_major_locator(ticker.MaxNLocator(4))
 
         ax.set_xlim(-1, 1)
-        ax.set_ylim(0, b / 2)
+        ax.set_ylim(0, self.span / 2)
         ax.set_zlim(-0.2, 0.2)
 
         plt.tight_layout()
@@ -1158,10 +1194,9 @@ if __name__ == "__main__":
     )
 
     wing = WingStructure(
-        span=2,  # total wingspan → half span = 1 m
         n_sections=10,
         root_section=root_section,
-        taper_ratio=0.4,
+        drone=drone,
     )
 
     dy = wing.dy
@@ -1195,13 +1230,18 @@ if __name__ == "__main__":
     # Use correct total lift for the selected case
     lift_per_section = []
     for y, _ in wing.sections:
-        L_prime = elliptical_lift_distribution(y, b, L_total)
+        L_prime = elliptical_lift_distribution(y, drone)
         lift = L_prime * dy
         lift_per_section.append(lift)
 
     weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
     total_vertical_load = [
         lift - weight for lift, weight in zip(lift_per_section, weight_per_section)
+    ]
+
+    D_total = drone.aero.drag(V_max)  # Total drag in N (example value, set as needed)
+    drag_per_section = [
+        constant_drag_distribution(y, b, D_total) * dy for y, _ in wing.sections
     ]
 
     # Compute internal shear force from tip to root
@@ -1226,17 +1266,6 @@ if __name__ == "__main__":
     for i, (y_pos, section) in enumerate(wing.sections):
         stresses = section.bending_stress(Mx=moments_x[i], My=0)
         stresses_per_section.append(stresses)
-
-    # Assume torque_per_section is a list of torques at each section
-    torque_per_section = [
-        0
-    ] * wing.n_sections  # Placeholder, replace with actual torques if available
-    torsional_stresses_per_section = []
-    for (y, sec), T in zip(wing.sections, torque_per_section):
-        tau_torsion = sec.torsional_shear_stress(T, thickness=0.002)
-        torsional_stresses_per_section.append(
-            [tau_torsion] * len(sec.booms)
-        )  # uniform for closed section
 
     wing.plot_3d_wing(
         stresses_per_section,
@@ -1343,10 +1372,9 @@ if __name__ == "__main__":
                     materials=materials,
                 )
                 wing = WingStructure(
-                    span=span,
                     n_sections=10,
                     root_section=root_section,
-                    taper_ratio=taper_ratio,
+                    drone=drone,
                 )
                 dy = wing.dy
                 b = wing.span
@@ -1355,7 +1383,7 @@ if __name__ == "__main__":
 
                 lift_per_section = []
                 for y, _ in wing.sections:
-                    L_prime = elliptical_lift_distribution(y, b, L_total)
+                    L_prime = elliptical_lift_distribution(y, drone)
                     lift = L_prime * dy
                     lift_per_section.append(lift)
 
