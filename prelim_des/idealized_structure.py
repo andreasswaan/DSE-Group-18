@@ -1,14 +1,16 @@
+import csv
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from mpl_toolkits.mplot3d import Axes3D
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
-import csv
+from prelim_des.drone import Drone
 
 # === CONFIG & MATERIALS ===
 
 toml = load_toml()
+
 
 
 class Material:
@@ -34,6 +36,7 @@ class Material:
 
     def __repr__(self):
         return f"Material({self.name}, E={self.E:.2e} Pa, ρ={self.density} kg/m³)"
+
 
 
 def load_materials(toml: dict) -> dict[str, Material]:
@@ -74,28 +77,34 @@ def load_materials(toml: dict) -> dict[str, Material]:
     return material_dict
 
 
+
 materials = load_materials(toml)
 
 # === LOAD DISTRIBUTIONS ===
 
 
-def elliptical_lift_distribution(y: float, b: float, L_total: float) -> float:
+
+def elliptical_lift_distribution(y: float, drone: Drone) -> float:
     """
     Computes lift per unit span (N/m) at spanwise position y from centerline.
     Assumes elliptical distribution.
 
     Parameters:
         y (float): Position along span (from root, 0 ≤ y ≤ b/2)
-        b (float): Full wingspan
-        L_total (float): Total lift over the entire wing
 
     Returns:
         float: Lift per unit span at y (N/m)
     """
+    b = float(drone.wing.span)  # Use the drone's wing span
+    CL_max = drone.aero.CL_max
+    V_max = toml["config"]["mission"]["max_velocity"]
+    L_total = float(drone.aero.lift(V_max, CL_max))  # Total lift at max velocity
     return (4 * L_total / (np.pi * b)) * np.sqrt(1 - (2 * y / b) ** 2)
 
 
-def constant_weight_distribution(y: float, b: float, W_total: float) -> float:
+def constant_weight_distribution(
+    y: float, b: float, W_total: float, drone: Drone
+) -> float:
     """
     Computes weight per unit span (N/m) at spanwise position y from centerline.
     Assumes constant weight distribution along the wing.
@@ -108,7 +117,16 @@ def constant_weight_distribution(y: float, b: float, W_total: float) -> float:
     Returns:
         float: Weight per unit span at y (N/m)
     """
-    return W_total / (b / 2)  # Divide by half-span (you model half wing)
+    return W_total / (b / 2)  # Divide by half-span (modelling half wing)
+
+
+def constant_drag_distribution(y: float, b: float, D_total: float) -> float:
+    """
+    Returns drag per unit span (N/m) at spanwise position y.
+    Assumes constant drag distribution along the wing.
+    """
+    return D_total / (b / 2)  # Divide by half-span (modelling half wing)
+
 
 
 # === STRUCTURAL CLASSES ===
@@ -391,8 +409,8 @@ class FuselageStructure:
     def __init__(
         self,
         length: float,
-        n_sections: int,
         root_section: IdealizedSection,
+        n_sections: int,
         taper_ratio: float = 1.0,  # For constant-diameter, keep at 1.0
     ):
         self.length = length
@@ -552,16 +570,15 @@ class FuselageStructure:
 class WingStructure:
     def __init__(
         self,
-        span: float,
         n_sections: int,
         root_section: IdealizedSection,
-        taper_ratio: float,
+        drone: Drone,
     ):
-        self.span = span
+        self.span = float(drone.wing.span)
         self.n_sections = n_sections
-        self.taper_ratio = taper_ratio
+        self.taper_ratio = float(drone.wing.taper)
         self.root_section = root_section
-        self.dy = span / 2 / (n_sections - 1)
+        self.dy = self.span / 2 / (n_sections - 1)
         self.sections = self.generate_sections()
         self.total_weight = None
 
@@ -593,7 +610,7 @@ class WingStructure:
 
         return sections
 
-    def compute_total_weight(self, g: float = g) -> float:
+    def compute_total_weight(self) -> float:
         """
         Computes total structural weight of the wing based on boom areas, material densities, and span.
         Assumes the total wing (not just half).
@@ -655,7 +672,9 @@ class WingStructure:
             moments_x.append(moment)
         return moments_x
 
+
     def compute_bending_moments_with_point_loads(
+        self, net_vertical_load: list[float], point_loads: list[dict]
         self, net_vertical_load: list[float], point_loads: list[dict]
     ) -> list[float]:
         """
@@ -721,6 +740,7 @@ class WingStructure:
         lift_per_section: list[float] = None,
         weight_per_section: list[float] = None,
         point_loads: list[dict] = None,
+        drag_per_section: list[float] = None,  # <-- Add this
     ):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
@@ -809,6 +829,30 @@ class WingStructure:
                     label="Weight" if i == 0 else None,
                 )
 
+        # --- Add drag arrows (if provided) ---
+        if drag_per_section:
+            arrow_scale = (
+                max(drag_per_section) / 0.1 if max(drag_per_section) != 0 else 1.0
+            )
+            for i, (y_pos, section) in enumerate(self.sections):
+                # Place drag arrow at mean chordwise position (x), at y=y_pos, z=mean boom height
+                x_c = np.mean([boom.x for boom in section.booms])
+                z_c = np.mean([boom.y for boom in section.booms])
+                drag = drag_per_section[i]
+                ax.quiver(
+                    x_c,
+                    y_pos,
+                    z_c,
+                    drag / arrow_scale,
+                    0,
+                    0,  # Arrow in +x (chordwise) direction
+                    color="green",
+                    arrow_length_ratio=0.2,
+                    linewidth=2,
+                    alpha=0.7,
+                    label="Drag" if i == 0 else None,
+                )
+
         if point_loads:
             for pl in point_loads:
                 x = pl.get("x", 0)
@@ -816,6 +860,17 @@ class WingStructure:
                 z = pl.get("z", 0)
                 Pz = pl.get("Pz", 0)
                 ax.quiver(
+                    x,
+                    y,
+                    z,  # base at (x, y, z)
+                    0,
+                    0,
+                    Pz / 1000,  # direction: vertical, scaled for visibility
+                    color="red",
+                    arrow_length_ratio=0.2,
+                    linewidth=3,
+                    alpha=0.9,
+                    label="Point Load",
                     x,
                     y,
                     z,  # base at (x, y, z)
@@ -845,17 +900,20 @@ class WingStructure:
         handles = []
         if lift_per_section:
             handles.append(plt.Line2D([0], [0], color="red", lw=2, label="Lift"))
+        if drag_per_section:
+            handles.append(plt.Line2D([0], [0], color="green", lw=2, label="Drag"))
         if weight_per_section:
             handles.append(plt.Line2D([0], [0], color="blue", lw=2, label="Weight"))
         if handles:
             ax.legend(handles=handles, loc="upper left")
+
 
         ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
         ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
         ax.zaxis.set_major_locator(ticker.MaxNLocator(4))
 
         ax.set_xlim(-1, 1)
-        ax.set_ylim(0, b / 2)
+        ax.set_ylim(0, self.span / 2)
         ax.set_zlim(-0.2, 0.2)
 
         plt.tight_layout()
@@ -902,14 +960,16 @@ class WingStructure:
         ax.zaxis.set_major_locator(ticker.MaxNLocator(4))
 
         ax.set_xlim(-1, 1)
-        ax.set_ylim(0, b / 2)
+        ax.set_ylim(0, self.span / 2)
         ax.set_zlim(-0.2, 0.2)
 
         plt.tight_layout()
         plt.show()
 
 
+
 # === ANALYSIS & UTILITY FUNCTIONS ===
+
 
 
 def find_critical_stress(
@@ -976,10 +1036,12 @@ def find_critical_stress(
     return critical
 
 
+
 def euler_buckling_stress(E, K, L, r):
     # buckling mode: one free end, the other fixed
     # r = 2
     return (np.pi**2 * E) / ((K * L / r) ** 2)
+
 
 
 def size_wing_for_min_mass(
@@ -1070,6 +1132,7 @@ def size_wing_for_min_mass(
                     "Initial area is not strong enough! Increase area_scale_start."
                 )
 
+
         # print(
         #     f"Area scale: {area_scale:.3f}, Utilization (yield): {utilization_with_sf:.3f}, "
         #     f"Utilization (buckling): {buckling_utilization:.3f}"
@@ -1080,27 +1143,31 @@ def size_wing_for_min_mass(
     raise RuntimeError("Failed to find a safe structure within max_iter iterations.")
 
 
+
 def compute_wing_area(span, root_chord, taper_ratio):
     tip_chord = root_chord * taper_ratio
     return 0.5 * span * (root_chord + tip_chord)
 
 
+
 # === MAIN EXECUTION ===
 
-if __name__ == "__main__":
+
+def run_structure_analysis(
+    drone: Drone,
+):
     SAFETY_FACTOR = 2.0
 
+    # --- All your main logic from the current if __name__ == "__main__": block ---
+    # (Copy everything from the current if __name__ == "__main__": block here)
+    # For example:
     # Create fuselage cross-section
-    # fuselage_root_section = create_circular_section(
-    #     diameter=1.0,
-    #     n_booms=16,
-    #     boom_area=1e-5,
-    #     material_name="al_6061_t4",
-    #     materials=materials,
-    #     cap_area=2e-5,  # Optional, can omit if not needed
-    # )
-
     fuselage_root_section = create_rectangular_section(
+        width=0.6,
+        height=0.3,
+        n_regular_booms=12,
+        spar_cap_area=2e-5,
+        regular_boom_area=1e-5,
         width=0.6,  # Set your fuselage width [m]
         height=0.3,  # Set your fuselage height [m]
         n_regular_booms=12,  # Number of regular booms (adjust as needed)
@@ -1111,20 +1178,16 @@ if __name__ == "__main__":
     )
 
     fuselage = FuselageStructure(
-        length=5.0,  # total fuselage length
+        length=5.0,
         n_sections=20,
         root_section=fuselage_root_section,
-        taper_ratio=1.0,  # 1.0 for constant diameter, <1 for tapered
+        taper_ratio=1.0,
     )
 
-    # Get fuselage section positions
     section_positions = [x for x, _ in fuselage.sections]
-
-    # If you have distributed moments, set them here (or use zeros)
-    Mz_distributed = [0] * fuselage.n_sections  # or your distributed moment
+    Mz_distributed = [0] * fuselage.n_sections
     My_distributed = [0] * fuselage.n_sections
 
-    # Define point loads
     point_loads = [
         {"x": 3.0, "y": 0.5, "z": -0.4, "Pz": -2000},  # 2000 N downward at x=3.0 m
         {
@@ -1135,12 +1198,10 @@ if __name__ == "__main__":
         },  # 1500 N sideways (positive x) at x=4.0 m
     ]
 
-    # Compute moments including point loads
     Mz_per_section, My_per_section = fuselage.compute_bending_moments_with_point_loads(
         Mz_distributed, My_distributed, point_loads
     )
 
-    # Compute and plot stresses as before
     fuselage_stresses_per_section = fuselage.compute_bending_stresses(
         Mz_per_section, My_per_section
     )
@@ -1158,15 +1219,15 @@ if __name__ == "__main__":
     )
 
     wing = WingStructure(
-        span=2,  # total wingspan → half span = 1 m
         n_sections=10,
         root_section=root_section,
-        taper_ratio=0.4,
+        drone=drone,
     )
 
     dy = wing.dy
     # b_half = wing.span / 2
     b = wing.span
+
 
     wing_point_loads = [
         {
@@ -1181,27 +1242,49 @@ if __name__ == "__main__":
             "z": 0.0,
             "Pz": 450 / 4,
         },  # 450 / 4 N upwards at (x=0.1, y=1.2, z=0.0)
+        {
+            "x": 1.5 * root_section.width,
+            "y": b / 2 / 3,
+            "z": 0.0,
+            "Pz": 450 / 4,
+        },  # 450 / 4 N upwards at (x=0.2, y=0.5, z=0.0)
+        {
+            "x": -1.5 * root_section.width,
+            "y": b / 2 / 3,
+            "z": 0.0,
+            "Pz": 450 / 4,
+        },  # 450 / 4 N upwards at (x=0.1, y=1.2, z=0.0)
     ]
+
 
     # --- Banked flight option ---
     banked = True  # Set to False for normal cruise, True for banked case
     phi_deg = 30  # Bank angle in degrees
+    phi_deg = 30  # Bank angle in degrees
     phi_rad = np.radians(phi_deg)
     n_load = 1 / np.cos(phi_rad) if banked else 1.0
 
-    L_total = 250  # total lift in N (replace with actual value)
+    CL_max = drone.aero.CL_max
+    V_max = toml["config"]["mission"]["max_velocity"]
+    L_total = drone.aero.lift(V_max, CL_max)  # Total lift at max velocity
     L_total_banked = L_total * n_load
 
     # Use correct total lift for the selected case
     lift_per_section = []
     for y, _ in wing.sections:
-        L_prime = elliptical_lift_distribution(y, b, L_total)
+        L_prime = elliptical_lift_distribution(y, drone)
         lift = L_prime * dy
         lift_per_section.append(lift)
 
     weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
+    weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
     total_vertical_load = [
         lift - weight for lift, weight in zip(lift_per_section, weight_per_section)
+    ]
+
+    D_total = drone.aero.drag(V_max)  # Total drag in N (example value, set as needed)
+    drag_per_section = [
+        constant_drag_distribution(y, b, D_total) * dy for y, _ in wing.sections
     ]
 
     # Compute internal shear force from tip to root
@@ -1219,6 +1302,9 @@ if __name__ == "__main__":
         )  # adjust thickness if needed
         shear_stresses_per_section.append(shear_stresses)
 
+    moments_x = wing.compute_bending_moments_with_point_loads(
+        total_vertical_load, wing_point_loads
+    )
     moments_x = wing.compute_bending_moments_with_point_loads(
         total_vertical_load, wing_point_loads
     )
@@ -1313,6 +1399,7 @@ if __name__ == "__main__":
     )
     print("==============================\n")
 
+
     # Define your parameter ranges
     # mtow_list = [6]  # Example MTOWs in kg
     # span_list = [2.0]  # Example spans in m
@@ -1343,10 +1430,9 @@ if __name__ == "__main__":
                     materials=materials,
                 )
                 wing = WingStructure(
-                    span=span,
                     n_sections=10,
                     root_section=root_section,
-                    taper_ratio=taper_ratio,
+                    drone=drone,
                 )
                 dy = wing.dy
                 b = wing.span
@@ -1355,7 +1441,7 @@ if __name__ == "__main__":
 
                 lift_per_section = []
                 for y, _ in wing.sections:
-                    L_prime = elliptical_lift_distribution(y, b, L_total)
+                    L_prime = elliptical_lift_distribution(y, drone)
                     lift = L_prime * dy
                     lift_per_section.append(lift)
 
@@ -1385,6 +1471,7 @@ if __name__ == "__main__":
     print(f"Coefficient A (MTOW): {A:.4f}")
     print(f"Coefficient B (Wing surface): {B:.4f}")
     print(f"Coefficient C (Load Factor): {C:.4f}")
+
 
     # --- Export wing sections ---
 
@@ -1417,3 +1504,5 @@ if __name__ == "__main__":
                     sec.mass(segment_length=dy),
                 ]
             )
+
+    return None
