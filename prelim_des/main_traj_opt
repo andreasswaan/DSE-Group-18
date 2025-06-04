@@ -1,0 +1,190 @@
+from __future__ import annotations
+import numpy as np
+import matplotlib.pyplot as plt
+from mission import Mission
+from prelim_des.drone import Drone
+from prelim_des.performance import Performance
+import logging
+import utils.define_logging  # do not remove this line, it sets up logging configuration
+from scipy.optimize import minimize
+
+
+
+def integrate_dynamics(U, drone:Drone, Vc, hc, t_final, N):
+    """
+    Integrate the full EOM with states [V, y, theta] and controls [Tv, Tf].
+    Returns state histories and total energy J (Joules).
+    """
+    # Unpack drone parameters
+    m = drone.MTOW
+    g = 9.81
+    rho = 1.225
+    eta = 0.6  # assume 60% efficiency
+    S = drone.wing.S
+    CL_alpha = drone.wing.CLalpha(0)
+    Cd = drone.aero.CD
+
+    # Time step
+    dt = t_final / N
+
+    # Initial states
+    V = np.zeros(N+1)
+    y = np.zeros(N+1)
+    theta = np.zeros(N+1)   # body pitch
+    Eb = np.zeros(N+1)
+    Eb[0] = 4000*1000  # Joules
+
+    energy = 0.0
+    Tv = U[:N]
+    Tf = U[N:]
+
+    for k in range(N):
+        # current states
+        Vk, yk, thetak = V[k], y[k], theta[k]
+        tv, tf = Tv[k], Tf[k]
+
+        # aerodynamic forces
+        D = 0.5 * rho * Cd * S * Vk**2
+        CL = CL_alpha * (thetak)          # assume small AoA ~= theta
+        L  = 0.5 * rho * CL * S * Vk**2
+
+        # thrust-vector angle relative to body is zero here
+        alpha_t = -thetak
+
+        # EOM: speed & vertical pos
+        dV     = (tv*np.sin(alpha_t)
+                  + tf*np.cos(alpha_t)
+                  - D
+                  - m*g*np.sin(0)) / m
+        dy     = Vk * np.sin(0)  # flight-path gamma assumed zero for simplicity
+        # pitch dynamics: assume instant control, so we drive theta directly with Tf/Tv?
+        # For simplicity here, we hold theta_k constant (no dynamics) 
+        dtheta = 0.0
+
+        # electrical power
+        Pelec = (tv*(dy) + tf*Vk) / eta
+        energy += Pelec * dt
+
+        # Euler integration
+        V[k+1]     = Vk + dt * dV
+        y[k+1]     = yk + dt * dy
+        theta[k+1] = thetak + dt * dtheta
+        Eb[k+1]    = Eb[k] - Pelec * dt
+
+    return V, y, theta, energy
+
+def transition_objective(U, drone, Vc, hc, t_final, N):
+    _, _, _, E = integrate_dynamics(U, drone, Vc, hc, t_final, N)
+    # minimize total energy
+    return E
+
+def transition_penalty_objective(U, drone, Vc, hc, t_final, N):
+    # Simulate
+    V, y, theta, E = integrate_dynamics(U, drone, Vc, hc, t_final, N)
+    # Hard end‐state errors
+    err_V     = V[-1]     - Vc
+    err_y     = y[-1]     - hc
+    err_theta = theta[-1] - 0.0
+    # Sum of squared errors
+    end_err = err_V**2 + err_y**2 + err_theta**2
+    # Total cost: energy (J) + alpha * end_error (scaled to J)
+    alpha = 1e5
+    return E + alpha * end_err
+
+
+
+def boundary_constraints(U, drone, Vc, hc, t_final, N):
+    V, y, theta, _ = integrate_dynamics(U, drone, Vc, hc, t_final, N)
+    return np.array([V[-1] - Vc,
+                     y[-1] - hc,
+                     theta[-1] - 0.0])
+
+def compute_transition_energy_simple(drone:Drone, Vc, hc,
+                                     t_final=10.0, N=20):
+    """
+    Direct shooting with equality constraints on final states.
+    """
+    hover_T = drone.MTOW * 9.81
+    # initial thrust guesses
+    Tv0 = np.linspace(hover_T, 0.2*hover_T, N)
+    Tf0 = np.linspace(0.0, 0.5*hover_T, N)
+    U0  = np.hstack([Tv0, Tf0]).flatten()
+
+    Tmax = drone.propulsion.motor.max_thrust()
+    bounds = [(0, Tmax)]*(2*N)
+
+    # define equality constraint
+    cons = {'type': 'eq',
+            'fun' : lambda U: boundary_constraints(U, drone, Vc, hc, t_final, N)}
+
+    res = minimize(
+        transition_penalty_objective, U0,
+        args=(drone, Vc, hc, t_final, N),
+        bounds=bounds,
+        constraints=[cons],
+        method='Nelder-Mead',
+        options={'maxiter':5000, 'ftol':1e-3}
+    )
+    if not res.success:
+        raise RuntimeError("Transition solve failed: " + res.message)
+
+    # extract trajectory
+    Uopt = res.x
+    Tv_opt, Tf_opt = Uopt[:N], Uopt[N:]
+    V, y, theta, E = integrate_dynamics(Uopt, drone, Vc, hc, t_final, N)
+
+    # compute power profile
+    dt = t_final/N
+    P = (Tv_opt*(np.diff(y)/dt) + Tf_opt*V[:-1]) / 0.6 # assume 60% efficiency
+
+    # convert energy to Wh, find peak power
+    E_wh   = E/3600.0
+    P_peak = np.max(P)
+
+    traj = {
+        't'    : np.linspace(0, t_final, N+1),
+        'V'    : V,
+        'y'    : y,
+        'theta': theta,
+        'Tv'   : Tv_opt,
+        'Tf'   : Tf_opt,
+        'P'    : P,
+    }
+    return E_wh, P_peak, traj
+
+
+mission = Mission("DRCCRCCRCCD")
+drone = Drone()
+perf = Performance(drone, mission)
+drone.perf = perf
+drone.class_1_weight_estimate()
+
+drone.wing.S = perf.wing_area(drone.OEW)
+
+drone.class_2_weight_estimate()
+
+drone.iterative_weight_estimate(plot=True, tolerance=0.01)
+
+
+E, Pmax, traj = compute_transition_energy_simple(
+     drone, Vc=15.0, hc=100.0, t_final=120.0, N=30
+)
+
+plt.figure(figsize=(12, 8))
+
+plt.subplot(3, 1, 1)
+plt.plot(traj['t'], traj['V'])
+plt.ylabel('Velocity (m/s)')
+plt.title('Transition Trajectory')
+
+plt.subplot(3, 1, 2)
+plt.plot(traj['t'], traj['y'])
+plt.ylabel('Altitude (m)')
+
+plt.subplot(3, 1, 3)
+plt.plot(traj['t'], traj['theta'])
+plt.ylabel('Theta (rad)')
+plt.xlabel('Time (s)')
+
+plt.tight_layout()
+plt.show()
