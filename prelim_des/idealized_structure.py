@@ -593,7 +593,7 @@ class WingStructure:
                 Boom(
                     x=boom.x * scale,
                     y=boom.y * scale,
-                    area=boom.area,  # * (scale**2),
+                    area=boom.area * (scale**2),
                     boom_type=boom.type,
                     material=boom.material,
                 )
@@ -1282,7 +1282,6 @@ def run_structure_analysis(
         abs(critical["stress"]) / allowable_with_sf if allowable_with_sf else 0
     )
 
-    """
     print("\n=== CRITICAL STRESS REPORT ===")
     print(f"Max utilization ratio (with SF={SAFETY_FACTOR}): {utilization_with_sf:.3f}")
     print(
@@ -1316,9 +1315,7 @@ def run_structure_analysis(
         print("WARNING: Buckling failure at critical boom!")
     else:
         print("No buckling at critical boom (with safety factor).")
-        
 
-    """
     # Sizing loop for minimal mass (automated)
     min_mass, final_scale = size_wing_for_min_mass(
         wing,
