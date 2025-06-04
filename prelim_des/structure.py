@@ -6,6 +6,8 @@ if TYPE_CHECKING:
 import numpy as np
 from prelim_des.constants import g
 from prelim_des.utils.import_toml import load_toml
+import utils.define_logging  # do not remove this line, it sets up logging configuration
+import logging
 
 toml = load_toml()
 

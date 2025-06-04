@@ -12,11 +12,13 @@ max_order_time = 4*60*60
 t_max = int(4.5*60*60)
 time_step = 10
 n_time_steps = int(t_max / time_step)
+city_center = [5000, 5000]
+city_radius = 5000
 city_map = [10000,10000]
 area_size = 100
 n_areas_x = int(city_map[0] / area_size)
 n_areas_y = int(city_map[1] / area_size)
-n_pizzas = 100
+n_pizzas = 200
 n_drones = 20
 n_depots = 2
 n_restaurants = 4
@@ -31,6 +33,7 @@ delivering_time = 60
 fraction_asap_orders = 0.5
 min_order_delay = 30*60
 scale=90*60 # standard deviation for the truncated normal distribution
+time_to_altitude = 30
 
 #assumptions
 # conservative:
@@ -78,7 +81,7 @@ class depot(point):
         self.idle_drones: list[drone] = []
         self.n_idle_drones: int = 0
         self.n_drones: int = 0
-        self.requests: list[list] = []  # requests are stored as [restaurant, ready_time]
+        self.requests: list[list] = []  # requests are stored as [restaurant, send_time]
         self.energy_spent: float = 0.0
         
     def receive_drone(self, drone: 'drone') -> None:
@@ -97,6 +100,7 @@ class depot(point):
         drone.set_target(target_place)
         drone.state = 'picking_up'
         self.energy_spent -= 100 - drone.battery
+        drone.battery-=drone.depletion_rate*time_to_altitude
 
     def charge_drones(self) -> None:
         for i in self.drones:
@@ -154,6 +158,7 @@ class drone(point):
         self.target_place: point | None = None
         self.n_pizzas: int = 0
         self.distance_travelled: float = 0.0
+        self.pizza_distance_travelled: float = 0.0
         self.timer: int = 0
 
     def set_target(self, target_place: 'point') -> None:
@@ -174,11 +179,13 @@ class drone(point):
             self.x, self.y = self.target_place.x, self.target_place.y
             self.target = None
             self.arrive()
-            self.distance_travelled += np.linalg.norm(direction_vector)
         else:
             self.x += step_vector[0]
             self.y += step_vector[1]
-            self.distance_travelled += np.linalg.norm(step_vector)
+            if self.n_pizzas > 0:   
+                self.pizza_distance_travelled += np.linalg.norm(step_vector)
+            else:
+                self.distance_travelled += np.linalg.norm(step_vector)
         self.battery -= self.depletion_rate * time_step
 
     def charge(self) -> None:
@@ -210,6 +217,7 @@ class drone(point):
                 self.timer -= time_step
             else:
                 self.state = 'transporting'
+                self.battery-=self.depletion_rate*time_to_altitude
         elif self.state == 'delivering':
             if self.timer > 0:
                 self.timer -= time_step
@@ -323,19 +331,27 @@ def update_time(t: int) -> None:
             i.update(t)
 
 # initialize stuff
-depot1 = depot(0, city_map[0]/4, city_map[1]/4)
-depot2 = depot(1, 3*city_map[0]/4, 3*city_map[1]/4)
+depots = []
+for i in range(n_depots):
+    theta = np.random.uniform(2*np.pi*i/n_depots, 2*np.pi *(i+1)/n_depots)
+    r = city_radius * (1 - np.random.random()**0.7)  # Inverse scaling
+    x = city_center[0] + r * np.cos(theta)
+    y = city_center[1] + r * np.sin(theta)
+    depots.append(depot(i, x, y))
+depot1 = depots[0]
+depot2 = depots[1]
 depot1.n_drones = 0
 depot2.n_drones = 0
 drone_list = []
 orders_delivered = 0
 min_battery=100
-depots = [depot1, depot2]
-restaurant1 = restaurant(0, city_map[0]/4, city_map[1]/2)
-restaurant2 = restaurant(1, 3*city_map[0]/4, city_map[1]/2)
-restaurant3 = restaurant(2, city_map[1]/2, city_map[1]/4)
-restaurant4 = restaurant(3, city_map[1]/2, 3*city_map[1]/4)
-restaurants = [restaurant1, restaurant2, restaurant3, restaurant4]
+restaurants = []
+for i in range(n_restaurants):
+    theta = np.random.uniform(2*np.pi*i/n_restaurants, 2*np.pi *(i+1)/n_restaurants)
+    r = city_radius * (1 - np.random.random()**0.7)  # Inverse scaling
+    x = city_center[0] + r * np.cos(theta)
+    y = city_center[1] + r * np.sin(theta)
+    restaurants.append(restaurant(i, x, y))
 areas=[]
 for i in range(n_areas_x):
     for j in range(n_areas_y):
@@ -344,7 +360,12 @@ for i in range(n_areas_x):
         x2 = (i+1)*area_size
         y1 = j*area_size
         y2 = (j+1)*area_size
-        areas.append(area(area_id, x1,x2, y1,y2))
+        # Calculate the center of the area
+        area_center_x = (x1 + x2) / 2
+        area_center_y = (y1 + y2) / 2
+        # Check if the area center is within the circular boundary
+        if np.sqrt((area_center_x - city_center[0])**2 + (area_center_y - city_center[1])**2) <= city_radius:
+            areas.append(area(area_id, x1, x2, y1, y2))
 order_coords = []
 order_id=0
 points = []
@@ -352,16 +373,25 @@ points.extend(restaurants)
 points.extend(depots)
 
 # run simulation
-for t in range(0, t_max+time_step, time_step):
-    update_time(t)
-
+average_distance = 0
+average_pizza_distance = 0
+n_times=10
+for i in range(n_times):
+    for t in range(0, t_max+time_step, time_step):
+        update_time(t)
+    average_distance += sum([i.distance_travelled for i in drone_list])/order_id
+    average_pizza_distance += sum([i.pizza_distance_travelled for i in drone_list])/order_id
+average_distance /= n_times
+average_pizza_distance /= n_times
+print('Average distance travelled:', average_distance)
+print('Average pizza distance travelled:', average_pizza_distance)
 #print results
-print('Orders placed:', order_id)
-print('Drones created:', len(drone_list))
-print('Orders delivered:', orders_delivered)
-print('min battery:', min_battery)
-print('energy spent:', depot1.energy_spent + depot2.energy_spent)
-print('average distance travelled:', sum([i.distance_travelled for i in drone_list])/len(drone_list))
+#print('Orders placed:', order_id)
+#print('Drones created:', len(drone_list))
+#print('Orders delivered:', orders_delivered)
+#print('min battery:', min_battery)
+#print('energy spent:', depot1.energy_spent + depot2.energy_spent)
+#print('average distance travelled:', sum([i.distance_travelled for i in drone_list])/order_id)
 
 #reset simulation
 for i in drone_list:
@@ -374,12 +404,13 @@ orders_delivered = 0
 if animation:
     # Initialize the figure and axis
     fig, ax = plt.subplots(figsize=(8, 8))
-    ax.set_xlim(0, city_map[0])
-    ax.set_ylim(0, city_map[1])
+    ax.set_xlim(city_center[0] - city_radius, city_center[0] + city_radius)
+    ax.set_ylim(city_center[1] - city_radius, city_center[1] + city_radius)
     ax.set_title("Drone Delivery Simulation")
     ax.set_xlabel("X Coordinate")
     ax.set_ylabel("Y Coordinate")
-
+    city_circle = plt.Circle(city_center, city_radius, color='blue', fill=False, linestyle='--', label='City Boundary')
+    ax.add_artist(city_circle)
     # Plot depots and restaurants
     depot_scatter = ax.scatter([depot1.x, depot2.x], [depot1.y, depot2.y], c='blue', label='Depots', s=200)
     restaurant_scatter = ax.scatter(
