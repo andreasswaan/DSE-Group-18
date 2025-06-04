@@ -72,6 +72,12 @@ class Wing:
         return (
             (2 / 3) * self.c_root * (1 + self.taper + self.taper**2) / (1 + self.taper)
         )
+    
+    @property
+    def x_ac_lemac(self):
+        """X-coordinate of the aerodynamic center (AC) of the wing [m]"""
+        # Assuming AC is at 25% chord
+        return self.x_chord(0.25 * self.MAC)
 
     @property
     def yLEMAC(self):
