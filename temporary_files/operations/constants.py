@@ -12,12 +12,17 @@ buffer_time=60
 battery_swap_time=300
 peak_order_volume=350
 time_window=3600*4 # time window to place orders
-min_order_delay=60*30
-scale=90*60 # scale for order time distribution
+min_order_delay=0*60
+scale=30*60 # scale for order time distribution
 pizza_cooling_time=30*60
-time_to_consider_order=60*60
+time_to_consider_order=60*20
 max_waiting_time=60*3 # maximum waiting time at restaurant or customer location
 max_extra_travel_time=60*2
+TO_land_energy=5
+initial_orders_time = 30*60
+max_hover_time=60*3
+max_orders_per_mission=5
+mp_interval=60*0.5
 
 # financial constants
 #initial costs
