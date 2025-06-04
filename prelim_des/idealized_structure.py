@@ -98,29 +98,33 @@ def elliptical_lift_distribution(y: float, drone: Drone) -> float:
     return (4 * L_total / (np.pi * b)) * np.sqrt(1 - (2 * y / b) ** 2)
 
 
-def constant_weight_distribution(
-    y: float, b: float, W_total: float, drone: Drone
-) -> float:
-    """
-    Computes weight per unit span (N/m) at spanwise position y from centerline.
-    Assumes constant weight distribution along the wing.
+# def constant_weight_distribution(
+#     y: float, W_total: float, drone: Drone
+# ) -> float:
+#     """
+#     Computes weight per unit span (N/m) at spanwise position y from centerline.
+#     Assumes constant weight distribution along the wing.
 
-    Parameters:
-        y (float): Position along span (from root, 0 ≤ y ≤ b/2)
-        b (float): Full wingspan
-        W_total (float): Total weight supported by the wing (N)
+#     Parameters:
+#         y (float): Position along span (from root, 0 ≤ y ≤ b/2)
+#         b (float): Full wingspan
+#         W_total (float): Total weight supported by the wing (N)
 
-    Returns:
-        float: Weight per unit span at y (N/m)
-    """
-    return W_total / (b / 2)  # Divide by half-span (modelling half wing)
+#     Returns:
+#         float: Weight per unit span at y (N/m)
+#     """
+
+#     return W_total / (b / 2)  # Divide by half-span (modelling half wing)
 
 
-def constant_drag_distribution(y: float, b: float, D_total: float) -> float:
+def constant_drag_distribution(drone: Drone) -> float:
     """
     Returns drag per unit span (N/m) at spanwise position y.
     Assumes constant drag distribution along the wing.
     """
+    b = float(drone.wing.span)
+    D_total = float(drone.aero.drag(toml["config"]["mission"]["max_velocity"]))
+    
     return D_total / (b / 2)  # Divide by half-span (modelling half wing)
 
 
@@ -225,7 +229,7 @@ class IdealizedSection:
     def shear_stress(self, Vz: float, thickness: float = 0.002) -> list[float]:
         """
         Compute shear stress at each boom by dividing shear flow by assumed thickness.
-        Default thickness is 2 mm.
+        Default thickness is 2 mm, shall be decided within the structures department.
         """
         q_values = self.shear_flow(Vz)
         tau_values = [q / thickness for q in q_values]
@@ -604,7 +608,7 @@ class WingStructure:
 
         return sections
 
-    def compute_total_weight(self, g: float = g) -> float:
+    def compute_total_weight(self) -> float:
         """
         Computes total structural weight of the wing based on boom areas, material densities, and span.
         Assumes the total wing (not just half).
@@ -621,15 +625,15 @@ class WingStructure:
         """
         Returns a list of weight per section [N] for half-wing.
         """
-        if self.total_weight is None:
-            raise ValueError(
-                "Set self.total_weight before computing weight distribution."
-            )
-
+        # if self.total_weight is None:
+        #     raise ValueError(
+        #         "Set self.total_weight before computing weight distribution."
+        
+        dz = self.dz
         weight_per_section = []
-        for y_pos, _ in self.sections:
-            w_y = constant_weight_distribution(y_pos, self.span, self.total_weight)
-            weight_per_section.append(w_y * self.dy)
+        for _, section in self.sections:
+            w_z = section.mass(dz) * g  # [N] for this section
+            weight_per_section.append(w_z)
         return weight_per_section
 
     def compute_net_vertical_load(
@@ -651,7 +655,6 @@ class WingStructure:
         return shear_forces
 
     def compute_bending_moments(self, net_vertical_load: list[float]) -> list[float]:
-        # def compute_bending_moments(self, lift_per_section: list[float]) -> list[float]:
         """
         Returns a list of bending moments at each section (about x-axis).
         """
@@ -731,7 +734,9 @@ class WingStructure:
         lift_per_section: list[float] = None,
         weight_per_section: list[float] = None,
         point_loads: list[dict] = None,
-        drag_per_section: list[float] = None,  # <-- Add this
+        drag_per_section: list[float] = None,
+        connector_sections: list[dict] = None,
+        connector_stresses_per_section: list[list[float]] = None,
     ):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
@@ -745,6 +750,12 @@ class WingStructure:
             for section_stresses in stresses_per_section
             for stress in section_stresses
         ]
+        if connector_stresses_per_section:
+            all_stresses += [
+                stress
+                for section_stresses in connector_stresses_per_section
+                for stress in section_stresses
+            ]
         min_stress = min(all_stresses)
         max_stress = max(all_stresses)
         norm = mcolors.Normalize(vmin=min_stress, vmax=max_stress)
@@ -863,6 +874,27 @@ class WingStructure:
                     alpha=0.9,
                     label="Point Load",
                 )
+                
+        # --- Plot connectors ---
+        if connector_sections and connector_stresses_per_section:
+            for conn, stresses in zip(connector_sections, connector_stresses_per_section):
+                x = conn.get("x", 0)
+                y = conn.get("y", 0)
+                z = conn.get("z", 0)
+                section = conn.get("section", None)
+                if section:
+                    for boom, stress in zip(section.booms, stresses):
+                        color = cmap(norm(stress))
+                        ax.scatter(
+                            x + boom.x,
+                            y,
+                            z + boom.y,
+                            color=color,
+                            s=boom.area * 1e6 * 20,
+                            marker="o",
+                            alpha=0.8,
+                        )
+
 
         ax.set_title("3D Wing Structure (Color-coded by Local Stress)")
         ax.set_xlabel("x [m] (chordwise)")
@@ -884,6 +916,8 @@ class WingStructure:
             handles.append(plt.Line2D([0], [0], color="green", lw=2, label="Drag"))
         if weight_per_section:
             handles.append(plt.Line2D([0], [0], color="blue", lw=2, label="Weight"))
+        if connector_sections:
+            handles.append(plt.Line2D([0], [0], color="magenta", marker="D", linestyle="", label="Connector"))
         if handles:
             ax.legend(handles=handles, loc="upper left")
 
@@ -1117,17 +1151,72 @@ def size_wing_for_min_mass(
         return last_safe[1], last_safe[0]
     raise RuntimeError("Failed to find a safe structure within max_iter iterations.")
 
+def get_fuselage_dimensions(case: int):
+    """
+    Returns (width, height, length) for the fuselage based on the selected case.
+    All dimensions in meters.
+    """
+    if case == 1:
+        payload_width = 0.675
+        payload_height = 0.450
+        payload_length = 0.630
+    elif case == 2:
+        payload_width = 0.675
+        payload_height = 0.270
+        payload_length = 1.260
+    else:
+        raise ValueError("Invalid case. Choose 1 or 2.")
 
-def compute_wing_area(span, root_chord, taper_ratio):
-    tip_chord = root_chord * taper_ratio
-    return 0.5 * span * (root_chord + tip_chord)
+    clearance = 0.2  # 20% clearance
+    width = payload_width * (1 + clearance)
+    height = payload_height * (1 + clearance)
+    length = payload_length * (1 + clearance)
+    return width, height, length
+class ConnectorStructure:
+    def __init__(
+        self,
+        length: float,
+        n_sections: int,
+        root_section: IdealizedSection,
+        start_point: tuple[float, float, float],  # (x, y, z) at point load
+        end_point: tuple[float, float, float],    # (x, y, z) at wing surface
+    ):
+        self.length = length
+        self.n_sections = n_sections
+        self.root_section = root_section
+        self.start_point = np.array(start_point)
+        self.end_point = np.array(end_point)
+        self.sections = self.generate_sections()
 
+    def generate_sections(self) -> list[tuple[np.ndarray, IdealizedSection]]:
+        sections = []
+        for i in range(self.n_sections):
+            frac = i / (self.n_sections - 1)
+            pos = self.start_point * (1 - frac) + self.end_point * frac
+            # No scaling of cross-section for now, but you could add tapering if needed
+            section = IdealizedSection([
+                Boom(
+                    x=boom.x,
+                    y=boom.y,
+                    area=boom.area,
+                    boom_type=boom.type,
+                    material=boom.material,
+                )
+                for boom in self.root_section.booms
+            ])
+            sections.append((pos, section))
+        return sections
+
+    def mass(self) -> float:
+        dz = self.length / (self.n_sections - 1)
+        return sum(section.mass(dz) for _, section in self.sections)
 
 # === MAIN EXECUTION ===
 
-
 def run_structure_analysis(
     drone: Drone,
+    prop_connection: str = "wing",
+    # prop_connection: "wing" or "fuselage"
 ):
     SAFETY_FACTOR = 2.0
 
@@ -1135,9 +1224,16 @@ def run_structure_analysis(
     # (Copy everything from the current if __name__ == "__main__": block here)
     # For example:
     # Create fuselage cross-section
+    
+    # Select case 1 or 2
+    fuselage_case = 1  # or 2
+
+    fuselage_width, fuselage_height, fuselage_length = get_fuselage_dimensions(fuselage_case)
+
+
     fuselage_root_section = create_rectangular_section(
-        width=0.6,
-        height=0.3,
+        width=fuselage_width,
+        height=fuselage_height,
         n_regular_booms=12,
         spar_cap_area=2e-5,
         regular_boom_area=1e-5,
@@ -1146,7 +1242,7 @@ def run_structure_analysis(
     )
 
     fuselage = FuselageStructure(
-        length=5.0,
+        length=fuselage_length,
         n_sections=20,
         root_section=fuselage_root_section,
         taper_ratio=1.0,
@@ -1190,21 +1286,106 @@ def run_structure_analysis(
     dy = wing.dy
     # b_half = wing.span / 2
     b = wing.span
-
-    wing_point_loads = [
-        {
-            "x": 1.5 * root_section.width,
-            "y": b / 2 / 3,
-            "z": 0.0,
-            "Pz": 450 / 4,
-        },  # 450 / 4 N upwards at (x=0.2, y=0.5, z=0.0)
-        {
-            "x": -1.5 * root_section.width,
-            "y": b / 2 / 3,
-            "z": 0.0,
-            "Pz": 450 / 4,
-        },  # 450 / 4 N upwards at (x=0.1, y=1.2, z=0.0)
+    
+    if prop_connection == "wing":
+        wing_point_loads = [
+            {
+                "x": 1.5 * root_section.width,
+                "y": b / 2 / 3,
+                "z": 0.0,
+                "Pz": 450 / 4,
+            },  # 450 / 4 N upwards at (x=0.2, y=0.5, z=0.0)
+            {
+                "x": -1.5 * root_section.width,
+                "y": b / 2 / 3,
+                "z": 0.0,
+                "Pz": 450 / 4,
+            },  # 450 / 4 N upwards at (x=0.1, y=1.2, z=0.0)
+        ]
+        fuselage_point_loads = []  # No fuselage loads in this case
+        
+    elif prop_connection == "fuselage":
+        fuselage_point_loads = [
+        {"x": 1.5, "y": 0.0, "z": 0.0, "Pz": 450 / 4},
+        {"x": -1.5, "y": 0.0, "z": 0.0, "Pz": 450 / 4},
+        {"x": 1.5, "y": 0.0, "z": 0.0, "Pz": 450 / 4},
+        {"x": -1.5, "y": 0.0, "z": 0.0, "Pz": 450 / 4},
     ]
+        wing_point_loads = []
+        
+    # FIX THIS
+        
+    else:
+        raise ValueError("prop_connection must be 'wing' or 'fuselage'")
+        
+
+    # --- Model a connector cross section at the propeller load point ---
+    # Choose a location (y_conn) where the load is applied
+    y_conn = b / 2 / 3  # same as the y of the point load
+
+    # Define a small rectangle (e.g., 40mm x 20mm)
+    conn_width = 0.04  # [m]
+    conn_height = 0.02  # [m]
+    conn_area = 1e-5  # [m^2] per boom (example)
+    conn_material = "al_6061_t4"
+
+    # Create the connector cross section (4 booms, rectangle)
+    connector_section = create_rectangular_section(
+        width=conn_width,
+        height=conn_height,
+        n_regular_booms=0,  # only corners
+        spar_cap_area=conn_area,
+        regular_boom_area=0,
+        material_name=conn_material,
+        materials=materials,
+    )
+
+    # Optionally, plot the connector cross section
+    # connector_section.plot_section()
+
+    # --- Model the connector as a structure from point load to wing surface ---
+    x_conn = 1.5 * root_section.width  # same as in wing_point_loads
+    z_conn = 0.0
+    # Find the closest boom in the root section to the connector load point (in x-z plane)
+    boom_positions = np.array([[boom.x, boom.y] for boom in root_section.booms])
+    conn_point = np.array([x_conn, z_conn])
+    distances = np.linalg.norm(boom_positions - conn_point, axis=1)
+    closest_boom_idx = np.argmin(distances)
+    min_dist = distances[closest_boom_idx]
+    connector_length = min_dist  # [m]
+    connector_mass = connector_section.mass(segment_length=connector_length)
+    # print(f"Connector mass (length={connector_length} m): {connector_mass:.4f} kg")
+
+    # Start at point load, end at closest boom on wing surface
+    start_point = (x_conn, y_conn, z_conn)
+    end_boom = root_section.booms[closest_boom_idx]
+    end_point = (end_boom.x, y_conn, end_boom.y)
+
+    # Create the connector structure (e.g., 10 sections)
+    connector_struct = ConnectorStructure(
+        length=connector_length,
+        n_sections=10,
+        root_section=connector_section,
+        start_point=start_point,
+        end_point=end_point,
+    )
+    
+    # Compute connector stresses (no bending moment for now, or set as needed)
+    connector_stresses_per_section = []
+    for (pos, section) in connector_struct.sections:
+        # If you want to compute actual bending moments, replace Mx=... as needed
+        stresses = section.bending_stress(Mx=0, My=0)
+        connector_stresses_per_section.append(stresses)
+
+    # For plotting: create a list of connector sections along its length
+    connector_sections = []
+    for (pos, section) in connector_struct.sections:
+        connector_sections.append({
+            "x": pos[0],
+            "y": pos[1],
+            "z": pos[2],
+            "section": section,
+        })
 
     # --- Banked flight option ---
     banked = True  # Set to False for normal cruise, True for banked case
@@ -1229,9 +1410,8 @@ def run_structure_analysis(
         lift - weight for lift, weight in zip(lift_per_section, weight_per_section)
     ]
 
-    D_total = drone.aero.drag(V_max)  # Total drag in N (example value, set as needed)
     drag_per_section = [
-        constant_drag_distribution(y, b, D_total) * dy for y, _ in wing.sections
+        constant_drag_distribution(drone) * dy for y, _ in wing.sections
     ]
 
     # Compute internal shear force from tip to root
@@ -1263,6 +1443,8 @@ def run_structure_analysis(
         weight_per_section,
         point_loads=wing_point_loads,
         drag_per_section=drag_per_section,
+        connector_sections=connector_sections,
+        connector_stresses_per_section=connector_stresses_per_section,
     )
 
     # wing.plot_3d_wing(lift_per_section)
@@ -1329,79 +1511,7 @@ def run_structure_analysis(
         f"Minimal safe wing mass: {min_mass:.2f} kg (area scale factor: {final_scale:.2f})"
     )
     print("==============================\n")
-
-    # Define your parameter ranges
-    # mtow_list = [6]  # Example MTOWs in kg
-    # span_list = [2.0]  # Example spans in m
-    mtow_list = [6, 8, 10, 12, 14, 16, 18]  # Example MTOWs in kg
-    span_list = [1.5, 2.0, 2.5]  # Example spans in m
-    n_factor_list = [1.0, 2.5, 3.0, 3.5]  # Example load factors
-    root_chord = 0.6
-    taper_ratio = 0.4
-
-    area_list = []
-    wing_mass_list = []
-    mtow_reg = []
-    area_reg = []
-    n_factor_reg = []
-
-    for mtow in mtow_list:
-        for span in span_list:
-            for n_factor in n_factor_list:
-                wing_area = compute_wing_area(span, root_chord, taper_ratio)
-                # --- Set up your wing structure for this geometry ---
-                root_section = create_rectangular_section(
-                    width=0.6,
-                    height=0.072,
-                    n_regular_booms=12,
-                    spar_cap_area=2e-5,
-                    regular_boom_area=1e-5,
-                    material_name="al_6061_t4",
-                    materials=materials,
-                )
-                wing = WingStructure(
-                    n_sections=10,
-                    root_section=root_section,
-                    drone=drone,
-                )
-                dy = wing.dy
-                b = wing.span
-                # Use load factor in total lift
-                L_total = mtow * g * n_factor
-
-                lift_per_section = []
-                for y, _ in wing.sections:
-                    L_prime = elliptical_lift_distribution(y, drone)
-                    lift = L_prime * dy
-                    lift_per_section.append(lift)
-
-                weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
-
-                # Sizing loop for minimal mass (automated)
-                min_mass, final_scale = size_wing_for_min_mass(
-                    wing,
-                    lift_per_section,
-                    weight_per_section,
-                    shear_thickness=0.002,
-                    safety_factor=SAFETY_FACTOR,
-                )
-                # Store for regression
-                mtow_reg.append(mtow)
-                area_reg.append(wing_area)
-                n_factor_reg.append(n_factor)
-                wing_mass_list.append(min_mass)
-                # print(
-                #     f"MTOW: {mtow}, Span: {span}, n_factor: {n_factor} -> Wing mass: {min_mass:.2f} kg"
-                # )
-
-    # --- Now fit A, B and C ---
-    X = np.column_stack((mtow_reg, area_reg, n_factor_reg))
-    coeffs, _, _, _ = np.linalg.lstsq(X, wing_mass_list, rcond=None)
-    A, B, C = coeffs
-    print(f"Coefficient A (MTOW): {A:.4f}")
-    print(f"Coefficient B (Wing surface): {B:.4f}")
-    print(f"Coefficient C (Load Factor): {C:.4f}")
-
+    
     # --- Export wing sections ---
 
     with open("wing_sections.csv", "w", newline="") as f:
