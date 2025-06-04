@@ -113,8 +113,14 @@ def constant_weight_distribution(
     Returns:
         float: Weight per unit span at y (N/m)
     """
-    b = drone.wing.span  # Use the drone's wing span
-    return W_total / (b / 2)  # Divide by half-span (you model half wing)
+    return W_total / (b / 2)  # Divide by half-span (modelling half wing)
+
+def constant_drag_distribution(y: float, b: float, D_total: float) -> float:
+    """
+    Returns drag per unit span (N/m) at spanwise position y.
+    Assumes constant drag distribution along the wing.
+    """
+    return D_total / (b / 2)  # Divide by half-span (modelling half wing)
 
 
 # === STRUCTURAL CLASSES ===
@@ -691,6 +697,7 @@ class WingStructure:
         lift_per_section: list[float] = None,
         weight_per_section: list[float] = None,
         point_loads: list[dict] = None,
+        drag_per_section: list[float] = None,  # <-- Add this
     ):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
@@ -778,7 +785,21 @@ class WingStructure:
                     alpha=0.7,
                     label="Weight" if i == 0 else None,
                 )
-
+                
+        # --- Add drag arrows (if provided) ---
+        if drag_per_section:
+            arrow_scale = max(drag_per_section) / 0.1 if max(drag_per_section) != 0 else 1.0
+            for i, (y_pos, section) in enumerate(self.sections):
+                # Place drag arrow at mean chordwise position (x), at y=y_pos, z=mean boom height
+                x_c = np.mean([boom.x for boom in section.booms])
+                z_c = np.mean([boom.y for boom in section.booms])
+                drag = drag_per_section[i]
+                ax.quiver(
+                    x_c, y_pos, z_c,
+                    drag / arrow_scale, 0, 0,  # Arrow in +x (chordwise) direction
+                    color="green", arrow_length_ratio=0.2, linewidth=2, alpha=0.7, label="Drag" if i == 0 else None
+                )
+        
         if point_loads:
             for pl in point_loads:
                 x = pl.get("x", 0)
@@ -815,6 +836,8 @@ class WingStructure:
         handles = []
         if lift_per_section:
             handles.append(plt.Line2D([0], [0], color="red", lw=2, label="Lift"))
+        if drag_per_section:
+            handles.append(plt.Line2D([0], [0], color="green", lw=2, label="Drag"))
         if weight_per_section:
             handles.append(plt.Line2D([0], [0], color="blue", lw=2, label="Weight"))
         if handles:
@@ -1143,6 +1166,12 @@ def run_structure_analysis(
     total_vertical_load = [
         lift - weight for lift, weight in zip(lift_per_section, weight_per_section)
     ]
+    
+    D_total = 50  # Total drag in N (example value, set as needed)
+    drag_per_section = [
+        constant_drag_distribution(y, b, D_total) * dy
+        for y, _ in wing.sections
+    ]
 
     # Compute internal shear force from tip to root
     shear_forces = []
@@ -1166,13 +1195,16 @@ def run_structure_analysis(
     for i, (y_pos, section) in enumerate(wing.sections):
         stresses = section.bending_stress(Mx=moments_x[i], My=0)
         stresses_per_section.append(stresses)
-
+        
     wing.plot_3d_wing(
         stresses_per_section,
         lift_per_section,
         weight_per_section,
         point_loads=wing_point_loads,
+        drag_per_section=drag_per_section,
     )
+
+    # wing.plot_3d_wing(lift_per_section)
 
     vertical_deflections = wing.compute_vertical_deflections(total_vertical_load)
     wing.plot_deformed_wing(vertical_deflections)
