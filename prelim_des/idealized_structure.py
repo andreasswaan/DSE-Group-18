@@ -10,6 +10,7 @@ import csv
 
 toml = load_toml()
 
+
 class Material:
     def __init__(
         self,
@@ -33,6 +34,7 @@ class Material:
 
     def __repr__(self):
         return f"Material({self.name}, E={self.E:.2e} Pa, ρ={self.density} kg/m³)"
+
 
 def load_materials(toml: dict) -> dict[str, Material]:
     material_dict = {}
@@ -71,9 +73,11 @@ def load_materials(toml: dict) -> dict[str, Material]:
         material_dict[mat_name] = material
     return material_dict
 
+
 materials = load_materials(toml)
 
 # === LOAD DISTRIBUTIONS ===
+
 
 def elliptical_lift_distribution(y: float, b: float, L_total: float) -> float:
     """
@@ -90,6 +94,7 @@ def elliptical_lift_distribution(y: float, b: float, L_total: float) -> float:
     """
     return (4 * L_total / (np.pi * b)) * np.sqrt(1 - (2 * y / b) ** 2)
 
+
 def constant_weight_distribution(y: float, b: float, W_total: float) -> float:
     """
     Computes weight per unit span (N/m) at spanwise position y from centerline.
@@ -105,7 +110,9 @@ def constant_weight_distribution(y: float, b: float, W_total: float) -> float:
     """
     return W_total / (b / 2)  # Divide by half-span (you model half wing)
 
+
 # === STRUCTURAL CLASSES ===
+
 
 class Boom:
     def __init__(
@@ -138,6 +145,7 @@ class Boom:
 
     def __repr__(self):
         return f"Boom({self.x:.2f}, {self.y:.2f}, A={self.area}, Type={self.type}, Material={self.material.name})"
+
 
 class IdealizedSection:
     def __init__(self, booms: list[Boom]):
@@ -210,6 +218,27 @@ class IdealizedSection:
         tau_values = [q / thickness for q in q_values]
         return tau_values
 
+    def torsional_shear_flow(self, torque: float) -> float:
+        """
+        Compute average shear flow in a closed section due to applied torque.
+        Assumes closed thin-walled section.
+        """
+        # Estimate enclosed area (polygon area formula)
+        x = np.array([boom.x for boom in self.booms])
+        y = np.array([boom.y for boom in self.booms])
+        area = 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
+        if area == 0:
+            raise ValueError("Section area is zero; cannot compute torsion.")
+        q = torque / (2 * area)
+        return q
+
+    def torsional_shear_stress(self, torque: float, thickness: float = 0.002) -> float:
+        """
+        Compute average shear stress due to torsion.
+        """
+        q = self.torsional_shear_flow(torque)
+        return q / thickness
+
     def plot_section(self):
         fig, ax = plt.subplots()
         ax.set_aspect("equal")
@@ -240,7 +269,9 @@ class IdealizedSection:
         plt.tight_layout()
         plt.show()
 
+
 # === SECTION GENERATORS ===
+
 
 def create_rectangular_section(
     width,
@@ -300,9 +331,10 @@ def create_rectangular_section(
             )
 
     section = IdealizedSection(booms)
-    section.width = width      # <-- Add this line
-    section.height = height    # <-- (optional, for symmetry)
+    section.width = width  # <-- Add this line
+    section.height = height  # <-- (optional, for symmetry)
     return section
+
 
 def create_circular_section(
     diameter: float,
@@ -351,7 +383,9 @@ def create_circular_section(
 
     return IdealizedSection(booms)
 
+
 # === FUSELAGE & WING STRUCTURES ===
+
 
 class FuselageStructure:
     def __init__(
@@ -502,6 +536,7 @@ class FuselageStructure:
         plt.tight_layout()
         plt.show()
 
+
 class WingStructure:
     def __init__(
         self,
@@ -534,7 +569,8 @@ class WingStructure:
                 Boom(
                     x=boom.x * scale,
                     y=boom.y * scale,
-                    area=boom.area,  # * (scale**2),
+                    area=boom.area
+                    * (scale**2),  # stringers become thinner towards the tip
                     boom_type=boom.type,
                     material=boom.material,
                 )
@@ -544,8 +580,8 @@ class WingStructure:
             sections.append((y, section))
 
         return sections
-    
-    def compute_total_weight(self, g: float = 9.81) -> float:
+
+    def compute_total_weight(self, g: float = g) -> float:
         """
         Computes total structural weight of the wing based on boom areas, material densities, and span.
         Assumes the total wing (not just half).
@@ -605,11 +641,9 @@ class WingStructure:
                 moment += net_vertical_load[j] * arm
             moments_x.append(moment)
         return moments_x
-    
+
     def compute_bending_moments_with_point_loads(
-        self,
-        net_vertical_load: list[float],
-        point_loads: list[dict]
+        self, net_vertical_load: list[float], point_loads: list[dict]
     ) -> list[float]:
         """
         Returns a list of bending moments at each section (about x-axis),
@@ -761,7 +795,7 @@ class WingStructure:
                     alpha=0.7,
                     label="Weight" if i == 0 else None,
                 )
-        
+
         if point_loads:
             for pl in point_loads:
                 x = pl.get("x", 0)
@@ -769,9 +803,17 @@ class WingStructure:
                 z = pl.get("z", 0)
                 Pz = pl.get("Pz", 0)
                 ax.quiver(
-                    x, y, z,    # base at (x, y, z)
-                    0, 0, Pz / 1000,  # direction: vertical, scaled for visibility
-                    color="red", arrow_length_ratio=0.2, linewidth=3, alpha=0.9, label="Point Load"
+                    x,
+                    y,
+                    z,  # base at (x, y, z)
+                    0,
+                    0,
+                    Pz / 1000,  # direction: vertical, scaled for visibility
+                    color="red",
+                    arrow_length_ratio=0.2,
+                    linewidth=3,
+                    alpha=0.9,
+                    label="Point Load",
                 )
 
         ax.set_title("3D Wing Structure (Color-coded by Local Stress)")
@@ -794,13 +836,13 @@ class WingStructure:
             handles.append(plt.Line2D([0], [0], color="blue", lw=2, label="Weight"))
         if handles:
             ax.legend(handles=handles, loc="upper left")
-            
+
         ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
         ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
         ax.zaxis.set_major_locator(ticker.MaxNLocator(4))
 
         ax.set_xlim(-1, 1)
-        ax.set_ylim(0, b/2)
+        ax.set_ylim(0, b / 2)
         ax.set_zlim(-0.2, 0.2)
 
         plt.tight_layout()
@@ -847,16 +889,21 @@ class WingStructure:
         ax.zaxis.set_major_locator(ticker.MaxNLocator(4))
 
         ax.set_xlim(-1, 1)
-        ax.set_ylim(0, b/2)
+        ax.set_ylim(0, b / 2)
         ax.set_zlim(-0.2, 0.2)
 
         plt.tight_layout()
         plt.show()
 
+
 # === ANALYSIS & UTILITY FUNCTIONS ===
 
+
 def find_critical_stress(
-    sections, stresses_per_section, shear_stresses_per_section=None
+    sections,
+    stresses_per_section,
+    shear_stresses_per_section=None,
+    torsional_stresses_per_section=None,
 ):
     critical = {
         "max_ratio": 0,
@@ -898,12 +945,29 @@ def find_critical_stress(
                             "type": "shear",
                         }
                     )
+            if torsional_stresses_per_section:
+                tau_torsion = torsional_stresses_per_section[i][j]
+                tau_allow = boom.material.tau_max
+                tau_ratio = abs(tau_torsion) / tau_allow if tau_allow else 0
+                if tau_ratio > critical["max_ratio"]:
+                    critical.update(
+                        {
+                            "max_ratio": tau_ratio,
+                            "section_idx": i,
+                            "boom_idx": j,
+                            "stress": tau_torsion,
+                            "allowable": tau_allow,
+                            "type": "torsion",
+                        }
+                    )
     return critical
+
 
 def euler_buckling_stress(E, K, L, r):
     # buckling mode: one free end, the other fixed
     # r = 2
     return (np.pi**2 * E) / ((K * L / r) ** 2)
+
 
 def size_wing_for_min_mass(
     wing: "WingStructure",
@@ -992,7 +1056,7 @@ def size_wing_for_min_mass(
                 raise RuntimeError(
                     "Initial area is not strong enough! Increase area_scale_start."
                 )
-                
+
         # print(
         #     f"Area scale: {area_scale:.3f}, Utilization (yield): {utilization_with_sf:.3f}, "
         #     f"Utilization (buckling): {buckling_utilization:.3f}"
@@ -1002,9 +1066,11 @@ def size_wing_for_min_mass(
         return last_safe[1], last_safe[0]
     raise RuntimeError("Failed to find a safe structure within max_iter iterations.")
 
+
 def compute_wing_area(span, root_chord, taper_ratio):
     tip_chord = root_chord * taper_ratio
     return 0.5 * span * (root_chord + tip_chord)
+
 
 # === MAIN EXECUTION ===
 
@@ -1020,13 +1086,13 @@ if __name__ == "__main__":
     #     materials=materials,
     #     cap_area=2e-5,  # Optional, can omit if not needed
     # )
-    
+
     fuselage_root_section = create_rectangular_section(
-        width=0.6,                # Set your fuselage width [m]
-        height=0.3,               # Set your fuselage height [m]
-        n_regular_booms=12,       # Number of regular booms (adjust as needed)
-        spar_cap_area=2e-5,       # Area for each corner boom
-        regular_boom_area=1e-5,   # Area for each regular boom
+        width=0.6,  # Set your fuselage width [m]
+        height=0.3,  # Set your fuselage height [m]
+        n_regular_booms=12,  # Number of regular booms (adjust as needed)
+        spar_cap_area=2e-5,  # Area for each corner boom
+        regular_boom_area=1e-5,  # Area for each regular boom
         material_name="al_6061_t4",
         materials=materials,
     )
@@ -1048,7 +1114,12 @@ if __name__ == "__main__":
     # Define point loads
     point_loads = [
         {"x": 3.0, "y": 0.5, "z": -0.4, "Pz": -2000},  # 2000 N downward at x=3.0 m
-        {"x": 0.0, "y": 0.2, "z": 0.2, "Px": 1500},  # 1500 N sideways (positive x) at x=4.0 m
+        {
+            "x": 0.0,
+            "y": 0.2,
+            "z": 0.2,
+            "Px": 1500,
+        },  # 1500 N sideways (positive x) at x=4.0 m
     ]
 
     # Compute moments including point loads
@@ -1083,15 +1154,25 @@ if __name__ == "__main__":
     dy = wing.dy
     # b_half = wing.span / 2
     b = wing.span
-    
+
     wing_point_loads = [
-        {"x": 1.5 * root_section.width, "y": b / 2 / 3, "z": 0.0, "Pz": 450 / 4},   # 450 / 4 N upwards at (x=0.2, y=0.5, z=0.0)
-        {"x": -1.5 * root_section.width, "y": b / 2 / 3, "z": 0.0, "Pz": 450 / 4},    # 450 / 4 N upwards at (x=0.1, y=1.2, z=0.0)
+        {
+            "x": 1.5 * root_section.width,
+            "y": b / 2 / 3,
+            "z": 0.0,
+            "Pz": 450 / 4,
+        },  # 450 / 4 N upwards at (x=0.2, y=0.5, z=0.0)
+        {
+            "x": -1.5 * root_section.width,
+            "y": b / 2 / 3,
+            "z": 0.0,
+            "Pz": 450 / 4,
+        },  # 450 / 4 N upwards at (x=0.1, y=1.2, z=0.0)
     ]
-    
+
     # --- Banked flight option ---
     banked = True  # Set to False for normal cruise, True for banked case
-    phi_deg = 30   # Bank angle in degrees
+    phi_deg = 30  # Bank angle in degrees
     phi_rad = np.radians(phi_deg)
     n_load = 1 / np.cos(phi_rad) if banked else 1.0
 
@@ -1125,13 +1206,31 @@ if __name__ == "__main__":
         )  # adjust thickness if needed
         shear_stresses_per_section.append(shear_stresses)
 
-    moments_x = wing.compute_bending_moments_with_point_loads(total_vertical_load, wing_point_loads)
+    moments_x = wing.compute_bending_moments_with_point_loads(
+        total_vertical_load, wing_point_loads
+    )
     stresses_per_section = []
     for i, (y_pos, section) in enumerate(wing.sections):
         stresses = section.bending_stress(Mx=moments_x[i], My=0)
         stresses_per_section.append(stresses)
-        
-    wing.plot_3d_wing(stresses_per_section, lift_per_section, weight_per_section, point_loads=wing_point_loads)
+
+    # Assume torque_per_section is a list of torques at each section
+    torque_per_section = [
+        0
+    ] * wing.n_sections  # Placeholder, replace with actual torques if available
+    torsional_stresses_per_section = []
+    for (y, sec), T in zip(wing.sections, torque_per_section):
+        tau_torsion = sec.torsional_shear_stress(T, thickness=0.002)
+        torsional_stresses_per_section.append(
+            [tau_torsion] * len(sec.booms)
+        )  # uniform for closed section
+
+    wing.plot_3d_wing(
+        stresses_per_section,
+        lift_per_section,
+        weight_per_section,
+        point_loads=wing_point_loads,
+    )
 
     # wing.plot_3d_wing(lift_per_section)
 
@@ -1200,7 +1299,7 @@ if __name__ == "__main__":
         f"Minimal safe wing mass: {min_mass:.2f} kg (area scale factor: {final_scale:.2f})"
     )
     print("==============================\n")
-    
+
     # Define your parameter ranges
     # mtow_list = [6]  # Example MTOWs in kg
     # span_list = [2.0]  # Example spans in m
@@ -1273,7 +1372,7 @@ if __name__ == "__main__":
     print(f"Coefficient A (MTOW): {A:.4f}")
     print(f"Coefficient B (Wing surface): {B:.4f}")
     print(f"Coefficient C (Load Factor): {C:.4f}")
-    
+
     # --- Export wing sections ---
 
     with open("wing_sections.csv", "w", newline="") as f:
