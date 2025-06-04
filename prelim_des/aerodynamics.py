@@ -1,17 +1,22 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
+
 if TYPE_CHECKING:
     from prelim_des.drone import Drone
 from constants import ρ
 from prelim_des.utils.import_toml import load_toml
+import utils.define_logging  # do not remove this line, it sets up logging configuration
+import logging
+
 
 toml = load_toml()
 
+
 class Aerodynamics:
-    
+
     S: float
-    
+
     def __init__(
         self,
         drone: Drone,
@@ -22,6 +27,8 @@ class Aerodynamics:
         Parameters:
         drone (Drone): The drone object to which this aerodynamics model belongs.
         """
+        logging.debug("Initializing Aerodynamics class...")
+
         self.CL_max = toml["config"]["aero"]["CL_max"]
         self.CL_cruise = toml["config"]["aero"]["CL_cruise"]
         self.CD_0 = toml["config"]["aero"]["CD0"]
@@ -31,10 +38,9 @@ class Aerodynamics:
 
     @property
     def CD(self) -> float:
-        return (
-            self.CD_0
-            + (self.CL_cruise**2 / (np.pi * self.oswald_efficiency * self.drone.wing.geom_AR))
-    
+        return self.CD_0 + (
+            self.CL_cruise**2
+            / (np.pi * self.oswald_efficiency * self.drone.wing.geom_AR)
         )
 
     def lift(self, V: float, CL) -> float:
@@ -49,7 +55,7 @@ class Aerodynamics:
         """
         # Placeholder: replace with real aerodynamic model
         return 0.5 * ρ * V**2 * self.drone.wing.S * CL
-    
+
     def drag(self, V: float, TO_or_LD: bool = False) -> float:
         """
         Estimate the drag force on the drone at a given velocity.
@@ -62,6 +68,12 @@ class Aerodynamics:
         float: The drag force in Newtons.
         """
         if TO_or_LD:
-            return 0.5 * ρ * V**2 * (self.drone.wing.S + self.drone.structure.top_view_area) * self.CD_flat_plate  # Drag force in N
+            return (
+                0.5
+                * ρ
+                * V**2
+                * (self.drone.wing.S + self.drone.structure.top_view_area)
+                * self.CD_flat_plate
+            )  # Drag force in N
         else:
-            return 0.5 * ρ * V**2 * self.drone.wing.S * self.CD # Drag force in N
+            return 0.5 * ρ * V**2 * self.drone.wing.S * self.CD  # Drag force in N
