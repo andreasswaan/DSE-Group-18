@@ -1,16 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
-import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from temporary_files.operations.mission_planning import MissionPlanning
 import financial_model
 import constants
 import scipy.stats as stats
 # pizza size to weight guide in kg
-np.random.seed(42)  # for reproducibility
+np.random.seed(48)  # for reproducibility
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
-n_drones = 2
+n_drones = 4
 class Point():
     def __init__(self, xpos: float, ypos: float) -> None:
         self.xpos = xpos
@@ -78,6 +77,7 @@ class Drone(Point):
         self.mission = None
         self.target = None
         self.max_battery_level = 100
+        self.energy_per_meter = 0.005  # kWh per meter, this is a placeholder value
         self.speed = 10*100/6000*5  # m/s, horizontal speed
         self.distance_travelled = 0
         self.max_capacity = 10 # max number of pizzas it can carry
@@ -87,6 +87,7 @@ class Drone(Point):
         self.simulation = None  # reference to the simulation object
         self.state = 'idle'  # state of the drone, can be 'idle', 'charging', 'delivering', etc.
         self.load = 0  # current load of the drone, in number of pizzas
+        self.restaurant_order_nodes = []  # list of restaurant order nodes, used for mission planning
         # define static characteristics
 
         super().__init__(self.depot.xpos, self.depot.ypos)
@@ -110,13 +111,19 @@ class Drone(Point):
             for target in self.targets:
                 if isinstance(target, Order):
                     target.being_delivered = True  #ToDo: we might want to remove this restriction later
-                else:
-                    break
-            if isinstance(self.targets[0], Order):
-                self.state = 'delivering'
-            else:
-                self.state = 'other'
-            return self.targets[0]        
+            #if isinstance(self.targets[0], Order):
+            #    self.state = 'delivering'
+            #else:
+            #    self.state = 'other'
+            self.departure_times.pop(0)
+            self.arrival_times.pop(0)
+            self.targets.pop(0)
+            if isinstance(self.target, Restaurant):
+                self.restaurant_order_nodes.pop(0)
+            if isinstance(self.target, Order):
+                self.target.status = True
+            self.target = self.targets[0] if self.targets else None 
+            self.state = 'moving'  
             #else:
             #    return None
         else:
@@ -137,14 +144,13 @@ class Drone(Point):
             self.depot = None
     
     def set_targets(self, targets: list[Point]):
-        """self.targets=targets
         if self.target is None:
-            self.target = targets[0]"""
+            self.state = 'waiting'
         self.targets = targets
-        self.target = self.get_target()
+        #self.target = self.get_target()
         if self.depot is not None:
             self.depot.current_drones.remove(self)
-            self.depot = None
+            self.depot = None  
 
     def update_drone(self, dt):
         """self.xpos += 0.5 * self.xacc * dt**2 + self.xvel * dt
@@ -152,8 +158,9 @@ class Drone(Point):
         self.xvel += self.xacc * dt
         self.yvel += self.yacc * dt
         self.battery_level -= 0.1 * (self.xvel**2 + self.yvel**2) * dt"""
-        if self.departure_times and self.departure_times[0] <= self.simulation.timestamp:
-            self.move_to_target(dt)
+        if self.departure_times and self.departure_times[0] <= self.simulation.timestamp and self.targets and self.state == 'waiting':
+            self.get_target()
+        self.move_to_target(dt)
     
     def move_to_target(self, dt):
         if self.target is None:
@@ -174,17 +181,11 @@ class Drone(Point):
             self.distance_travelled += np.linalg.norm(step_vector)
 
     def arrive(self):
-        if isinstance(self.target, Order):
-            self.target.status = True
         if isinstance(self.target, Depot):
             self.target.current_drones.append(self)
             self.depot = self.target
-        self.targets.pop(0)
-        #if len(self.departure_times) > 1:
-        #    self.departure_times.pop(0)   ToDo: decide if we want this
-        self.departure_times.pop(0)
-        self.arrival_times.pop(0)
-        self.target = self.get_target()
+        #self.target = self.get_target()
+        self.state = 'waiting'
 
 
 class Depot(Point):
@@ -247,7 +248,6 @@ class Logger:
         self.order_log = dict()
         self.objective_log = dict()
 
-
 class Simulation:
     def __init__(self,
                  city: City,
@@ -262,18 +262,20 @@ class Simulation:
             drone.simulation = self
         self.financial_model = financial_model.FinancialModel(self)
         self.dt = 5
-        self.mp_interval = 100
+        self.mp_interval = constants.mp_interval
         self.mp = MissionPlanning(self)
         self.timestamp = 0
+        self.take_orders(dt=constants.initial_orders_time)  
 
-    
     def change_order_volume(self, order_volume_ratio: float):
         for restaurant in self.city.restaurants:
             restaurant.mean_nr_orders *= order_volume_ratio
 
-    def take_step(self):        
+    def take_orders(self, dt=None):
+        if dt is None:
+            dt = self.dt
         for restaurant in self.city.restaurants:
-            orders = restaurant.generate_orders(self.dt, self.inv_total_time)
+            orders = restaurant.generate_orders(dt, self.inv_total_time)
             if orders:
                 for order in orders:
                     order['restaurant_id'] = restaurant.restaurant_id
@@ -290,6 +292,9 @@ class Simulation:
                     logorder['order_id'] = order_id
                     del logorder['time']
                     self.logger.order_log[order['time']] = logorder
+
+    def take_step(self):        
+        self.take_orders()
 
         if self.timestamp % self.mp_interval == 0:
             # run mission planning
@@ -310,7 +315,7 @@ class Simulation:
 
     def calculate_arrival_time(self):
         min_order_time: int = self.timestamp + constants.min_order_delay
-        loc: float = ((min_order_time) * 2 + constants.time_window) / 3
+        loc: float = ((min_order_time) * 4 + constants.time_window) / 5
         a_trunc, b_trunc = min_order_time, constants.time_window
         a, b = (a_trunc - loc) / constants.scale, (b_trunc - loc) / constants.scale
         order_time: float = stats.truncnorm.rvs(a, b, loc=loc, scale=constants.scale, size=1)[0]
@@ -348,7 +353,7 @@ depots = [Depot0, Depot1]
 
 # Example: 8 drones at depot 0, 7 drones at depot 1
 drone_dict = [
-    {'drone_id': i, 'depot': 0 if i <n_drones//2 else 1}
+    {'drone_id': i, 'depot': 0 if i%2 == 0 else 1}
     for i in range(n_drones)
 ]
 
@@ -394,7 +399,8 @@ def animate_simulation(sim, steps=100, interval=200):
     ax.set_xlim(0, city.reso)
     ax.set_ylim(0, city.reso)
     ax.legend(loc='upper right')
-    ax.set_title('Simulation Map Animation')
+    # Use a Text artist for the title
+    title_text = ax.text(0.5, 1.01, '', transform=ax.transAxes, ha='center', va='bottom', fontsize=12)
 
     order_xs, order_ys = [], []
     drone_xs, drone_ys = [], []
@@ -405,7 +411,7 @@ def animate_simulation(sim, steps=100, interval=200):
         order_xs.clear()
         order_ys.clear()
         for order in sim.order_book.values():
-            if not order.status:
+            if not order.status and order.arrival_time <= sim.timestamp + constants.time_to_consider_order:
                 order_xs.append(order.xpos)
                 order_ys.append(order.ypos)
         scat_orders.set_offsets(np.c_[order_xs, order_ys])
@@ -418,8 +424,10 @@ def animate_simulation(sim, steps=100, interval=200):
             drone_ys.append(drone.ypos)
         scat_drones.set_offsets(np.c_[drone_xs, drone_ys])
 
-        ax.set_title(f'Simulation Map Animation\nTime: {sim.timestamp}s, Orders: {len(order_xs)}')
-        return scat_orders, scat_drones
+        # Update the title text
+        title_text.set_text(f'Simulation Map Animation\nTime: {sim.timestamp}s, Orders: {len(order_xs)}')
+        # Return all artists that need to be redrawn
+        return scat_orders, scat_drones, scat_restaurants, scat_depots, title_text
 
     ani = animation.FuncAnimation(
         fig, update, frames=steps, interval=interval, blit=False, repeat=False
@@ -427,4 +435,4 @@ def animate_simulation(sim, steps=100, interval=200):
     plt.show()
 n_steps = int(constants.time_window / my_sim.dt)
 my_sim.change_order_volume(1)
-animate_simulation(my_sim, n_steps, interval=20)
+animate_simulation(my_sim, n_steps, interval=10)
