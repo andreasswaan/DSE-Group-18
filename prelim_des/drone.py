@@ -79,7 +79,7 @@ class Drone:
             else "Mission Energy: Not calculated"
         )
         print(
-            f"Battery Weight: {self.propulsion.battery.weight(energy_required=mission_energy)[0]:.2f} kg"
+            f"Battery Weight: {self.propulsion.battery.calc_weight(energy_required=mission_energy)[0]:.2f} kg"
             if hasattr(self.propulsion, "battery")
             else "Battery Weight: Not available"
         )

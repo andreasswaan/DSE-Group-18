@@ -29,7 +29,7 @@ class PropulsionSystem:
 
     def weight(self, energy_required: float = None) -> float:
         return (
-            self.battery.weight(energy_required)
+            self.battery.calc_weight(energy_required)
             + self.motor.weight()
             + self.ver_prop.weight()
             + self.hor_prop.weight()
@@ -37,6 +37,7 @@ class PropulsionSystem:
 
 
 class Battery:
+    weight: float  # Placeholder for battery weight
     def __init__(self):
         logging.debug("Initializing Battery class...")
 
@@ -48,8 +49,13 @@ class Battery:
             1
         )  # J/kg
 
-    def weight(self, energy_required: float) -> float:
-        return energy_required / (self.energy_density * self.batt_energy_ratio)
+    def calc_weight(self, energy_required: float) -> float:
+        weight = energy_required / (self.energy_density * self.batt_energy_ratio)
+        if weight < 0:
+            logging.error("Calculated battery weight is negative. Check energy requirements.")
+            raise ValueError("Battery weight cannot be negative.")
+        self.weight = weight
+        return weight
 
 
 class Motor:
