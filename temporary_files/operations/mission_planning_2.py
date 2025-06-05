@@ -67,7 +67,7 @@ class MissionPlanning:
         waiting_times = [node.waiting_time for node in nodes]  # waiting times at each node
         model = gp.Model("DARP")
         model.Params.OutputFlag = 1
-        model.Params.TimeLimit = 100
+        model.Params.TimeLimit = 5
         model.Params.MIPGap = 0.1  # Set a gap for suboptimal solutions
         model.Params.Heuristics = 0.5
         model.Params.Presolve = 2
@@ -136,7 +136,7 @@ class MissionPlanning:
 
        # 2. Each order is served by at most one drone
         for o, order in enumerate(orders):
-            cust = n_depots * 2 + n_restaurants + o  # index of the order node in nodes
+            cust = n_depots + n_restaurants + o  # index of the order node in nodes
             model.addConstr(gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i != cust for k in range(n_drones)) <= 1, name=f"serve_order_{o}")
        
         # 3. Drones must arrive at customer after order time

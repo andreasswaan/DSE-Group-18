@@ -437,7 +437,7 @@ def animate_simulation(sim, steps=100, interval=200):
             if not order.status and order.arrival_time <= sim.timestamp + constants.time_to_consider_order:
                 order_xs.append(order.xpos)
                 order_ys.append(order.ypos)
-                order_ids.append(order.order_id)
+                order_ids.append(order.arrival_time)
         scat_orders.set_offsets(np.c_[order_xs, order_ys])
 
         # Update order ID texts
