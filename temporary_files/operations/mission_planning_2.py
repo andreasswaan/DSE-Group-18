@@ -3,19 +3,6 @@ import gurobipy as gp
 from gurobipy import GRB
 import constants
 
-def get_node_index(node, nodes, n_depots, n_orders, drone=None, count0=0, count1=0):
-    if hasattr(node, "order_id"):
-        return nodes.index(node)
-    elif hasattr(node, "depot_id"):
-        # For depots, you may need to know which copy (start/end) is intended.
-        return nodes.index(node) + n_depots * count0
-    else:
-        # For restaurants, you may need to know which order (copy) is intended.
-        if drone is not None:
-            return nodes.index(drone.restaurant_order_nodes[count1]) - n_orders
-        else:
-            return nodes.index(node)  # fallback
-
 class MissionPlanning:
     def __init__(self, Simulation):
         self.simulation = Simulation
@@ -38,139 +25,13 @@ class MissionPlanning:
             if nearest_depot:
                 nearest_depot.current_drones[0].set_targets([order.restaurant, order, order.nearest(self.depots)])
                 order.being_delivered = True
-
-    def set_warm_start(self, x, t_dep, t_arr, l, b, order_arrival, drones, nodes, n_orders, n_depots, orders):
-        """
-        Set a warm start for the Gurobi model using the previous mission planning solution,
-        updated to the current simulation time.
-        """
-        drone_assigned = [False] * len(drones)
-        # Set all variables to 0 as a default for the warm start
-        for i in range(len(nodes)):
-            for j in range(len(nodes)):
-                for k in range(len(drones)):
-                    x[i, j, k].Start = 0
-        for i in range(len(nodes)):
-            for k in range(len(drones)):
-                t_dep[i, k].Start = 0
-                t_arr[i, k].Start = 0
-                l[i, k].Start = 0
-                b[i, k].Start = 0
-        for o in range(n_orders):
-            order_arrival[o].Start = 0
-        current_time = self.simulation.timestamp            
-        for k, drone in enumerate(drones):
-            # Only proceed if the drone has a previous plan
-            if drone.targets:
-                drone_assigned[k] = True
-                count0 = 0
-                count1 = 0
-                first_node = next(
-                    (idx for idx, t in reversed(list(enumerate(drone.targets)))
-                    if hasattr(t, "being_delivered") and t.being_delivered),
-                    None
-                )
-                if first_node is None:
-                    continue
-                for idx in range(first_node, len(drone.targets) - 1):
-                    node_from = drone.targets[idx]
-                    node_to = drone.targets[idx + 1]
-                    try:
-                        i = get_node_index(node_from, nodes, n_depots, n_orders, drone, count0, count1)
-                        j = get_node_index(node_to, nodes, n_depots, n_orders, drone, count0, count1)
-                        # Update counters if needed
-                        if hasattr(node_from, "depot_id"):
-                            count0 += 1
-                        elif hasattr(node_from, "mean_nr_orders"):
-                            count1 += 1
-                    except ValueError:
-                        continue  # Node not in current node list (e.g., order already delivered)
-                    # Set the route variable
-                    x[i, j, k].Start = 1
-                    # Update times relative to current simulation time
-                    arr_time = max(drone.arrival_times[idx], current_time)
-                    dep_time = max(drone.departure_times[idx], current_time)
-                    t_arr[i, k].Start = arr_time
-                    t_dep[i, k].Start = dep_time
-                # Set arrival/departure for the last node in the route
-                last_idx = len(drone.targets) - 1
-                if last_idx >= 0:
-                    try:
-                        last_node = drone.targets[last_idx]
-                        i = nodes.index(last_node)
-                        t_arr[i, k].Start = max(drone.arrival_times[last_idx], current_time)
-                        t_dep[i, k].Start = max(drone.departure_times[last_idx], current_time)
-                    except ValueError:
-                        pass
-
-        new_orders = [order for order in orders if not order.being_delivered]
-        for o, order in enumerate(new_orders):
-            available_drones = [drone for drone in drones if drone.available_time <= order.arrival_time - 400]
-            best_drone = None
-            best_depot = None
-            min_dist = float('inf')
-            for drone in available_drones:
-                if drone.depot is None:
-                    depot = next((t for t in drone.targets if hasattr(t, "depot_id")), None)
-                else:
-                    depot = drone.depot
-                dist = depot.distance(order.restaurant)
-                if dist < min_dist:
-                    min_dist = dist
-                    best_drone = drone
-                    best_depot = depot
-            if best_drone is not None:
-                drone_assigned[drones.index(best_drone)] = True
-                # Find node indices for depot, restaurant, customer, depot
-                try:
-                    depot_idx = nodes.index(best_depot)
-                    rest_idx = nodes.index(order) - n_orders - 1
-                    cust_idx = nodes.index(order)
-                except ValueError:
-                    continue  # Node not found in current node list
-                k = drones.index(best_drone)
-                # Set the route: depot -> restaurant -> customer -> depot
-                x[depot_idx, rest_idx, k].Start = 1
-                x[rest_idx, cust_idx, k].Start = 1
-                x[cust_idx, len(nodes) - depot_idx - 1, k].Start = 1
-                # Set the departure and arrival times
-                t_arr[depot_idx, k].Start = current_time
-                t_dep[depot_idx, k].Start = order.arrival_time - best_depot.distance(order.restaurant) / best_drone.speed - constants.loading_time - order.distance(order.restaurant) / best_drone.speed
-                l[depot_idx, k].Start = 0
-                b[depot_idx, k].Start = 100
-                t_arr[rest_idx, k].Start = order.arrival_time - order.distance(order.restaurant) / best_drone.speed - constants.loading_time
-                t_dep[rest_idx, k].Start = order.arrival_time - order.distance(order.restaurant) / best_drone.speed
-                l[rest_idx, k].Start = order.demand
-                b[rest_idx, k].Start = 100 - order.restaurant.distance(best_depot) * drone.energy_per_meter - constants.TO_land_energy
-                t_arr[cust_idx, k].Start = order.arrival_time
-                t_dep[cust_idx, k].Start = order.arrival_time + constants.loading_time
-                l[cust_idx, k].Start = 0
-                b[cust_idx, k].Start = 100 - (order.restaurant.distance(best_depot) + order.distance(order.restaurant)) * best_drone.energy_per_meter - constants.TO_land_energy * 2
-                t_arr[len(nodes) - depot_idx - 1, k].Start = order.arrival_time + constants.loading_time + best_depot.distance(order) / best_drone.speed
-                t_dep[len(nodes) - depot_idx - 1, k].Start = order.arrival_time + constants.loading_time + best_depot.distance(order) / best_drone.speed + constants.battery_swap_time
-                l[len(nodes) - depot_idx - 1, k].Start = 0
-                b[len(nodes) - depot_idx - 1, k].Start = 100 - (order.restaurant.distance(best_depot) + order.distance(order.restaurant) + order.distance(best_depot)) * best_drone.energy_per_meter - constants.TO_land_energy * 3
-                order_arrival[o].Start = order.arrival_time
-                # Optionally, set t_dep and t_arr initial guesses if you want
-                available_drones.remove(best_drone)
-        for k, i in enumerate(drone_assigned):
-            if not i:
-                print(f"Drone {k} not assigned to any order, setting to depot")
-                depot_idx = nodes.index(drones[k].depot)
-                x[depot_idx, len(nodes) - depot_idx - 1, k].Start = 1
-                t_arr[depot_idx, k].Start = 0
-                t_dep[depot_idx, k].Start = current_time
-                t_arr[len(nodes) - depot_idx - 1, k].Start = current_time
-                t_dep[len(nodes) - depot_idx - 1, k].Start = current_time
-
-
         
     def setup_problem(self):
         print("-------------------------time:", self.simulation.timestamp, "-------------------------")
         for drone in self.drones:
             print(f"drone {drone.drone_id} target: {drone.target.name if drone.target else 'None'}, state: {drone.state}, targets: {[node.name for node in drone.targets]}")
             print(f"drone {drone.drone_id} departure times: {drone.departure_times}, arrival times: {drone.arrival_times}")
-        drones=self.drones
+        drones=[drone for drone in self.drones if drone.available_time <= self.simulation.timestamp] 
         depots=self.depots
         orders = self.get_orders()
         orders_to_deliver = [order for order in orders if order.arrival_time < self.simulation.timestamp + constants.time_to_consider_order]
@@ -178,29 +39,8 @@ class MissionPlanning:
         orders.sort(key=lambda order: order.arrival_time)
         orders = orders[:constants.max_orders_per_mission]  # Limit the number of orders to consider
         restaurants = [order.restaurant for order in orders]
-        drone_start_nodes = []
-        drone_earliest_dep = []
-        orders_being_delivered = [order for order in orders if order.being_delivered]
-        nodes = [*depots, *depots, *restaurants, *orders, *orders_being_delivered]
-        for drone in drones:
-            being_delivered_orders = [t for t in drone.targets if hasattr(t, "being_delivered") and t.being_delivered]
-            if being_delivered_orders:
-                nodes.append(being_delivered_orders[-1])
-                drone_start_nodes.append(nodes.index(being_delivered_orders[-1]))
-                drone_earliest_dep.append(drone.departure_times[drone.targets.index(being_delivered_orders[-1])])
-                #drone_earliest_dep.append(self.simulation.timestamp)
-            else:
-                if drone.targets:
-                    if hasattr(drone.targets[0], "depot_id"):
-                        drone_start_nodes.append(nodes.index(drone.targets[0]))
-                    else:
-                        drone_start_nodes.append(nodes.index(drone.restaurant_order_nodes[0])-len(orders))
-                    drone_earliest_dep.append(drone.departure_times[0])
-                    #drone_earliest_dep.append(self.simulation.timestamp)
-                else:
-                    drone_start_nodes.append(nodes.index(drone.depot))
-                    drone_earliest_dep.append(self.simulation.timestamp)
-        nodes = [*nodes, *depots]
+        drone_start_nodes = [drone.depot.depot_id for drone in drones]
+        nodes = [*depots, *restaurants, *orders, *depots]
         print(f"Nodes: {[node.name for node in nodes]}")
         #print(f"Orders: {[order.name for order in orders]}")
         #print(f"Orders being delivered: {[order.name for order in orders_being_delivered]}")
@@ -210,15 +50,17 @@ class MissionPlanning:
             for j, node2 in enumerate(nodes):
                 if i != j:
                     distance_matrix[i, j] = node1.distance(node2)        
-        return drones, drone_start_nodes, drone_earliest_dep, depots, restaurants, orders, drone_batteries, nodes, distance_matrix
+        return drones, drone_start_nodes, depots, restaurants, orders, drone_batteries, nodes, distance_matrix
 
     def solve_mission_planning(self):
-        drones, drone_start_nodes, drone_earliest_dep, depots, restaurants, orders, drone_batteries, nodes, distance_matrix = self.setup_problem()
+        drones, drone_start_nodes, depots, restaurants, orders, drone_batteries, nodes, distance_matrix = self.setup_problem()
         M = 1e4  # big-M
         n_nodes = len(nodes)
         n_drones = len(drones)
         n_orders = len(orders)
-        if n_orders <= 0:
+        if n_orders <= 2:
+            return
+        if n_drones <= 0:
             return
         n_restaurants = len(restaurants)
         n_depots = len(depots)
@@ -237,12 +79,12 @@ class MissionPlanning:
                 travel_matrix[i,j] = 0 if distance_matrix[i,j] == 0 else 1
         q = []
         for i in range(len(nodes)):
-            if i < n_depots * 2:
+            if i < n_depots:
                 q.append(0)
-            elif i < n_depots * 2 + n_orders:
-                q.append(int(orders[i - n_depots * 2].demand))
-            elif i < n_depots * 2 + n_orders * 2:
-                q.append(int(-orders[i - n_depots * 2 - n_orders].demand))
+            elif i < n_depots + n_orders:
+                q.append(int(orders[i - n_depots].demand))
+            elif i < n_depots + n_orders * 2:
+                q.append(int(-orders[i - n_depots - n_orders].demand))
             else:
                 q.append(0)
         # Decision variables
@@ -266,8 +108,8 @@ class MissionPlanning:
         
         # 1a. No direct depot->depot routes
         for k in range(n_drones):
-            for d1 in range(n_depots * 2):
-                for d2 in range(n_depots * 2):
+            for d1 in range(n_depots):
+                for d2 in range(n_depots):
                     if d1 != d2:
                         x[d1, d2, k].ub = 0
         
@@ -287,23 +129,27 @@ class MissionPlanning:
         # 1b. Drone can only leave its start node after it arrives there
         for k in range(n_drones):
             s = drone_start_nodes[k]
-            model.addConstr(t_dep[s, k] >= drone_earliest_dep[k], name=f"earliest_dep_{k}")
+            model.addConstr(t_dep[s, k] >= self.simulation.timestamp, name=f"earliest_dep_{k}")
             model.addConstr(t_dep[s, k] >= t_arr[s, k], name=f"start_departure_{k}")
-            if s > n_depots * 2:
-                model.addConstr(t_dep[s, k] <= drone_earliest_dep[k] + constants.max_waiting_time - waiting_times[s], name=f"max_wait_{k}")
+            if s > n_depots:
+                model.addConstr(t_dep[s, k] <= self.simulation.timestamp + constants.max_waiting_time - waiting_times[s], name=f"max_wait_{k}")
 
-        # 2. Each order is served by exactly one drone
+       # 2. Each order is served by at most one drone
         for o, order in enumerate(orders):
             cust = n_depots * 2 + n_restaurants + o  # index of the order node in nodes
-            model.addConstr(gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i != cust for k in range(n_drones)) == 1, name=f"serve_order_{o}")
-
+            model.addConstr(gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i != cust for k in range(n_drones)) <= 1, name=f"serve_order_{o}")
+       
         # 3. Drones must arrive at customer after order time
         for o, order in enumerate(orders):
-            cust = n_depots * 2 + n_restaurants + o
+            cust = n_depots + n_restaurants + o
             order_time = order.arrival_time
             for k in range(n_drones):
                 model.addConstr(t_arr[cust, k] >= order_time - M * (1 - gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i != cust)), name=f"arr_after_order_{o}_{k}")
-
+                model.addConstr(
+                    t_arr[cust, k] <= order_time + constants.deliver_time_window + M * (1 - gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i != cust)),
+                    name=f"arr_before_cust_{o}_{k}"
+                )
+        
         # 4. Flow conservation (leave every node you arrive at, except depots)
         for k in range(n_drones):
             s = drone_start_nodes[k]
@@ -322,7 +168,7 @@ class MissionPlanning:
             for i in range(n_nodes):
                 for j in range(n_nodes):
                     travel_time = distance_matrix[i, j] / drone.speed
-                    if i != j and i >= n_depots * 2:
+                    if i != j and i >= n_depots:
                         model.addConstr(
                             b[j, k] <= b[i, k] - (distance_matrix[i, j] * drone.energy_per_meter)
                               - constants.TO_land_energy + M * (1 - x[i, j, k]),
@@ -337,7 +183,7 @@ class MissionPlanning:
 
         # order arrival time constraints
         for o in range(n_orders):
-            cust = n_depots * 2 + n_restaurants + o
+            cust = n_depots + n_restaurants + o
             for k in range(n_drones):
                 model.addConstr(
                     order_arrival[o] >= t_arr[cust, k] - M * (1 - gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i != cust)),
@@ -365,30 +211,24 @@ class MissionPlanning:
         
         # 7. Restaurant before customer
         for o, order in enumerate(orders):
-            rest = n_depots * 2 + o 
-            cust = n_depots * 2 + n_restaurants + o
+            rest = n_depots + o 
+            cust = n_depots + n_restaurants + o
             for k in range(n_drones):
-                s = drone_start_nodes[k]
                 model.addConstr(
                     t_arr[cust, k] >= t_dep[rest, k] - M * (1 - gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i != cust)),
                     name=f"rest_before_cust_{o}_{k}"
                 )
                 # If drone k serves customer, it must also visit restaurant
-                if s != rest:
-                    model.addConstr(
+                model.addConstr(
                         gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i != cust) <=
                         gp.quicksum(x[i, rest, k] for i in range(n_nodes) if i != rest),
                         name=f"must_visit_restaurant_{o}_{k}"
                     )
-                else:
-                    model.addConstr(
-                        gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i == cust) == 1
-                    )
 
         # 8. Delivery time limit (30 min from pickup at restaurant to delivery at customer)
         for o, order in enumerate(orders):
-            rest = n_depots * 2 + o 
-            cust = n_depots * 2 + n_restaurants + o
+            rest = n_depots + o 
+            cust = n_depots + n_restaurants + o
             for k in range(n_drones):
                 travel_time = distance_matrix[rest, cust] / drones[k].speed
                 model.addConstr(
@@ -398,12 +238,12 @@ class MissionPlanning:
 
         # 9. No direct depot->customer or restaurant->depot
         for k in range(n_drones):
-            for d in range(n_depots * 2):
+            for d in range(n_depots):
                 for o in range(n_orders):
-                    cust = n_depots * 2 + n_restaurants + o
+                    cust = n_depots + n_restaurants + o
                     x[d, cust, k].ub = 0
                 for r in range(n_restaurants):
-                    rest = n_depots * 2 + r
+                    rest = n_depots + r
                     x[rest, d, k].ub = 0
                     # ToDo: consider removing this constraint
 
@@ -429,35 +269,20 @@ class MissionPlanning:
                 if i != s: 
                     model.addConstr(t_dep[i, k] >= t_arr[i, k] + waiting_times[i]*(0 if i >= n_nodes - n_depots and gp.quicksum(x[d,i,k] for d in range(n_depots*2)) else 1)
                                     - M * (1 - gp.quicksum(x[j, i, k] for j in range(n_nodes) if j != i)), name=f"dep_after_arr_{i}_{k}")
-                if i >= n_depots * 2 and i < n_nodes - n_depots:  # if it's not a depot
+                if i >= n_depots and i < n_nodes - n_depots:  # if it's not a depot
                     model.addConstr(t_dep[i, k] <=t_arr[i, k] + constants.max_waiting_time
                                     + M * (1 - gp.quicksum(x[j, i, k] for j in range(n_nodes) if j != i)), name=f"dep_before_max_wait_{i}_{k}")
         # Objective: Minimize weighted sum of total distance and total delay
-        weight_dist = 0.5
-        weight_delay = 0.5
-        weight_finish_time = 0.001
-        weight_travel_time = 0.5
-        weight_n_trips = 100
-        weight_total_start_time = 0.001
-        #total_travel_time = gp.quicksum(
-        #    travel_time_arc[i, j, k]
-        #    for i in range(n_nodes) for j in range(n_nodes) if i != j for k in range(n_drones)
-        #)
-        total_n_trips = gp.quicksum(
-            x[i, j, k] for i in range(n_nodes) for j in range(n_nodes) if i != j and not (i in range(n_depots) and j in range(n_nodes-n_depots, n_nodes)) for k in range(n_drones)
-        )
+        weight_dist = -0.5
+        weight_finish_time = -0.001
+        weight_orders_delivered = 5000
+
+        total_orders_delivered = gp.quicksum(x[i, n_depots + n_restaurants + o, k] for o in range(n_orders) for i in range(n_nodes) if i != n_depots + n_restaurants + o for k in range(n_drones))
         total_distance = gp.quicksum(distance_matrix[i, j] * x[i, j, k] for i in range(n_nodes) for j in range(n_nodes) if i != j for k in range(n_drones))
-        #total_delay = gp.quicksum(
-        #    (t_arr[n_depots * 2 + n_restaurants + o, k] - orders[o].arrival_time) *
-        #    gp.quicksum(x[i, n_depots * 2 + n_restaurants + o, k] for i in range(n_nodes) if i != n_depots * 2 + n_restaurants + o)
-        #    for o in range(n_orders)
-        #    for k in range(n_drones)
-        #)
-        total_delay = gp.quicksum(order_arrival[o] - orders[o].arrival_time for o in range(n_orders))
         total_finish_time = gp.quicksum(t_dep[d, k] for d in range(n_nodes-n_depots, n_nodes) for k in range(n_drones))
-        #total_start_time = gp.quicksum(t_dep[drone_start_nodes[k], k] for k in range(n_drones))
-        model.setObjective(weight_n_trips * total_n_trips + weight_dist * total_distance + weight_delay * total_delay + total_finish_time * weight_finish_time, GRB.MINIMIZE)
-        #self.set_warm_start(x, t_dep, t_arr, l, b, order_arrival, drones, nodes, n_orders, n_depots, orders)
+        
+        model.setObjective(weight_orders_delivered * total_orders_delivered + weight_dist * total_distance + total_finish_time * weight_finish_time, GRB.MAXIMIZE)
+        
         model.optimize()
         if model.status == GRB.OPTIMAL:
             self.assign_routes(x, t_dep, t_arr, drones, nodes, n_orders)
@@ -489,28 +314,10 @@ class MissionPlanning:
             legs.sort(key=lambda leg: leg[3])
 
             if legs:
-
-                if drone.targets:
-                    if any(hasattr(t, "being_delivered") and t.being_delivered for t in drone.targets):
-                        last_being_delivered_order = next(
-                            (t for t in reversed(drone.targets) if hasattr(t, "being_delivered") and t.being_delivered),
-                            None
-                        )   
-                        if last_being_delivered_order is not None:
-                            idx = drone.targets.index(last_being_delivered_order)
-                            targets_to_keep = drone.targets[:idx]
-                        else:
-                            targets_to_keep = []                        
-                        routes = targets_to_keep
-                        departure_times = [drone.departure_times[i] for i in range(len(targets_to_keep))]
-                        arrival_times = [drone.arrival_times[i] for i in range(len(targets_to_keep))]
-                        n_restaurants = sum(1 for t in targets_to_keep if hasattr(t, "mean_nr_orders"))
-                        restaurant_order_nodes = drone.restaurant_order_nodes[:n_restaurants]
-                else:
-                    routes = []
-                    arrival_times = []
-                    departure_times = []
-                    restaurant_order_nodes = []
+                routes = []
+                arrival_times = []
+                departure_times = []
+                restaurant_order_nodes = []
                 for leg in legs:
                     #print(f"Drone {drone.drone_id} leg: {nodes[leg[0]].name} -> {nodes[leg[1]].name}, arr: {leg[2]}, dep: {leg[3]}")
                     routes.append(nodes[leg[0]])

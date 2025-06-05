@@ -2,14 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 import matplotlib.animation as animation
-from temporary_files.operations.mission_planning import MissionPlanning
+from temporary_files.operations.mission_planning_2 import MissionPlanning
 import financial_model
 import constants
 import scipy.stats as stats
 # pizza size to weight guide in kg
-np.random.seed(48)  # for reproducibility
+np.random.seed(40)  # for reproducibility
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
-n_drones = 4
+n_drones = 2
 class Point():
     def __init__(self, xpos: float, ypos: float) -> None:
         self.xpos = xpos
@@ -74,7 +74,7 @@ class Drone(Point):
         self.depot = depots[drone_dict['depot']]
         self.depot.current_drones.append(self)
         self.targets = []
-        self.mission = None
+        self.available_time = 0
         self.target = None
         self.max_battery_level = 100
         self.energy_per_meter = 0.005  # kWh per meter, this is a placeholder value
@@ -124,10 +124,7 @@ class Drone(Point):
                 self.target.status = True
             self.target = self.targets[0] if self.targets else None 
             self.state = 'moving'  
-            #else:
-            #    return None
-        else:
-            return None
+            
     def calculate_payload_weight(self):
         # calculate the weight of the current payload
         weight = 0
@@ -151,6 +148,7 @@ class Drone(Point):
         if self.depot is not None:
             self.depot.current_drones.remove(self)
             self.depot = None  
+        self.available_time = self.departure_times[-1] if self.departure_times else 0
 
     def update_drone(self, dt):
         """self.xpos += 0.5 * self.xacc * dt**2 + self.xvel * dt
@@ -326,13 +324,31 @@ restaurant_dict = [{
     'xpos': 50,
     'ypos': 20,
     'restaurant_id': 0,
-    'name': 'Pizza Place',
+    'name': 'Pizza Place0',
+    'mean_nr_orders': 400,
+    'mean_order_size': {'small': 0, 'medium': 3, 'large': 0}
+},
+{
+    'xpos': 50,
+    'ypos': 50,
+    'restaurant_id': 1,
+    'name': 'Pizza Place1',
+    'mean_nr_orders': 400,
+    'mean_order_size': {'small': 0, 'medium': 3, 'large': 0}
+},
+{
+    'xpos': 20,
+    'ypos': 80,
+    'restaurant_id': 2,
+    'name': 'Pizza Place2',
     'mean_nr_orders': 400,
     'mean_order_size': {'small': 0, 'medium': 3, 'large': 0}
 }]
 
 Restaurant0 = Restaurant(restaurant_dict[0])
-restaurants = [Restaurant0]
+Restaurant1 = Restaurant(restaurant_dict[1])
+Restaurant2 = Restaurant(restaurant_dict[2])
+restaurants = [Restaurant0, Restaurant1, Restaurant2]
 
 depot_dict = [{
     'depot_id': 0,
@@ -399,22 +415,39 @@ def animate_simulation(sim, steps=100, interval=200):
     ax.set_xlim(0, city.reso)
     ax.set_ylim(0, city.reso)
     ax.legend(loc='upper right')
-    # Use a Text artist for the title
     title_text = ax.text(0.5, 1.01, '', transform=ax.transAxes, ha='center', va='bottom', fontsize=12)
 
     order_xs, order_ys = [], []
     drone_xs, drone_ys = [], []
 
+    # Prepare text artists for order IDs
+    order_id_texts = []
+    for _ in range(100):
+        txt = ax.text(0, 0, '', color='black', fontsize=8, ha='center', va='bottom')
+        txt.set_visible(False)
+        order_id_texts.append(txt)
+
     def update(frame):
         sim.take_step()
-        # Collect undelivered order locations
+        # Collect undelivered order locations and IDs
         order_xs.clear()
         order_ys.clear()
+        order_ids = []
         for order in sim.order_book.values():
             if not order.status and order.arrival_time <= sim.timestamp + constants.time_to_consider_order:
                 order_xs.append(order.xpos)
                 order_ys.append(order.ypos)
+                order_ids.append(order.order_id)
         scat_orders.set_offsets(np.c_[order_xs, order_ys])
+
+        # Update order ID texts
+        for i, txt in enumerate(order_id_texts):
+            if i < len(order_xs):
+                txt.set_position((order_xs[i], order_ys[i] + 1.5))
+                txt.set_text(str(order_ids[i]))
+                txt.set_visible(True)
+            else:
+                txt.set_visible(False)
 
         # Collect drone locations
         drone_xs.clear()
@@ -424,15 +457,13 @@ def animate_simulation(sim, steps=100, interval=200):
             drone_ys.append(drone.ypos)
         scat_drones.set_offsets(np.c_[drone_xs, drone_ys])
 
-        # Update the title text
         title_text.set_text(f'Simulation Map Animation\nTime: {sim.timestamp}s, Orders: {len(order_xs)}')
-        # Return all artists that need to be redrawn
-        return scat_orders, scat_drones, scat_restaurants, scat_depots, title_text
+        return (scat_orders, scat_drones, scat_restaurants, scat_depots, title_text, *order_id_texts)
 
     ani = animation.FuncAnimation(
         fig, update, frames=steps, interval=interval, blit=False, repeat=False
     )
     plt.show()
 n_steps = int(constants.time_window / my_sim.dt)
-my_sim.change_order_volume(1)
+my_sim.change_order_volume(5)
 animate_simulation(my_sim, n_steps, interval=10)
