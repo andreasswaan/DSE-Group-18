@@ -29,19 +29,29 @@ drone.class_2_weight_estimate()
 # print("Drone OEW after class 2 estimate:", drone.OEW)
 
 drone.iterative_weight_estimate(plot=True, tolerance=0.01)
-print("Drone MTOW after iterative estimate:", drone.MTOW)
-print(f"Wing surface area: {drone.wing.S}")
+# print("Drone MTOW after iterative estimate:", drone.MTOW)
+# print(f"Wing surface area: {drone.wing.S}")
 
 drone.wing.plot_planform(save_plot=True)
-print(f"Aspect ratio: {drone.wing.geom_AR}")
-print(f"Mean aerodynamic chord (MAC): {drone.wing.MAC}")
+# print(f"Aspect ratio: {drone.wing.geom_AR}")
+# print(f"Mean aerodynamic chord (MAC): {drone.wing.MAC}")
 
-print(drone.wing.c_root, drone.wing.c_tip, drone.wing.S)
-print(drone.wing.span)
-print(drone.wing.x_ac_lemac)
+# print(drone.wing.c_root, drone.wing.c_tip, drone.wing.S)
+# print(drone.wing.span)
+# print(drone.wing.x_ac_lemac)
 
 # drone.perf.cruise_noise(plot=True)
 
+
 # drone.perf.payload_range_diagram()
 
-run_structure_analysis(drone)
+for prop_connection in ["fuselage", "wing"]:
+    for fuselage_case in [1, 2]:
+        print(
+            f"\n=== Running structure analysis for prop_connection='{prop_connection}', fuselage_case={fuselage_case} ==="
+        )
+        run_structure_analysis(
+            drone, prop_connection=prop_connection, fuselage_case=fuselage_case
+        )
+
+# run_structure_analysis(drone, 'fuselage', fuselage_case=1)
