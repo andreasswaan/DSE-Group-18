@@ -401,9 +401,42 @@ def create_circular_section(
     return IdealizedSection(booms)
 
 
-# === FUSELAGE & WING STRUCTURES ===
+# === STRUCTURES ASSEMBLY ===
 
+class ConnectorStructure:
+    def __init__(
+        self,
+        length: float,
+        n_sections: int,
+        root_section: IdealizedSection,
+        start_point: tuple[float, float, float],  # (x, y, z) at point load
+        end_point: tuple[float, float, float],    # (x, y, z) at wing surface
+    ):
+        self.length = length
+        self.n_sections = n_sections
+        self.root_section = root_section
+        self.start_point = np.array(start_point)
+        self.end_point = np.array(end_point)
+        self.sections = self.generate_sections()
 
+    def generate_sections(self) -> list[tuple[np.ndarray, IdealizedSection]]:
+        sections = []
+        for i in range(self.n_sections):
+            frac = i / (self.n_sections - 1)
+            pos = self.start_point * (1 - frac) + self.end_point * frac
+            # No scaling of cross-section for now, but you could add tapering if needed
+            section = IdealizedSection([
+                Boom(
+                    x=boom.x,
+                    y=boom.y,
+                    area=boom.area,
+                    boom_type=boom.type,
+                    material=boom.material,
+                )
+                for boom in self.root_section.booms
+            ])
+            sections.append((pos, section))
+        return sections
 class FuselageStructure:
     def __init__(
         self,
@@ -413,6 +446,8 @@ class FuselageStructure:
         taper_ratio: float = 1.0,  # For constant-diameter, keep at 1.0
     ):
         self.length = length
+        self.width = root_section.width
+        self.height = root_section.height
         self.n_sections = n_sections
         self.taper_ratio = taper_ratio
         self.root_section = root_section
@@ -453,51 +488,47 @@ class FuselageStructure:
             weight_per_section.append(w_z)
         return weight_per_section
 
+    def compute_bending_moments_with_point_loads(
+        self,
+        point_loads: list[dict],
+    ) -> tuple[list[float], list[float]]:
+        """
+        Returns two lists: (Mz_per_section, My_per_section)
+        - Mz: bending moment about z-axis (from Py)
+        - My: bending moment about y-axis (from Pz)
+        Includes effects of point loads.
+        point_loads: list of dicts, each with {"x": position, "y": ..., "z": ..., "Px": ..., "Py": ..., "Pz": ...}
+        """
+        Mz_list = []
+        My_list = []
+        section_positions = [x for x, _ in self.sections]
+        for i, x in enumerate(section_positions):
+            Mz = 0
+            My = 0
+            for pl in point_loads:
+                if pl["x"] >= x:
+                    arm = pl["x"] - x
+                    Pz = pl.get("Pz", 0)
+                    # Bending about z-axis from vertical force
+                    Mz += Pz * arm
+            Mz_list.append(Mz)
+            My_list.append(My)
+        return Mz_list, My_list
+    
     def compute_bending_stresses(
-        self, Mz_per_section: list[float], My_per_section: list[float] = None
+        self, Mz_per_section: list[float], My_per_section: list[float]
     ) -> list[list[float]]:
         """
         Returns a list of [stress at each boom] for each section.
         """
         stresses_per_section = []
         for i, (x_pos, section) in enumerate(self.sections):
-            Mz = Mz_per_section[i]
+            Mz = Mz_per_section[i] if Mz_per_section else 0
             My = My_per_section[i] if My_per_section else 0
-            # Pass Mz as "Mx" and My as "My" to the section's bending_stress method,
-            # since the section method expects (Mx, My), but for fuselage, Mx = Mz (longitudinal axis)
-            stresses = section.bending_stress(Mx=Mz, My=My)
+            # Pass both moments to the section's bending_stress method
+            stresses = section.bending_stress(Mx=Mz, My=0)
             stresses_per_section.append(stresses)
         return stresses_per_section
-
-    def compute_bending_moments_with_point_loads(
-        self,
-        Mz_distributed: list[float],
-        My_distributed: list[float],
-        point_loads: list[dict],
-    ) -> tuple[list[float], list[float]]:
-        """
-        Returns two lists: (Mz_per_section, My_per_section)
-        - Mz: bending moment about z-axis (from Px)
-        - My: bending moment about y-axis (from Pz)
-        Includes effects of distributed moments and point loads.
-        point_loads: list of dicts, each with {"x": position, "Px": ..., "Pz": ...}
-        """
-        Mz_list = []
-        My_list = []
-        section_positions = [x for x, _ in self.sections]
-        for i, x in enumerate(section_positions):
-            Mz = Mz_distributed[i] if Mz_distributed else 0
-            My = My_distributed[i] if My_distributed else 0
-            for pl in point_loads:
-                if pl["x"] >= x:
-                    arm = pl["x"] - x
-                    Px = pl.get("Px", 0)
-                    Pz = pl.get("Pz", 0)
-                    Mz += Px * arm
-                    My += Pz * arm
-            Mz_list.append(Mz)
-            My_list.append(My)
-        return Mz_list, My_list
 
     def plot_3d_fuselage(
         self, stresses_per_section: list[list[float]], point_loads: list[dict] = None
@@ -534,6 +565,7 @@ class FuselageStructure:
             for pl in point_loads:
                 # Default to 0 if not specified
                 Px = pl.get("Px", 0)
+                Py = pl.get("Py", 0)
                 Pz = pl.get("Pz", 0)
                 # Arrow at (sideways=0, fuselage x=pl["x"], upwards=0)
                 ax.quiver(
@@ -541,9 +573,8 @@ class FuselageStructure:
                     pl["y"],
                     pl["z"],  # base: x=fuselage length, y=sideways, z=upwards
                     0,
-                    Px / 1000,
-                    Pz
-                    / 1000,  # direction: y=sideways, z=upwards, scaled for visibility
+                    0,
+                    Pz / 1000,  # direction: y=sideways, z=upwards, scaled for visibility
                     color="red",
                     arrow_length_ratio=0.2,
                     linewidth=3,
@@ -561,9 +592,18 @@ class FuselageStructure:
         mappable.set_array(all_stresses)
         cbar = plt.colorbar(mappable, ax=ax, pad=0.1)
         cbar.set_label("Bending Stress [Pa]")
+        
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
+        ax.zaxis.set_major_locator(ticker.MaxNLocator(4))
+
+        ax.set_xlim(-0.3, 1.5)
+        ax.set_ylim(-0.8, 0.8)
+        ax.set_zlim(-0.5, 0.5)
 
         plt.tight_layout()
         plt.show()
+    
 
 
 class WingStructure:
@@ -1064,6 +1104,7 @@ def size_wing_for_min_mass(
     area_scale_step: float = 0.02,
     min_scale: float = 0.01,
     max_iter: int = 200,
+    wing_point_loads: list[dict] = None,
 ):
     original_areas = [
         [boom.area for boom in section.booms] for _, section in wing.sections
@@ -1085,6 +1126,19 @@ def size_wing_for_min_mass(
         total_vertical_load = [
             L - W for L, W in zip(lift_per_section, weight_per_section)
         ]
+        moments_x, stresses_per_section = wing.compute_bending_stresses(
+            total_vertical_load
+        )
+        
+        # --- Add point loads to the correct sections ---
+        if wing_point_loads:
+            for pl in wing_point_loads:
+                idx = min(
+                    range(len(wing.sections)),
+                    key=lambda i: abs(wing.sections[i][0] - pl["y"])
+                )
+                total_vertical_load[idx] += pl.get("Pz", 0)
+
         moments_x, stresses_per_section = wing.compute_bending_stresses(
             total_vertical_load
         )
@@ -1151,61 +1205,159 @@ def size_wing_for_min_mass(
         return last_safe[1], last_safe[0]
     raise RuntimeError("Failed to find a safe structure within max_iter iterations.")
 
+def size_fuselage_for_min_mass(
+    fuselage: "FuselageStructure",
+    distributed_loads: list[float],
+    shear_thickness: float = 0.002,
+    safety_factor: float = 2.0,
+    area_scale_start: float = 3.0,
+    area_scale_step: float = 0.02,
+    min_scale: float = 0.01,
+    max_iter: int = 200,
+    fuselage_point_loads: list[dict] = None,
+):
+    """
+    Sizing loop for minimal fuselage mass, considering distributed and point loads.
+    """
+    original_areas = [
+        [boom.area for boom in section.booms] for _, section in fuselage.sections
+    ]
+    area_scale = area_scale_start
+    last_safe = None
+
+    for _ in range(max_iter):
+        # Reset all boom areas to original, then scale
+        for orig_areas, (_, section) in zip(original_areas, fuselage.sections):
+            for boom, orig_area in zip(section.booms, orig_areas):
+                boom.area = orig_area * area_scale
+            section.centroid_x, section.centroid_y = section.calc_centroid()
+            section.Ixx, section.Iyy, section.Ixy = section.calc_moments()
+
+        # --- Bending moments and stresses ---
+        # Use only distributed loads for moments, pass point loads separately
+        Mz_per_section, My_per_section = fuselage.compute_bending_moments_with_point_loads(
+            fuselage_point_loads or []
+        )
+        stresses_per_section = fuselage.compute_bending_stresses(
+            Mz_per_section, My_per_section
+        )
+
+        # --- Shear stresses ---
+        # For shear, add point loads to distributed loads at the correct section
+        shear_vertical_load = distributed_loads.copy()
+        if fuselage_point_loads:
+            for pl in fuselage_point_loads:
+                idx = min(
+                    range(len(fuselage.sections)),
+                    key=lambda i: abs(fuselage.sections[i][0] - pl["x"])
+                )
+                shear_vertical_load[idx] += pl.get("Pz", 0)
+
+        # Compute shear forces (from tail to nose)
+        shear_forces = []
+        running_shear = 0.0
+        for net_load in reversed(shear_vertical_load):
+            running_shear += net_load
+            shear_forces.insert(0, running_shear)
+
+        shear_stresses_per_section = []
+        for (x, sec), Vz in zip(fuselage.sections, shear_forces):
+            shear_stresses = sec.shear_stress(Vz=Vz, thickness=shear_thickness)
+            shear_stresses_per_section.append(shear_stresses)
+
+        # --- Find critical stress (yield/shear) ---
+        critical = find_critical_stress(
+            [sec for _, sec in fuselage.sections],
+            stresses_per_section,
+            shear_stresses_per_section,
+        )
+        allowable_with_sf = critical["allowable"] / safety_factor
+        utilization_with_sf = (
+            abs(critical["stress"]) / allowable_with_sf if allowable_with_sf else 0
+        )
+
+        # --- Buckling check for the critical boom ---
+        dz = fuselage.dz
+        critical_boom = fuselage.sections[critical["section_idx"]][1].booms[
+            critical["boom_idx"]
+        ]
+        E = critical_boom.material.E
+        K = 2.0  # free-fixed
+        L = dz
+        A = critical_boom.area
+        r = np.sqrt(A / np.pi)
+        sigma_cr = euler_buckling_stress(E, K, L, r)
+        sigma_cr_with_sf = sigma_cr / safety_factor
+        buckling_utilization = (
+            abs(critical["stress"]) / sigma_cr_with_sf if sigma_cr_with_sf else 0
+        )
+
+        # --- Check both criteria ---
+        if utilization_with_sf < 1.0 and buckling_utilization < 1.0:
+            last_safe = (area_scale, sum(sec.mass(dz) for _, sec in fuselage.sections))
+            area_scale -= area_scale_step
+            if area_scale < min_scale:
+                break
+        else:
+            if last_safe is not None:
+                return last_safe[1], last_safe[0]
+            else:
+                raise RuntimeError(
+                    "Initial area is not strong enough! Increase area_scale_start."
+                )
+
+    if last_safe is not None:
+        return last_safe[1], last_safe[0]
+    raise RuntimeError("Failed to find a safe structure within max_iter iterations.")
+
 def get_fuselage_dimensions(case: int):
     """
     Returns (width, height, length) for the fuselage based on the selected case.
     All dimensions in meters.
     """
     if case == 1:
-        payload_width = 0.675
-        payload_height = 0.450
-        payload_length = 0.630
+        width = 0.675
+        height = 0.450
+        length = 0.630
     elif case == 2:
-        payload_width = 0.675
-        payload_height = 0.270
-        payload_length = 1.260
+        width = 0.675
+        height = 0.270
+        length = 1.260
     else:
         raise ValueError("Invalid case. Choose 1 or 2.")
 
     clearance = 0.2  # 20% clearance
-    width = payload_width * (1 + clearance)
-    height = payload_height * (1 + clearance)
-    length = payload_length * (1 + clearance)
+    width = width * (1 + clearance)
+    height = height * (1 + clearance)
+    length = length * (1 + clearance)
     return width, height, length
-class ConnectorStructure:
-    def __init__(
-        self,
-        length: float,
-        n_sections: int,
-        root_section: IdealizedSection,
-        start_point: tuple[float, float, float],  # (x, y, z) at point load
-        end_point: tuple[float, float, float],    # (x, y, z) at wing surface
-    ):
-        self.length = length
-        self.n_sections = n_sections
-        self.root_section = root_section
-        self.start_point = np.array(start_point)
-        self.end_point = np.array(end_point)
-        self.sections = self.generate_sections()
 
-    def generate_sections(self) -> list[tuple[np.ndarray, IdealizedSection]]:
-        sections = []
-        for i in range(self.n_sections):
-            frac = i / (self.n_sections - 1)
-            pos = self.start_point * (1 - frac) + self.end_point * frac
-            # No scaling of cross-section for now, but you could add tapering if needed
-            section = IdealizedSection([
-                Boom(
-                    x=boom.x,
-                    y=boom.y,
-                    area=boom.area,
-                    boom_type=boom.type,
-                    material=boom.material,
-                )
-                for boom in self.root_section.booms
-            ])
-            sections.append((pos, section))
-        return sections
+def get_fuselage_payload_weights(case: int):
+    """
+    Returns loads for the fuselage based on the selected case.
+    All dimensions in N.
+    """
+    battery_weight = 0.5 * g
+    sensors_weight = 0.1 * g
+    computing_module_weight = 0.1 * g
+    miscellaneous_weight = 0.1 * g
+    # These values are placeholders and should be replaced with actual values
+    
+    if case == 1:
+        pizza_weight_1 = 2.5 * g
+        pizza_weight_2 = 0 * g
+        mechanisms_weight = 1.31 * g
+        payload_insulator_weight = 0.41 * g
+    elif case == 2:
+        pizza_weight_1 = 1.25 * g
+        pizza_weight_2 = 1.25 * g
+        mechanisms_weight = 1.58 * g
+        payload_insulator_weight = 0.56 * g
+    else:
+        raise ValueError("Invalid case. Choose 1 or 2.")
+
+    return battery_weight, sensors_weight, computing_module_weight,miscellaneous_weight, pizza_weight_1, pizza_weight_2, mechanisms_weight, payload_insulator_weight
+
 
     def mass(self) -> float:
         dz = self.length / (self.n_sections - 1)
@@ -1217,19 +1369,40 @@ def run_structure_analysis(
     drone: Drone,
     prop_connection: str = "wing",
     # prop_connection: "wing" or "fuselage"
+    fuselage_case = 2,  # or 2, (1 for chubby, 2 for elongated fuselage)
+    banked = True,  # Set to False for normal cruise, True for banked case
 ):
     SAFETY_FACTOR = 2.0
 
     # --- All your main logic from the current if __name__ == "__main__": block ---
     # (Copy everything from the current if __name__ == "__main__": block here)
+    
+    # Create root cross-section
+    root_section = create_rectangular_section(
+        width=0.6,
+        height=0.072,
+        n_regular_booms=12,
+        spar_cap_area=2e-5,
+        regular_boom_area=1e-5,
+        material_name="al_6061_t4",
+        materials=materials,
+    )
+
+    wing = WingStructure(
+        n_sections=10,
+        root_section=root_section,
+        drone=drone,
+    )
+
     # For example:
     # Create fuselage cross-section
+
     
-    # Select case 1 or 2
-    fuselage_case = 1  # or 2
+    dy = wing.dy
+    # b_half = wing.span / 2
+    b = wing.span
 
     fuselage_width, fuselage_height, fuselage_length = get_fuselage_dimensions(fuselage_case)
-
 
     fuselage_root_section = create_rectangular_section(
         width=fuselage_width,
@@ -1251,73 +1424,109 @@ def run_structure_analysis(
     section_positions = [x for x, _ in fuselage.sections]
     Mz_distributed = [0] * fuselage.n_sections
     My_distributed = [0] * fuselage.n_sections
-
-    point_loads = [
-        {"x": 3.0, "y": 0.5, "z": -0.4, "Pz": -2000},
-        {"x": 0.0, "y": 0.2, "z": 0.2, "Px": 1500},
+    
+    battery_weight, sensors_weight, computing_module_weight,miscellaneous_weight, pizza_weight_1, pizza_weight_2, mechanisms_weight, payload_insulator_weight = get_fuselage_payload_weights(fuselage_case)
+    
+    if fuselage_case == 1: 
+        point_loads = [
+            {"x": 0.9 * fuselage_length, "y": fuselage_width, "z": fuselage_height, "Pz": 100}, # placeholder for left wing lift
+            {"x": 0.9 * fuselage_length, "y": -fuselage_width, "z": fuselage_height, "Pz": 100}, # placeholder for right wing lift
+            {"x": 0.5 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -battery_weight},
+            {"x": 0.05 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -sensors_weight},
+            {"x": 0.5 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -computing_module_weight},
+            {"x": 0.5 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -miscellaneous_weight},
+            {"x": 0.5 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -pizza_weight_1},
+            {"x": 0.45 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -mechanisms_weight},
+            {"x": 0.5 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -payload_insulator_weight}, # placeholder, all of them shall be changed to actual values
+        ]
+    elif fuselage_case == 2:
+        # Example: place load at center of the longer cargo bay for case 2
+        point_loads = [
+            {"x": 0.9 * fuselage_length, "y": fuselage_width, "z": fuselage_height, "Pz": 100}, # placeholder for left wing lift
+            {"x": 0.9 * fuselage_length, "y": -fuselage_width, "z": fuselage_height, "Pz": 100}, # placeholder for right wing lift
+            {"x": 0.5 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -battery_weight},
+            {"x": 0.05 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -sensors_weight},
+            {"x": 0.5 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -computing_module_weight},
+            {"x": 0.5 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -miscellaneous_weight},
+            {"x": 0.35 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -pizza_weight_1},
+            {"x": 0.65 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -pizza_weight_2},
+            {"x": 0.45 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -mechanisms_weight},
+            {"x": 0.5 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -payload_insulator_weight}, # placeholder, all of them shall be changed to actual values
+        ]
+    else:
+        raise ValueError("Invalid fuselage case. Choose 1 or 2.")
+    
+    fuselage_prop_loads = [
+    {"x": 1.5 * root_section.width,  "y":  b / 2 / 3, "z": 0.0, "Pz": 450 / 4},
+    {"x": -1.5 * root_section.width, "y":  b / 2 / 3, "z": 0.0, "Pz": 450 / 4},
+    {"x": 1.5 * root_section.width,  "y": -b / 2 / 3, "z": 0.0, "Pz": 450 / 4},
+    {"x": -1.5 * root_section.width, "y": -b / 2 / 3, "z": 0.0, "Pz": 450 / 4},
     ]
+    wing_prop_loads = [
+    {"x": 1.5 * root_section.width,  "y":  b / 2 / 3, "z": 0.0, "Pz": 450 / 4},
+    {"x": -1.5 * root_section.width, "y":  b / 2 / 3, "z": 0.0, "Pz": 450 / 4},
+    ]
+    
+    if prop_connection == "wing":
+        wing_point_loads = wing_prop_loads
+        fuselage_point_loads = []  # No fuselage loads in this case
+        
+    elif prop_connection == "fuselage":
+        fuselage_point_loads = fuselage_prop_loads
+        wing_point_loads = []
+        
+    else:
+        raise ValueError("prop_connection must be 'wing' or 'fuselage'")
 
-    Mz_per_section, My_per_section = fuselage.compute_bending_moments_with_point_loads(
-        Mz_distributed, My_distributed, point_loads
-    )
+    all_fuselage_point_loads = point_loads + fuselage_point_loads
+    Mz_per_section, My_per_section = fuselage.compute_bending_moments_with_point_loads(all_fuselage_point_loads)
 
     fuselage_stresses_per_section = fuselage.compute_bending_stresses(
         Mz_per_section, My_per_section
     )
-    fuselage.plot_3d_fuselage(fuselage_stresses_per_section, point_loads=point_loads)
-
-    # Create root cross-section
-    root_section = create_rectangular_section(
-        width=0.6,
-        height=0.072,
-        n_regular_booms=12,
-        spar_cap_area=2e-5,
-        regular_boom_area=1e-5,
-        material_name="al_6061_t4",
-        materials=materials,
-    )
-
-    wing = WingStructure(
-        n_sections=10,
-        root_section=root_section,
-        drone=drone,
-    )
-
-    dy = wing.dy
-    # b_half = wing.span / 2
-    b = wing.span
     
-    if prop_connection == "wing":
-        wing_point_loads = [
-            {
-                "x": 1.5 * root_section.width,
-                "y": b / 2 / 3,
-                "z": 0.0,
-                "Pz": 450 / 4,
-            },  # 450 / 4 N upwards at (x=0.2, y=0.5, z=0.0)
-            {
-                "x": -1.5 * root_section.width,
-                "y": b / 2 / 3,
-                "z": 0.0,
-                "Pz": 450 / 4,
-            },  # 450 / 4 N upwards at (x=0.1, y=1.2, z=0.0)
-        ]
-        fuselage_point_loads = []  # No fuselage loads in this case
-        
-    elif prop_connection == "fuselage":
-        fuselage_point_loads = [
-        {"x": 1.5, "y": 0.0, "z": 0.0, "Pz": 450 / 4},
-        {"x": -1.5, "y": 0.0, "z": 0.0, "Pz": 450 / 4},
-        {"x": 1.5, "y": 0.0, "z": 0.0, "Pz": 450 / 4},
-        {"x": -1.5, "y": 0.0, "z": 0.0, "Pz": 450 / 4},
-    ]
-        wing_point_loads = []
-        
-    # FIX THIS
-        
-    else:
-        raise ValueError("prop_connection must be 'wing' or 'fuselage'")
-        
+    # After computing fuselage_stresses_per_section
+    
+    # Compute internal shear force for the fuselage (from tail to nose)
+    shear_forces_fuselage = []
+    running_shear = 0.0
+    # Use the same point/distributed loads as in your moment calculation
+    # Compute net vertical load per section (sum of all Pz from point_loads and fuselage_point_loads)
+    for i in reversed(range(len(fuselage.sections))):
+        x_pos, section = fuselage.sections[i]
+        # Sum all Pz loads applied at this section
+        net_load = 0.0
+        for pl in point_loads + fuselage_point_loads:
+            if abs(pl["x"] - x_pos) < 1e-6:  # or use a tolerance
+                net_load += pl.get("Pz", 0)
+        running_shear += net_load
+        shear_forces_fuselage.insert(0, running_shear)
+    
+    # Compute shear stresses per section for the fuselage
+    shear_stresses_fuselage = []
+    for (x, sec), Vz in zip(fuselage.sections, shear_forces_fuselage):
+        shear_stresses = sec.shear_stress(Vz=Vz, thickness=0.002)
+        shear_stresses_fuselage.append(shear_stresses)
+    
+    # fuselage.plot_3d_fuselage(fuselage_stresses_per_section, point_loads=all_fuselage_point_loads)
+
+    # Compute distributed weight per section
+    fuselage_weight_per_section = fuselage.compute_weight_distribution()
+    
+    # Call the sizing function
+    min_fuselage_mass, fuselage_area_scale = size_fuselage_for_min_mass(
+        fuselage,
+        distributed_loads=fuselage_weight_per_section,
+        shear_thickness=0.002,
+        safety_factor=SAFETY_FACTOR,
+        area_scale_start=3.0,
+        area_scale_step=0.02,
+        min_scale=0.01,
+        max_iter=200,
+        fuselage_point_loads=all_fuselage_point_loads,
+    )
+    
+    # print(f"Minimal safe fuselage mass: {min_fuselage_mass:.2f} kg (area scale factor: {fuselage_area_scale:.2f})")
 
     # --- Model a connector cross section at the propeller load point ---
     # Choose a location (y_conn) where the load is applied
@@ -1388,7 +1597,6 @@ def run_structure_analysis(
         })
 
     # --- Banked flight option ---
-    banked = True  # Set to False for normal cruise, True for banked case
     phi_deg = 30  # Bank angle in degrees
     phi_rad = np.radians(phi_deg)
     n_load = 1 / np.cos(phi_rad) if banked else 1.0
@@ -1409,6 +1617,18 @@ def run_structure_analysis(
     total_vertical_load = [
         lift - weight for lift, weight in zip(lift_per_section, weight_per_section)
     ]
+    
+    # Add propeller point loads to the correct sections for shear only
+    shear_vertical_load = total_vertical_load.copy()
+    for pl in wing_point_loads:
+        idx = min(range(len(wing.sections)), key=lambda i: abs(wing.sections[i][0] - pl["y"]))
+        shear_vertical_load[idx] += pl.get("Pz", 0)
+
+    # For bending: use only distributed loads and pass point loads separately
+    moments_x = wing.compute_bending_moments_with_point_loads(
+        total_vertical_load,  # Only distributed loads (no prop loads added)
+        wing_point_loads
+)
 
     drag_per_section = [
         constant_drag_distribution(drone) * dy for y, _ in wing.sections
@@ -1417,7 +1637,7 @@ def run_structure_analysis(
     # Compute internal shear force from tip to root
     shear_forces = []
     running_shear = 0.0
-    for net_load in reversed(total_vertical_load):
+    for net_load in reversed(shear_vertical_load):
         running_shear += net_load
         shear_forces.insert(0, running_shear)
 
@@ -1437,21 +1657,166 @@ def run_structure_analysis(
         stresses = section.bending_stress(Mx=moments_x[i], My=0)
         stresses_per_section.append(stresses)
 
-    wing.plot_3d_wing(
-        stresses_per_section,
-        lift_per_section,
-        weight_per_section,
-        point_loads=wing_point_loads,
-        drag_per_section=drag_per_section,
-        connector_sections=connector_sections,
-        connector_stresses_per_section=connector_stresses_per_section,
-    )
+    # wing.plot_3d_wing(
+        # stresses_per_section,
+        # lift_per_section,
+        # weight_per_section,
+        # point_loads=wing_point_loads,
+        # drag_per_section=drag_per_section,
+        # connector_sections=connector_sections,
+        # connector_stresses_per_section=connector_stresses_per_section,)
 
     # wing.plot_3d_wing(lift_per_section)
 
     vertical_deflections = wing.compute_vertical_deflections(total_vertical_load)
-    wing.plot_deformed_wing(vertical_deflections)
+    # wing.plot_deformed_wing(vertical_deflections)
+    
+    
+    
+    # --- SIZING FOR BOTH FLIGHT MODES ---
+    
+    results = {}
+    
+    for flight_mode in ["cruise", "vtol"]:
+        if flight_mode == "cruise":
+            # All lift from wings, no propeller loads
+            lift_per_section = [
+                elliptical_lift_distribution(y, drone) * dy for y, _ in wing.sections
+            ]
+            wing_point_loads_mode = []
+            fuselage_point_loads_mode = []
+        elif flight_mode == "vtol":
+            # All lift from propellers, no aerodynamic lift
+            lift_per_section = [0.0 for _ in wing.sections]
+            if prop_connection == "wing":
+                wing_point_loads_mode = wing_prop_loads
+                fuselage_point_loads_mode = []
+            elif prop_connection == "fuselage":
+                wing_point_loads_mode = []
+                fuselage_point_loads_mode = fuselage_prop_loads
+        else:
+            raise ValueError("Unknown flight mode")
+    
+        weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
+    
+        # --- WING SIZING ---
+        min_wing_mass, wing_scale = size_wing_for_min_mass(
+            wing,
+            lift_per_section,
+            weight_per_section,
+            shear_thickness=0.002,
+            safety_factor=SAFETY_FACTOR,
+            wing_point_loads=wing_point_loads_mode,
+        )
+    
+        # --- FUSELAGE SIZING ---
+        fuselage_weight_per_section = fuselage.compute_weight_distribution()
+        # For fuselage, use only point loads (no distributed lift)
+        all_fuselage_point_loads_mode = list(point_loads) + fuselage_point_loads_mode
+    
+        min_fuselage_mass, fuselage_scale = size_fuselage_for_min_mass(
+            fuselage,
+            distributed_loads=fuselage_weight_per_section,
+            shear_thickness=0.002,
+            safety_factor=SAFETY_FACTOR,
+            area_scale_start=3.0,
+            area_scale_step=0.02,
+            min_scale=0.01,
+            max_iter=200,
+            fuselage_point_loads=all_fuselage_point_loads_mode,
+        )
+    
+        results[flight_mode] = {
+            "wing_mass": min_wing_mass,
+            "wing_scale": wing_scale,
+            "fuselage_mass": min_fuselage_mass,
+            "fuselage_scale": fuselage_scale,
+        }
+    
+    # --- REPORT THE LEADING (CRITICAL) MODE FOR EACH STRUCTURE ---
+    
+    wing_critical_mode = max(results, key=lambda m: results[m]["wing_mass"])
+    fuselage_critical_mode = max(results, key=lambda m: results[m]["fuselage_mass"])
+    
+    print("\n=== STRUCTURE SIZING SUMMARY ===")
+    print(f"Wing: Critical mode is '{wing_critical_mode}' with mass {results[wing_critical_mode]['wing_mass']:.2f} kg")
+    print(f"Fuselage: Critical mode is '{fuselage_critical_mode}' with mass {results[fuselage_critical_mode]['fuselage_mass']:.2f} kg")
+    print("==============================\n")
+    
+    # --- Store critical mode variables for further use ---
+    wing_critical_mass = results[wing_critical_mode]["wing_mass"]
+    wing_critical_scale = results[wing_critical_mode]["wing_scale"]
+    fuselage_critical_mass = results[fuselage_critical_mode]["fuselage_mass"]
+    fuselage_critical_scale = results[fuselage_critical_mode]["fuselage_scale"]
 
+    # Example: print or use these variables
+    print(f"Wing critical scale: {wing_critical_scale:.2f}")
+    print(f"Fuselage critical scale: {fuselage_critical_scale:.2f}")
+    
+    # --- Prepare and plot the critical case for the WING ---
+    if wing_critical_mode == "cruise":
+        # All lift from wings, no propeller loads
+        lift_per_section_plot = [
+            elliptical_lift_distribution(y, drone) * dy for y, _ in wing.sections
+        ]
+        wing_point_loads_plot = []
+    elif wing_critical_mode == "vtol":
+        # All lift from propellers, no aerodynamic lift
+        lift_per_section_plot = [0.0 for _ in wing.sections]
+        wing_point_loads_plot = wing_prop_loads
+
+    weight_per_section_plot = [sec.mass(dy) * g for _, sec in wing.sections]
+    total_vertical_load_plot = [
+        lift - weight for lift, weight in zip(lift_per_section_plot, weight_per_section_plot)
+    ]
+    # For shear, add prop loads if present
+    shear_vertical_load_plot = total_vertical_load_plot.copy()
+    for pl in wing_point_loads_plot:
+        idx = min(range(len(wing.sections)), key=lambda i: abs(wing.sections[i][0] - pl["y"]))
+        shear_vertical_load_plot[idx] += pl.get("Pz", 0)
+
+    moments_x_plot = wing.compute_bending_moments_with_point_loads(
+        total_vertical_load_plot, wing_point_loads_plot
+    )
+    stresses_per_section_plot = []
+    for i, (y_pos, section) in enumerate(wing.sections):
+        stresses = section.bending_stress(Mx=moments_x_plot[i], My=0)
+        stresses_per_section_plot.append(stresses)
+
+    drag_per_section_plot = [
+        constant_drag_distribution(drone) * dy for y, _ in wing.sections
+    ]
+
+    # Plot the critical wing case
+    wing.plot_3d_wing(
+        stresses_per_section_plot,
+        lift_per_section=lift_per_section_plot,
+        weight_per_section=weight_per_section_plot,
+        point_loads=wing_point_loads_plot,
+        drag_per_section=drag_per_section_plot,
+    )
+
+    # --- Prepare and plot the critical case for the FUSELAGE ---
+    if fuselage_critical_mode == "cruise":
+        fuselage_point_loads_plot = []
+    elif fuselage_critical_mode == "vtol":
+        fuselage_point_loads_plot = fuselage_prop_loads
+
+    all_fuselage_point_loads_plot = point_loads + fuselage_point_loads_plot
+
+    Mz_per_section_plot, My_per_section_plot = fuselage.compute_bending_moments_with_point_loads(
+        all_fuselage_point_loads_plot
+    )
+    fuselage_stresses_per_section_plot = fuselage.compute_bending_stresses(
+        Mz_per_section_plot, My_per_section_plot
+    )
+
+    # Plot the critical fuselage case
+    fuselage.plot_3d_fuselage(
+        fuselage_stresses_per_section_plot,
+        point_loads=all_fuselage_point_loads_plot,
+    )
+    '''
     critical = find_critical_stress(
         [sec for _, sec in wing.sections],
         stresses_per_section,
@@ -1505,6 +1870,7 @@ def run_structure_analysis(
         weight_per_section,
         shear_thickness=0.002,
         safety_factor=SAFETY_FACTOR,
+        wing_point_loads=wing_point_loads
     )
     print(f"\n=== OPTIMAL STRUCTURE FOUND ===")
     print(
@@ -1513,7 +1879,7 @@ def run_structure_analysis(
     print("==============================\n")
     
     # --- Export wing sections ---
-
+    '''
     with open("wing_sections.csv", "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(

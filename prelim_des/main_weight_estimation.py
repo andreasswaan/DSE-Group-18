@@ -44,4 +44,8 @@ print(drone.wing.x_ac_lemac)
 
 # drone.perf.payload_range_diagram()
 
-run_structure_analysis(drone)
+for prop_connection in ["fuselage", "wing"]:
+    for fuselage_case in [1, 2]:
+        print(f"\n=== Running structure analysis for prop_connection='{prop_connection}', fuselage_case={fuselage_case} ===")
+        run_structure_analysis(drone, prop_connection=prop_connection, fuselage_case=fuselage_case)
+# run_structure_analysis(drone)
