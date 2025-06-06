@@ -69,11 +69,11 @@ class FinancialModel:
         num_s_pizzas = 0
         num_m_pizzas = 0
         num_l_pizzas = 0
-        for order in self.simulation.logger.order_log.values():
-            if order.status == True:
-                num_s_pizzas += order['s']
-                num_m_pizzas += order['m']
-                num_l_pizzas += order['l']
+        orders = [self.simulation.order_book[order_id] for order_id in self.simulation.order_book if self.simulation.order_book[order_id].status]
+        for order in orders:
+                num_s_pizzas += order.s
+                num_m_pizzas += order.m
+                num_l_pizzas += order.l
         order_value = (num_s_pizzas * constants.s_price +
                        num_m_pizzas * constants.m_price +
                        num_l_pizzas * constants.l_price)

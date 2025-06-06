@@ -469,4 +469,4 @@ my_sim.change_order_volume(3)
 #animate_simulation(my_sim, n_steps, interval=10)
 for i in range(n_steps):
     my_sim.take_step()
-my_sim.financial_model.calculate_revenue()
+print(my_sim.financial_model.calculate_revenue())
