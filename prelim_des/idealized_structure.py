@@ -642,6 +642,37 @@ class FuselageStructure:
         """
         dz = self.length / (self.n_sections - 1)
         return sum(section.mass(dz) for _, section in self.sections)
+    
+    def compute_bending_moments_with_distributed_and_point_loads(
+        self,
+        distributed_loads: list[float],
+        point_loads: list[dict],
+    ) -> tuple[list[float], list[float]]:
+        """
+        Returns two lists: (Mz_per_section, My_per_section)
+        - Mz: bending moment about z-axis (from vertical loads)
+        Includes effects of distributed loads (e.g., fuselage weight) and point loads.
+        """
+        Mz_list = []
+        My_list = []
+        section_positions = [x for x, _ in self.sections]
+        n = len(section_positions)
+        for i, x in enumerate(section_positions):
+            Mz = 0.0
+            # Distributed loads (from i to end)
+            for j in range(i, n):
+                x_j = section_positions[j]
+                arm = x_j - x
+                Mz += distributed_loads[j] * arm
+            # Point loads
+            for pl in point_loads:
+                if pl["x"] >= x:
+                    arm = pl["x"] - x
+                    Pz = pl.get("Pz", 0)
+                    Mz += Pz * arm
+            Mz_list.append(Mz)
+            My_list.append(0.0)  # Not used, but kept for compatibility
+        return Mz_list, My_list
 
     
 class WingStructure:
@@ -1274,7 +1305,8 @@ def size_fuselage_for_min_mass(
 
         # --- Bending moments and stresses ---
         # Use only distributed loads for moments, pass point loads separately
-        Mz_per_section, My_per_section = fuselage.compute_bending_moments_with_point_loads(
+        Mz_per_section, My_per_section = fuselage.compute_bending_moments_with_distributed_and_point_loads(
+            distributed_loads,
             fuselage_point_loads or []
         )
         stresses_per_section = fuselage.compute_bending_stresses(
@@ -1887,7 +1919,8 @@ def run_structure_analysis(
 
     all_fuselage_point_loads_plot = point_loads + fuselage_point_loads_plot
 
-    Mz_per_section_plot, My_per_section_plot = fuselage.compute_bending_moments_with_point_loads(
+    Mz_per_section_plot, My_per_section_plot = fuselage.compute_bending_moments_with_distributed_and_point_loads(
+        fuselage_weight_per_section,
         all_fuselage_point_loads_plot
     )
     fuselage_stresses_per_section_plot = fuselage.compute_bending_stresses(
