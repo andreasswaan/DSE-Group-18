@@ -32,16 +32,16 @@ drone.iterative_weight_estimate(plot=True, tolerance=0.01)
 print("Drone MTOW after iterative estimate:", drone.MTOW)
 print(f"Wing surface area: {drone.wing.S}")
 
-drone.wing.plot_planform(save_plot=True)
-print(f"Aspect ratio: {drone.wing.geom_AR}")
-print(f"Mean aerodynamic chord (MAC): {drone.wing.MAC}")
+# drone.wing.plot_planform(save_plot=True)
+# print(f"Aspect ratio: {drone.wing.geom_AR}")
+# print(f"Mean aerodynamic chord (MAC): {drone.wing.MAC}")
 
-print(drone.wing.c_root, drone.wing.c_tip, drone.wing.S)
-print(drone.wing.span)
-print(drone.wing.x_ac_lemac)
+# print(drone.wing.c_root, drone.wing.c_tip, drone.wing.S)
+# print(drone.wing.span)
+# print(drone.wing.x_ac_lemac)
 
 # drone.perf.cruise_noise(plot=True)
 
 # drone.perf.payload_range_diagram()
 
-run_structure_analysis(drone)
+# run_structure_analysis(drone)

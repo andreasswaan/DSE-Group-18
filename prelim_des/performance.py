@@ -123,11 +123,12 @@ class Performance:
             leg["distance"] / leg["cruise_speed"]
         )  # Power = Energy / Time
 
-        takeoff_thrust = self.takeoff_thrust(self.drone.OEW + PL_mass, leg["TO_speed"])
+        takeoff_thrust = self.takeoff_thrust(self.drone.OEW + PL_mass, leg["TO_speed"], use_T_over_W=True)
         takeoff_power = self.drone.propulsion.ver_prop.power(takeoff_thrust)
         take_off_energy = takeoff_power * (leg["TO_time"])
+        print(f"takeoff thrust: {takeoff_thrust}")
 
-        landing_thrust = self.landing_thrust(self.drone.OEW + PL_mass, leg["LD_speed"])
+        landing_thrust = self.landing_thrust(self.drone.OEW + PL_mass, leg["LD_speed"], use_T_over_W=True)
         landing_power = self.drone.propulsion.ver_prop.power(landing_thrust)
         landing_energy = landing_power * (leg["LD_time"])
 
@@ -154,6 +155,7 @@ class Performance:
                 leg_energy, cruise_power, takeoff_power, landing_power, hover_power = (
                     self.leg_energy(leg)
                 )
+                print(f"Takeoff power: {takeoff_power}")
                 mission_energy += leg_energy
                 # Store or process the energy and power values as needed
             except Exception as e:
