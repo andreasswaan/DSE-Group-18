@@ -499,10 +499,9 @@ class FuselageStructure:
     ) -> tuple[list[float], list[float]]:
         """
         Returns two lists: (Mz_per_section, My_per_section)
-        - Mz: bending moment about z-axis (from Py)
-        - My: bending moment about y-axis (from Pz)
-        Includes effects of point loads.
-        point_loads: list of dicts, each with {"x": position, "y": ..., "z": ..., "Px": ..., "Py": ..., "Pz": ...}
+        - Mz: bending moment about z-axis (from vertical forces and point moments)
+        - My: bending moment about y-axis (from drag and point moments)
+        Includes effects of point loads and point moments.
         """
         Mz_list = []
         My_list = []
@@ -514,8 +513,15 @@ class FuselageStructure:
                 if pl["x"] >= x:
                     arm = pl["x"] - x
                     Pz = pl.get("Pz", 0)
+                    Px = pl.get("Px", 0)
                     # Bending about z-axis from vertical force
                     Mz += Pz * arm
+                    # Bending about y-axis from drag force
+                    My += Px * arm
+                    # Add any direct moments applied at this point
+                    if abs(pl["x"] - x) < 1e-6:  # at this section
+                        Mz += pl.get("Mz", 0)
+                        My += pl.get("My", 0)
             Mz_list.append(Mz)
             My_list.append(My)
         return Mz_list, My_list
@@ -534,6 +540,36 @@ class FuselageStructure:
             stresses = section.bending_stress(Mx=Mz, My=0)
             stresses_per_section.append(stresses)
         return stresses_per_section
+    
+    import numpy as np
+
+    def draw_moment_arrow(self, ax, origin, axis='z', radius=0.1, direction=1, color='purple', lw=2):
+        # origin: (x, y, z)
+        # axis: 'z' for moment about z, 'y' for moment about y
+        # direction: 1 for CCW, -1 for CW (relative to axis)
+        theta = np.linspace(0, np.pi/1.5, 30)  # arc angle
+        if axis == 'z':
+            x = origin[0] + radius * np.cos(theta)
+            y = origin[1] + direction * radius * np.sin(theta)
+            z = np.full_like(x, origin[2])
+            # Arrowhead
+            ax.quiver(
+                x[-1], y[-1], z[-1],
+                -0.05 * np.sin(theta[-1]), 0.05 * np.cos(theta[-1]), 0,
+                color=color, linewidth=lw
+            )
+        elif axis == 'y':
+            x = origin[0] + radius * np.cos(theta)
+            y = np.full_like(x, origin[1])
+            z = origin[2] + direction * radius * np.sin(theta)
+            ax.quiver(
+                x[-1], y[-1], z[-1],
+                -0.05 * np.sin(theta[-1]), 0, 0.05 * np.cos(theta[-1]),
+                color=color, linewidth=lw
+            )
+        ax.plot(x, y, z, color=color, linewidth=lw)
+
+    
 
     def plot_3d_fuselage(
         self,
@@ -576,20 +612,52 @@ class FuselageStructure:
                 Px = pl.get("Px", 0)
                 Py = pl.get("Py", 0)
                 Pz = pl.get("Pz", 0)
-                # Arrow at (sideways=0, fuselage x=pl["x"], upwards=0)
-                ax.quiver(
-                    pl["x"],
-                    pl["y"],
-                    pl["z"],  # base: x=fuselage length, y=sideways, z=upwards
-                    0,
-                    0,
-                    Pz
-                    / arrow_scale,  # direction: y=sideways, z=upwards, scaled for visibility
-                    color="red",
-                    arrow_length_ratio=0.2,
-                    linewidth=3,
-                    alpha=0.9,
-                    label="Point Load",
+                # Plot drag arrow if Px is nonzero
+                if Px != 0:
+                    ax.quiver(
+                        pl["x"], pl["y"], pl["z"],
+                        Px / arrow_scale, 0, 0,
+                        color="green",  # or another color for drag
+                        arrow_length_ratio=0.2,
+                        linewidth=3,
+                        alpha=0.9,
+                        label="Drag"  # Only label the first time if needed
+                    )
+                # Plot vertical force arrow as before
+                if Pz != 0:
+                    ax.quiver(
+                        pl["x"], pl["y"], pl["z"],
+                        0, 0, Pz / arrow_scale,
+                        color="red",
+                        arrow_length_ratio=0.2,
+                        linewidth=3,
+                        alpha=0.9,
+                        label="Lift - Weight"
+                    )
+                    
+             # --- Plot moment (rotating) arrows if present ---
+        for pl in point_loads:
+            # Draw Mz (about z-axis)
+            if abs(pl.get("Mz", 0)) > 1e-6:
+                self.draw_moment_arrow(
+                    ax,
+                    (pl["x"], pl["y"], pl["z"]),
+                    axis='z',
+                    radius=0.1,
+                    direction=np.sign(pl["Mz"]),
+                    color='purple',
+                    lw=3,
+                )
+            # Draw My (about y-axis)
+            if abs(pl.get("My", 0)) > 1e-6:
+                self.draw_moment_arrow(
+                    ax,
+                    (pl["x"], pl["y"], pl["z"]),
+                    axis='y',
+                    radius=0.1,
+                    direction=np.sign(pl["My"]),
+                    color='orange',
+                    lw=3,
                 )
 
         if weight_per_section:
@@ -1557,21 +1625,53 @@ def run_structure_analysis(
         mechanisms_weight,
         payload_insulator_weight,
     ) = get_fuselage_payload_weights(fuselage_case)
+    
+    lift_per_section = [elliptical_lift_distribution(y, drone) * dy for y, _ in wing.sections]
+    weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
+    drag_per_section = [constant_drag_distribution(drone) * dy for y, _ in wing.sections]
+    
+    # Calculate total forces on the wing
+    total_lift = sum(lift_per_section)
+    total_weight = sum(weight_per_section)
+    total_drag = sum(drag_per_section)
+
+    net_vertical_force = total_lift - total_weight  # Pz (upwards positive)
+    net_drag_force = total_drag  
+    
+    # Calculate moments at the two connection points (left and right)
+    connection_points = [
+        {"x": 0.9 * fuselage_length, "y": 0.5 * fuselage_width, "z": 0.5 * fuselage_height},
+        {"x": 0.9 * fuselage_length, "y": -0.5 * fuselage_width, "z": 0.5 * fuselage_height},
+    ]
+
+    # For each connection, sum moments from all sections
+    for conn in connection_points:
+        Mz = 0.0  # Moment about z-axis (from vertical forces, i.e., lift-weight)
+        My = 0.0  # Moment about y-axis (from drag)
+        for (y_pos, _), lv, drag in zip(wing.sections, [l-w for l, w in zip(lift_per_section, weight_per_section)], drag_per_section):
+            # Moment arm is spanwise distance from section to connection point
+            arm_y = conn["y"] - y_pos  # y_conn - y_section
+            # Moment from vertical force (about z): Mz += (lift-weight) * arm_y * dy
+            Mz += lv * arm_y * dy
+            # Moment from drag (about y): My += drag * arm_y * dy
+            My += drag * arm_y * dy
+        conn["Mz"] = Mz
+        conn["My"] = My
 
     if fuselage_case == 1:
         point_loads = [
             {
-                "x": 0.9 * fuselage_length,
-                "y": 0.5 * fuselage_width,
-                "z": 0.5 * fuselage_height,
-                "Pz": 0,  # -100,
-            },  # placeholder for left wing weight
-            {
-                "x": 0.9 * fuselage_length,
-                "y": -0.5 * fuselage_width,
-                "z": 0.5 * fuselage_height,
-                "Pz": 0,  # -100, Comment this out to apply the load here, because Marcos tried to apply in the loop
-            },  # placeholder for right wing weight
+                "x": conn["x"],
+                "y": conn["y"],
+                "z": conn["z"],
+                "Pz": net_vertical_force,
+                "Px": net_drag_force,
+                "Mz": conn["Mz"],
+                "My": conn["My"],
+            }
+            for conn in connection_points
+        ]
+        [     
             {"x": 0.5 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -battery_weight},
             {"x": 0.05 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -sensors_weight},
             {
@@ -1602,14 +1702,16 @@ def run_structure_analysis(
                 "x": 0.9 * fuselage_length,
                 "y": 0.5 * fuselage_width,
                 "z": 0.5 * fuselage_height,
-                "Pz": -100,
-            },  # placeholder for left wing weight
+                "Pz": net_vertical_force,
+                "Px": net_drag_force,
+            },
             {
                 "x": 0.9 * fuselage_length,
                 "y": -0.5 * fuselage_width,
                 "z": 0.5 * fuselage_height,
-                "Pz": -100,
-            },  # placeholder for right wing weight
+                "Pz": net_vertical_force,
+                "Px": net_drag_force,
+            },
             {"x": 0.5 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -battery_weight},
             {"x": 0.05 * fuselage_length, "y": 0.0, "z": 0.0, "Pz": -sensors_weight},
             {
