@@ -47,7 +47,11 @@ drone.wing.plot_planform(save_plot=True)
 
 for prop_connection in ["fuselage", "wing"]:
     for fuselage_case in [1, 2]:
-        print(f"\n=== Running structure analysis for prop_connection='{prop_connection}', fuselage_case={fuselage_case} ===")
-        run_structure_analysis(drone, prop_connection=prop_connection, fuselage_case=fuselage_case)
+        print(
+            f"\n=== Running structure analysis for prop_connection='{prop_connection}', fuselage_case={fuselage_case} ==="
+        )
+        run_structure_analysis(
+            drone, prop_connection=prop_connection, fuselage_case=fuselage_case
+        )
 
 # run_structure_analysis(drone, 'fuselage', fuselage_case=1)
