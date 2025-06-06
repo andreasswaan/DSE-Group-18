@@ -7,9 +7,9 @@ import financial_model
 import constants
 import scipy.stats as stats
 # pizza size to weight guide in kg
-np.random.seed(40)  # for reproducibility
+np.random.seed(4)  # for reproducibility
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
-n_drones = 2
+n_drones = 1
 class Point():
     def __init__(self, xpos: float, ypos: float) -> None:
         self.xpos = xpos
@@ -77,7 +77,7 @@ class Drone(Point):
         self.available_time = 0
         self.target = None
         self.max_battery_level = 100
-        self.energy_per_meter = 0.005  # kWh per meter, this is a placeholder value
+        self.energy_per_meter = constants.energy_per_metre  # kWh per meter, this is a placeholder value
         self.speed = 10*100/6000*5  # m/s, horizontal speed
         self.distance_travelled = 0
         self.max_capacity = 10 # max number of pizzas it can carry
@@ -108,9 +108,6 @@ class Drone(Point):
         if self.targets:
             # If there are scheduled departures and the next departure is now or in the past
             #if self.departure_times and self.departure_times[0] <= self.simulation.timestamp:
-            for target in self.targets:
-                if isinstance(target, Order):
-                    target.being_delivered = True  #ToDo: we might want to remove this restriction later
             #if isinstance(self.targets[0], Order):
             #    self.state = 'delivering'
             #else:
@@ -149,6 +146,9 @@ class Drone(Point):
             self.depot.current_drones.remove(self)
             self.depot = None  
         self.available_time = self.departure_times[-1] if self.departure_times else 0
+        for target in self.targets:
+            if isinstance(target, Order):
+                target.being_delivered = True  #ToDo: we might want to remove this restriction later
 
     def update_drone(self, dt):
         """self.xpos += 0.5 * self.xacc * dt**2 + self.xvel * dt
@@ -259,7 +259,7 @@ class Simulation:
         for drone in self.drones:
             drone.simulation = self
         self.financial_model = financial_model.FinancialModel(self)
-        self.dt = 5
+        self.dt = 10
         self.mp_interval = constants.mp_interval
         self.mp = MissionPlanning(self)
         self.timestamp = 0
@@ -465,5 +465,8 @@ def animate_simulation(sim, steps=100, interval=200):
     )
     plt.show()
 n_steps = int(constants.time_window / my_sim.dt)
-my_sim.change_order_volume(5)
-animate_simulation(my_sim, n_steps, interval=10)
+my_sim.change_order_volume(3)
+#animate_simulation(my_sim, n_steps, interval=10)
+for i in range(n_steps):
+    my_sim.take_step()
+my_sim.financial_model.calculate_revenue()

@@ -18,11 +18,12 @@ pizza_cooling_time=30*60
 time_to_consider_order=60*20
 max_waiting_time=60*2 # maximum waiting time at restaurant or customer location
 max_extra_travel_time=60*2
-TO_land_energy=5
+TO_land_energy=8
+energy_per_metre=0.005
 initial_orders_time = 30*60
 max_hover_time=60*3
-max_orders_per_mission=5
-mp_interval=60*0.5
+max_orders_per_mission=6
+mp_interval=60*2
 deliver_time_window=60*10
 
 # financial constants
