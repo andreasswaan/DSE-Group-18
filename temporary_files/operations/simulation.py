@@ -9,7 +9,7 @@ import scipy.stats as stats
 # pizza size to weight guide in kg
 np.random.seed(4)  # for reproducibility
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
-n_drones = 1
+n_drones = 10
 class Point():
     def __init__(self, xpos: float, ypos: float) -> None:
         self.xpos = xpos
@@ -115,8 +115,8 @@ class Drone(Point):
             self.departure_times.pop(0)
             self.arrival_times.pop(0)
             self.targets.pop(0)
-            if isinstance(self.target, Restaurant):
-                self.restaurant_order_nodes.pop(0)
+            #if isinstance(self.target, Restaurant):
+            #    self.restaurant_order_nodes.pop(0)
             if isinstance(self.target, Order):
                 self.target.status = True
             self.target = self.targets[0] if self.targets else None 
@@ -145,7 +145,7 @@ class Drone(Point):
         if self.depot is not None:
             self.depot.current_drones.remove(self)
             self.depot = None  
-        self.available_time = self.departure_times[-1] if self.departure_times else 0
+        #self.available_time = self.departure_times[-1] if self.departure_times else 0
         for target in self.targets:
             if isinstance(target, Order):
                 target.being_delivered = True  #ToDo: we might want to remove this restriction later
@@ -182,6 +182,7 @@ class Drone(Point):
         if isinstance(self.target, Depot):
             self.target.current_drones.append(self)
             self.depot = self.target
+            self.available_time = self.simulation.timestamp + self.target.waiting_time
         #self.target = self.get_target()
         self.state = 'waiting'
 
@@ -461,12 +462,12 @@ def animate_simulation(sim, steps=100, interval=200):
         return (scat_orders, scat_drones, scat_restaurants, scat_depots, title_text, *order_id_texts)
 
     ani = animation.FuncAnimation(
-        fig, update, frames=steps, interval=interval, blit=False, repeat=False
+        fig, update, frames=steps, interval=interval, blit=True, repeat=False
     )
     plt.show()
 n_steps = int(constants.time_window / my_sim.dt)
 my_sim.change_order_volume(3)
-#animate_simulation(my_sim, n_steps, interval=10)
-for i in range(n_steps):
-    my_sim.take_step()
+animate_simulation(my_sim, n_steps, interval=10)
+#for i in range(n_steps):
+#    my_sim.take_step()
 print(my_sim.financial_model.calculate_revenue())

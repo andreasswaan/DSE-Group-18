@@ -1,7 +1,10 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 import constants
+from sklearn.cluster import KMeans
 
 class MissionPlanning:
     def __init__(self, Simulation):
@@ -25,6 +28,17 @@ class MissionPlanning:
             if nearest_depot:
                 nearest_depot.current_drones[0].set_targets([order.restaurant, order, order.nearest(self.depots)])
                 order.being_delivered = True
+
+    def solve_mission_planning(self):
+        drones, drone_start_nodes, depots, restaurants, orders, nodes, distance_matrix, order_clusters = self.setup_problem()
+        for cluster in order_clusters:
+            if len(cluster) > 0:
+                # Split cluster into chunks of size max_orders_per_mission
+                for i in range(0, len(cluster), constants.max_orders_per_mission):
+                    subcluster = cluster[i:i + constants.max_orders_per_mission]
+                    if len(subcluster) > 0:
+                        drones = [drone for drone in drones if drone.available_time <= self.simulation.timestamp and drone.depot is not None]
+                        self.solve(drones, drone_start_nodes, depots, restaurants, subcluster, nodes, distance_matrix)
         
     def setup_problem(self):
         #print("-------------------------time:", self.simulation.timestamp, "-------------------------")
@@ -35,7 +49,8 @@ class MissionPlanning:
         depots=self.depots
         orders = self.get_orders()
         orders_to_deliver = [order for order in orders if order.arrival_time < self.simulation.timestamp + constants.time_to_consider_order and order.arrival_time > self.simulation.timestamp]
-        orders = [order for order in orders_to_deliver if not order.being_delivered]    
+        orders = [order for order in orders_to_deliver if not order.being_delivered]
+        order_clusters = self.cluster_orders(orders, int(np.ceil(len(orders)/constants.max_orders_per_mission)))
         orders.sort(key=lambda order: order.arrival_time)
         orders = orders[:constants.max_orders_per_mission]  # Limit the number of orders to consider
         restaurants = [order.restaurant for order in orders]
@@ -48,10 +63,10 @@ class MissionPlanning:
             for j, node2 in enumerate(nodes):
                 if i != j:
                     distance_matrix[i, j] = node1.distance(node2)        
-        return drones, drone_start_nodes, depots, restaurants, orders, nodes, distance_matrix
+        return drones, drone_start_nodes, depots, restaurants, orders, nodes, distance_matrix, order_clusters
 
-    def solve_mission_planning(self):
-        drones, drone_start_nodes, depots, restaurants, orders, nodes, distance_matrix = self.setup_problem()
+    def solve(self, drones, drone_start_nodes, depots, restaurants, orders, nodes, distance_matrix):
+        #drones, drone_start_nodes, depots, restaurants, orders, nodes, distance_matrix = self.setup_problem()
         M = 1e4  # big-M
         n_nodes = len(nodes)
         n_drones = len(drones)
@@ -60,14 +75,14 @@ class MissionPlanning:
             return
         if n_drones <= 0:
             return
-        print(f" -------------------------------- Time: {self.simulation.timestamp} --------------------------------")
-        print(f"Nodes: {[node.name for node in nodes]}")
-        print(f"order arrival times: {[order.arrival_time for order in orders]}")
+        #print(f" -------------------------------- Time: {self.simulation.timestamp} --------------------------------")
+        #print(f"Nodes: {[node.name for node in nodes]}")
+        #print(f"order arrival times: {[order.arrival_time for order in orders]}")
         n_restaurants = len(restaurants)
         n_depots = len(depots)
         waiting_times = [node.waiting_time for node in nodes]  # waiting times at each node
         model = gp.Model("DARP")
-        model.Params.OutputFlag = 0
+        model.Params.OutputFlag = 1
         model.Params.TimeLimit = 5
         model.Params.MIPGap = 0.1  # Set a gap for suboptimal solutions
         model.Params.Heuristics = 0.05
@@ -275,24 +290,24 @@ class MissionPlanning:
                                     + M * (1 - gp.quicksum(x[j, i, k] for j in range(n_nodes) if j != i)), name=f"dep_before_max_wait_{i}_{k}")
         # Objective: Minimize weighted sum of total distance and total delay
         weight_dist = -0.5
-        weight_finish_time = -0.001
+        weight_finish_time = -0.5
         weight_orders_delivered = 500
 
         total_orders_delivered = gp.quicksum(x[i, n_depots + n_restaurants + o, k] for o in range(n_orders) for i in range(n_nodes) if i != n_depots + n_restaurants + o for k in range(n_drones))
         #total_distance = gp.quicksum(distance_matrix[i, j] * x[i, j, k] for i in range(n_nodes) for j in range(n_nodes) if i != j for k in range(n_drones))
         total_finish_time = gp.quicksum(t_dep[d, k] for d in range(n_nodes-n_depots, n_nodes) for k in range(n_drones))
         
-        model.setObjective(weight_orders_delivered * total_orders_delivered + total_finish_time * weight_finish_time, GRB.MAXIMIZE)
+        model.setObjective(weight_orders_delivered * total_orders_delivered + weight_finish_time * total_finish_time, GRB.MAXIMIZE)
         
         model.optimize()
         if model.status == GRB.OPTIMAL:
-            print("------------------------------------- Optimal solution found -------------------------------------")
+            #print("------------------------------------- Optimal solution found -------------------------------------")
             self.assign_routes(x, t_dep, t_arr, drones, nodes, n_orders)
             #print(f"total distance: {model.ObjVal:.2f} m")
             #print(f"total delay: {sum((t_arr[n_depots + n_restaurants + o, k].X - orders[o].arrival_time) * x[i, n_depots + n_restaurants + o, k].X for o in range(n_orders) for k in range(n_drones) for i in range(n_nodes) if i != n_depots + n_restaurants + o):.2f} s")
             #print(f"total finish time: {sum(x[i, d, k].X * t_arr[d, k].X for i in range(n_nodes) for d in range(n_depots) for k in range(n_drones) if i != d):.2f} s")
         elif model.status == GRB.TIME_LIMIT or model.status == GRB.INTERRUPTED or model.status == GRB.SUBOPTIMAL:
-            print("------------------------------------- NO optimal solution found -------------------------------------")
+            #print("------------------------------------- NO optimal solution found -------------------------------------")
             self.assign_routes(x, t_dep, t_arr, drones, nodes, n_orders)
         if model.status == GRB.INFEASIBLE:
             model.computeIIS()
@@ -336,8 +351,38 @@ class MissionPlanning:
                 #print(f"Drone {drone.drone_id} assigned targets: {[node.name for node in drone.targets]}")
                 drone.arrival_times = arrival_times
                 drone.departure_times = departure_times
-                drone.restaurant_order_nodes = restaurant_order_nodes
+                #drone.restaurant_order_nodes = restaurant_order_nodes
                 drone.set_targets(routes)
-            print(f"Drone {drone.drone_id} assigned targets: {[node.name for node in drone.targets]}")
+            #print(f"Drone {drone.drone_id} assigned targets: {[node.name for node in drone.targets]}")
             #print(f"Arrival times: {drone.arrival_times}")
             #print(f"Departure times: {drone.departure_times}")
+    
+    def cluster_orders(self, orders, n_clusters):
+        """
+        Cluster orders based on order location, restaurant location, and arrival time.
+        Returns a list of clusters, each a list of orders.
+        """
+        if len(orders) == 0:
+            return []
+
+        # Build feature matrix: [order_x, order_y, restaurant_x, restaurant_y, arrival_time]
+        features = np.array([
+            [
+                order.xpos,
+                order.ypos,
+                order.restaurant.xpos,
+                order.restaurant.ypos,
+            ]
+            for order in orders
+        ])
+
+        # Fit KMeans
+        kmeans = KMeans(n_clusters=min(n_clusters, len(orders)), random_state=0)
+        labels = kmeans.fit_predict(features)
+
+        # Group orders by cluster
+        clusters = [[] for _ in range(n_clusters)]
+        for order, label in zip(orders, labels):
+            clusters[label].append(order)
+
+        return clusters
