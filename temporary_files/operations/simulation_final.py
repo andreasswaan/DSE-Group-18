@@ -335,9 +335,11 @@ min_x, min_y, max_x, max_y = pop_dens_df.total_bounds
 
 # Target grid resolution
 reso = 100
+meters_per_pixel = (max_x - min_x) / reso
 
 # Compute scaling factors
 x_scale = reso / (max_x - min_x)
+print(f"x_scale: {x_scale}")
 y_scale = reso / (max_y - min_y)
 
 # Shift and scale population polygons
@@ -353,9 +355,12 @@ if 'rd_x' in restaurants_df.columns and 'rd_y' in restaurants_df.columns:
 
 no_fly_zones_df = no_fly_zones_df.copy()
 if 'rd_x' in no_fly_zones_df.columns and 'rd_y' in no_fly_zones_df.columns:
-    no_fly_zones_df['x'] = (no_fly_zones_df['rd_x'] - min_x) * x_scale
-    no_fly_zones_df['y'] = (no_fly_zones_df['rd_y'] - min_y) * y_scale
-    
+    no_fly_zones_df['x'] = np.round((no_fly_zones_df['rd_x'] - min_x) * x_scale).astype(int)
+    no_fly_zones_df['y'] = np.round((no_fly_zones_df['rd_y'] - min_y) * y_scale).astype(int)
+# buffer No fly zones to take up a 50m radius
+n_boxes = 50/ meters_per_pixel / 2  # number of pixels to buffer
+# make the surrounding n_boxes in each direction also no fly zones
+
 
 # Create restaurant objects
 restaurant_dict = []
