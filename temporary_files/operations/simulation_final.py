@@ -330,20 +330,44 @@ class Simulation:
 # -------- SIMULATION SETUP --------
 
 city_name = 'Delft'   
-pop_dens, restaurants, no_fly_zones = create_city_data(city_name)
+pop_dens_df, restaurants_df, no_fly_zones_df = create_city_data(city_name)
+min_x, min_y, max_x, max_y = pop_dens_df.total_bounds
+
+# Target grid resolution
+reso = 100
+
+# Compute scaling factors
+x_scale = reso / (max_x - min_x)
+y_scale = reso / (max_y - min_y)
+
+# Shift and scale population polygons
+pop_dens_df = pop_dens_df.copy()
+pop_dens_df['geometry'] = pop_dens_df['geometry'].translate(-min_x, -min_y)
+pop_dens_df['geometry'] = pop_dens_df['geometry'].scale(xfact=x_scale, yfact=y_scale, origin=(0, 0))
+
+# Shift and scale restaurant and no-fly zone coordinates (if RD columns exist)
+restaurants_df = restaurants_df.copy()
+if 'rd_x' in restaurants_df.columns and 'rd_y' in restaurants_df.columns:
+    restaurants_df['x'] = np.round((restaurants_df['rd_x'] - min_x) * x_scale).astype(int)
+    restaurants_df['y'] = np.round((restaurants_df['rd_y'] - min_y) * y_scale).astype(int)
+
+no_fly_zones_df = no_fly_zones_df.copy()
+if 'rd_x' in no_fly_zones_df.columns and 'rd_y' in no_fly_zones_df.columns:
+    no_fly_zones_df['x'] = (no_fly_zones_df['rd_x'] - min_x) * x_scale
+    no_fly_zones_df['y'] = (no_fly_zones_df['rd_y'] - min_y) * y_scale
+    
 
 # Create restaurant objects
 restaurant_dict = []
 
-print(restaurants)
 # iterate through each row of the dataframe and create a Restaurant object
-restaurants = restaurants.to_dict(orient='records')
+restaurants = restaurants_df.to_dict(orient='records')
 
 for i, restaurant in enumerate(restaurants):
     print(restaurant)
     restaurant_dict.append({
-        'xpos': restaurant['rd_x'],
-        'ypos': restaurant['rd_y'],
+        'xpos': restaurant['x'],
+        'ypos': restaurant['y'],
         'restaurant_id': i,
         'name': restaurant['name'],
         'mean_nr_orders': 400,  # Placeholder value
