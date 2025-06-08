@@ -38,9 +38,15 @@ def smooth_path(path, walkable):
         i = j
     return smoothed
 
+def point_line_distance(px, py, x0, y0, x1, y1):
+    # Distance from (px,py) to the line through (x0,y0)-(x1,y1)
+    num = abs((y1 - y0)*px - (x1 - x0)*py + x1*y0 - y1*x0)
+    den = sqrt((y1 - y0)**2 + (x1 - x0)**2)
+    return num / den if den != 0 else 0
+
 # ---------- A* ALGORITHM ----------
 
-def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=None, alpha=0.3):
+def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=None, alpha=0.3, beta=0.005):
     """
     start, end: (x, y)
     walkable: boolean 2D array
@@ -52,6 +58,7 @@ def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=
     open_set = []
     heapq.heappush(open_set, (0 + heuristic(start, end), 0, start, []))
     visited = set()
+
 
     while open_set:
         _, current_cost, current, path = heapq.heappop(open_set)
@@ -85,7 +92,10 @@ def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=
                     extra_cost = float(density_map[ny, nx])
                     if np.isinf(extra_cost):
                         continue  # skip impassable
-                    total_cost = alpha * step_cost + (1-alpha) * extra_cost
+                    deviation = point_line_distance(nx, ny, start[0], start[1], end[0], end[1])
+                    scale = np.pow(heuristic((nx, ny), end), 0.5) # <-- scale by distance to goal
+                    # total cost = (distance cost)  + (public disturbance cost) + (deviation from straight line cost)
+                    total_cost = (alpha * step_cost) + ((1-alpha) * extra_cost) + (alpha * beta * deviation * scale)
                     if extra_cost == 0:
                         total_cost = alpha * step_cost
                 else:
