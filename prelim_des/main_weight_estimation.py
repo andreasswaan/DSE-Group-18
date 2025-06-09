@@ -19,8 +19,8 @@ drone = Drone()
 perf = Performance(drone, mission)
 drone.perf = perf
 drone.class_1_weight_estimate()
-# print("Drone MTOW:", drone.MTOW)
-# print("Drone OEW:", drone.OEW)
+print("Drone MTOW:", drone.MTOW)
+print("Drone OEW:", drone.OEW)
 drone.wing.S = perf.wing_area(drone.OEW)
 # print("Wing area (S):", drone.wing.S)
 
@@ -39,19 +39,22 @@ drone.wing.plot_planform(save_plot=True)
 # print(drone.wing.c_root, drone.wing.c_tip, drone.wing.S)
 # print(drone.wing.span)
 # print(drone.wing.x_ac_lemac)
+# print(drone.wing.c_root, drone.wing.c_tip, drone.wing.S)
+# print(drone.wing.span)
+# print(drone.wing.x_ac_lemac)
 
 # drone.perf.cruise_noise(plot=True)
 
 
 # drone.perf.payload_range_diagram()
 
-for prop_connection in ["fuselage", "wing"]:
-    for fuselage_case in [1, 2]:
-        print(
-            f"\n=== Running structure analysis for prop_connection='{prop_connection}', fuselage_case={fuselage_case} ==="
-        )
-        run_structure_analysis(
-            drone, prop_connection=prop_connection, fuselage_case=fuselage_case
-        )
+# for prop_connection in ["fuselage", "wing"]:
+#     for fuselage_case in [1, 2]:
+#         print(
+#             f"\n=== Running structure analysis for prop_connection='{prop_connection}', fuselage_case={fuselage_case} ==="
+#         )
+#         run_structure_analysis(
+#             drone, prop_connection=prop_connection, fuselage_case=fuselage_case
+#         )
 
 # run_structure_analysis(drone, 'fuselage', fuselage_case=1)

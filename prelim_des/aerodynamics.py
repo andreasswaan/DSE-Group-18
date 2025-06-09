@@ -35,6 +35,7 @@ class Aerodynamics:
         self.CD_flat_plate = toml["config"]["aero"]["CD_flat_plate"]
         self.oswald_efficiency = toml["config"]["aero"]["oswald_efficiency"]
         self.drone = drone
+        self.CL_slope_aircraft = toml["config"]["aero"]["CL_slope_aircraft"]
 
     @property
     def CD(self) -> float:
