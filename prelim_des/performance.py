@@ -143,7 +143,8 @@ class Performance:
         print(f"Energy breakdown: Cruise Energy: {cruise_energy[0]:.2f} J, "
               f"Takeoff Energy: {take_off_energy[0]:.2f} J, "
               f"Landing Energy: {landing_energy[0]:.2f} J, "
-              f"Hover Energy: {hover_energy[0]:.2f} J")
+              f"Hover Energy: {hover_energy[0]:.2f} J",
+              f"Leg Mass: {self.drone.OEW + PL_mass} kg")
 
         return leg_energy, cruise_power, takeoff_power, landing_power, hover_power
 
