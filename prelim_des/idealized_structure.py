@@ -1178,6 +1178,173 @@ class WingStructure:
 
         plt.tight_layout()
         plt.show()
+        
+class TailStructure:
+    def __init__(
+        self,
+        horiz_span: float,
+        horiz_chord: float,
+        vert_span: float,
+        vert_chord: float,
+        n_sections: int,
+        horiz_section: IdealizedSection,
+        vert_section: IdealizedSection,
+        x0: float = 0.0,  # x-location of tail root (relative to fuselage)
+        z0: float = 0.0,  # z-location of tail root (relative to fuselage)
+    ):
+        self.horiz_span = horiz_span
+        self.horiz_chord = horiz_chord
+        self.vert_span = vert_span
+        self.vert_chord = vert_chord
+        self.n_sections = n_sections
+        self.horiz_section = horiz_section
+        self.vert_section = vert_section
+        self.x0 = x0
+        self.z0 = z0
+        self.horiz_sections = self.generate_horizontal_sections()
+        self.vert_sections = self.generate_vertical_sections()
+
+    def generate_horizontal_sections(self):
+        # Sweep horizontal stabilizer along y (spanwise), centered at z0
+        sections = []
+        for i in range(self.n_sections):
+            y = -self.horiz_span/2 + i * self.horiz_span/(self.n_sections-1)
+            pos = np.array([self.x0, y, self.z0])
+            sections.append((pos, self.horiz_section))
+        return sections
+
+    def generate_vertical_sections(self):
+        # Sweep vertical stabilizer along z (upwards), centered at y=0
+        sections = []
+        for i in range(self.n_sections):
+            z = self.z0 + i * self.vert_span/(self.n_sections-1)
+            pos = np.array([self.x0, 0.0, z])
+            sections.append((pos, self.vert_section))
+        return sections
+
+    def mass(self):
+        # Sum mass of all sections (approximate)
+        horiz_mass = sum(sec.mass(self.horiz_span/(self.n_sections-1)) for _, sec in self.horiz_sections)
+        vert_mass = sum(sec.mass(self.vert_span/(self.n_sections-1)) for _, sec in self.vert_sections)
+        return horiz_mass + vert_mass
+
+    def compute_bending_stresses(self, horiz_loads: list[float], vert_loads: list[float]):
+        """
+        Compute bending stresses for both horizontal and vertical stabilizers.
+        horiz_loads: list of distributed loads (N) for horizontal tail (per section)
+        vert_loads: list of distributed loads (N) for vertical tail (per section)
+        Returns: (horiz_stresses_per_section, vert_stresses_per_section)
+        """
+        # Horizontal tail: bending about z (like a mini-wing)
+        horiz_stresses_per_section = []
+        for i, (pos, section) in enumerate(self.horiz_sections):
+            # Simple cantilever: moment at section = sum of loads outboard * arm
+            moment = 0
+            for j in range(i, len(self.horiz_sections)):
+                y_out = self.horiz_sections[j][0][1]
+                y_here = pos[1]
+                arm = y_out - y_here
+                moment += horiz_loads[j] * arm
+            stresses = section.bending_stress(Mx=moment, My=0)
+            horiz_stresses_per_section.append(stresses)
+
+        # Vertical tail: bending about y (vertical cantilever)
+        vert_stresses_per_section = []
+        for i, (pos, section) in enumerate(self.vert_sections):
+            moment = 0
+            for j in range(i, len(self.vert_sections)):
+                z_out = self.vert_sections[j][0][2]
+                z_here = pos[2]
+                arm = z_out - z_here
+                moment += vert_loads[j] * arm
+            stresses = section.bending_stress(Mx=0, My=moment)
+            vert_stresses_per_section.append(stresses)
+
+        return horiz_stresses_per_section, vert_stresses_per_section
+    
+    def plot_3d_tail(
+        self,
+        horiz_stresses_per_section: list[list[float]],
+        vert_stresses_per_section: list[list[float]],
+        arrow_scale: float,
+        horiz_loads: list[float] = None,
+        vert_loads: list[float] = None,
+    ):
+        import matplotlib.colors as mcolors
+        from matplotlib import cm
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+
+        # Combine all stresses for color normalization
+        all_stresses = [s for sec in horiz_stresses_per_section for s in sec] + \
+                       [s for sec in vert_stresses_per_section for s in sec]
+        norm = mcolors.Normalize(vmin=min(all_stresses), vmax=max(all_stresses))
+        cmap = plt.colormaps["viridis"]
+
+        # Plot horizontal tail booms (spanwise in y)
+        for i, (pos, section) in enumerate(self.horiz_sections):
+            stresses = horiz_stresses_per_section[i]
+            for boom, stress in zip(section.booms, stresses):
+                color = cmap(norm(stress))
+                ax.scatter(
+                    pos[0] + boom.x,      # x: along fuselage
+                    pos[1] + boom.y,      # y: sideways (span)
+                    pos[2],               # z: vertical (fixed)
+                    color=color,
+                    s=boom.area * 1e6 * 20,
+                )
+
+        # Plot vertical tail booms (spanwise in z)
+        for i, (pos, section) in enumerate(self.vert_sections):
+            stresses = vert_stresses_per_section[i]
+            for boom, stress in zip(section.booms, stresses):
+                color = cmap(norm(stress))
+                ax.scatter(
+                    pos[0] + boom.x,      # x: along fuselage
+                    pos[1],               # y: sideways (fixed, usually 0)
+                    pos[2] + boom.y,      # z: upwards (span)
+                    color=color,
+                    s=boom.area * 1e6 * 20,
+                )
+
+        # Optionally, plot load arrows
+        if horiz_loads:
+            for i, (pos, section) in enumerate(self.horiz_sections):
+                x_c = np.mean([boom.x for boom in section.booms])
+                z_c = np.mean([boom.y for boom in section.booms])
+                load = horiz_loads[i]
+                ax.quiver(
+                    pos[0] + x_c, pos[1] + z_c, pos[2],
+                    0, 0, load / arrow_scale,
+                    color="red", arrow_length_ratio=0.2, linewidth=2, alpha=0.7,
+                    label="Horiz Load" if i == 0 else None,
+                )
+        if vert_loads:
+            for i, (pos, section) in enumerate(self.vert_sections):
+                x_c = np.mean([boom.x for boom in section.booms])
+                y_c = np.mean([boom.y for boom in section.booms])
+                load = vert_loads[i]
+                ax.quiver(
+                    pos[0] + x_c, pos[1], pos[2] + y_c,
+                    0, load / arrow_scale, 0,
+                    color="blue", arrow_length_ratio=0.2, linewidth=2, alpha=0.7,
+                    label="Vert Load" if i == 0 else None,
+                )
+
+        ax.set_title("3D Tail Structure (Booms colored by Bending Stress)")
+        ax.set_xlabel("x [m] (Fuselage length, nose to tail)")
+        ax.set_ylabel("y [m] (Sideways, starboard +)")
+        ax.set_zlabel("z [m] (Upwards)")
+        ax.grid(True)
+
+        mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
+        mappable.set_array(all_stresses)
+        cbar = plt.colorbar(mappable, ax=ax, pad=0.1)
+        cbar.set_label("Bending Stress [Pa]")
+
+        plt.tight_layout()
+        plt.show()
 
 
 # === ANALYSIS & UTILITY FUNCTIONS ===
@@ -2165,6 +2332,59 @@ def run_structure_analysis(
         weight_per_section=fuselage_weight_per_section,
         arrow_scale=arrow_scale,
     )
+    
+    
+    horiz_span = 0.6
+    horiz_chord = 0.15
+    vert_span = 0.25
+    vert_chord = 0.12
+
+    horiz_section = create_rectangular_section(
+        width=horiz_chord,
+        height=0.02,
+        n_regular_booms=8,
+        spar_cap_area=1e-5,
+        regular_boom_area=5e-6,
+        material_name="al_6061_t4",
+        materials=materials,
+    )
+
+    vert_section = create_rectangular_section(
+        width=0.02,
+        height=vert_chord,
+        n_regular_booms=8,
+        spar_cap_area=1e-5,
+        regular_boom_area=5e-6,
+        material_name="al_6061_t4",
+        materials=materials,
+    )
+
+    tail = TailStructure(
+        horiz_span=horiz_span,
+        horiz_chord=horiz_chord,
+        vert_span=vert_span,
+        vert_chord=vert_chord,
+        n_sections=10,
+        horiz_section=horiz_section,
+        vert_section=vert_section,
+        x0=1.1 * fuselage_length,  # example: place at rear of fuselage
+        z0=0.0,
+    )
+    
+    
+    vert_half_idx = tail.n_sections // 2
+    z_half = tail.vert_sections[vert_half_idx][0][2]
+    
+    vert_loads = [0.0 for _ in range(tail.n_sections)]
+    vert_loads[vert_half_idx] = 30.0  # 30 N at halfway up the vertical stabiliser
+    
+    horiz_loads = [0.0 for _ in range(tail.n_sections)]
+    horiz_loads[0] = 50.0    # 50 N at left tip
+    horiz_loads[-1] = 50.0   # 50 N at right tip
+
+    h_stress, v_stress = tail.compute_bending_stresses(horiz_loads, vert_loads)
+    tail.plot_3d_tail(h_stress, v_stress, arrow_scale=arrow_scale, horiz_loads=horiz_loads, vert_loads=vert_loads)
+    
     """
     critical = find_critical_stress(
         [sec for _, sec in wing.sections],
