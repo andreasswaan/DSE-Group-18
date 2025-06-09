@@ -19,8 +19,8 @@ drone = Drone()
 perf = Performance(drone, mission)
 drone.perf = perf
 drone.class_1_weight_estimate()
-# print("Drone MTOW:", drone.MTOW)
-# print("Drone OEW:", drone.OEW)
+print("Drone MTOW:", drone.MTOW)
+print("Drone OEW:", drone.OEW)
 drone.wing.S = perf.wing_area(drone.OEW)
 # print("Wing area (S):", drone.wing.S)
 
@@ -42,6 +42,6 @@ print(f"Wing surface area: {drone.wing.S}")
 
 # drone.perf.cruise_noise(plot=True)
 
-# drone.perf.payload_range_diagram()
+drone.perf.payload_range_diagram()
 
 # run_structure_analysis(drone)
