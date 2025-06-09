@@ -19,6 +19,9 @@ CL_slope_aircraft = 5.7                   # [1/rad]
 
 cruise_speed = 15                         # m/s
 cruise_height = 200                       # ft
+transition_height = 60                    # ft
+transition_energy = 22380                 # [J]
+default_transition_MTOW = 10              # [kg]
 max_velocity = 20                         # m/s
 
 [config.mission.loitering_times]

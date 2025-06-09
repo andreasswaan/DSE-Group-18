@@ -54,7 +54,7 @@ class Drone:
             )
         return self.MTOW, self.OEW
 
-    def class_2_weight_estimate(self):
+    def class_2_weight_estimate(self, transition=False):
         """
         Estimate the weight of the drone using a class 2 weight estimate.
         """
@@ -66,7 +66,7 @@ class Drone:
                 "Wing area (S) must be defined before performing class 2 weight estimate."
             )
 
-        mission_energy = self.perf.mission_energy()
+        mission_energy = self.perf.mission_energy(transition)
         self.OEW = (
             self.wing.weight()
             + self.fuselage.weight()
@@ -110,7 +110,7 @@ class Drone:
 
         return self.MTOW, self.OEW
 
-    def iterative_weight_estimate(self, max_iterations=100, tolerance=0.01, plot=False):
+    def iterative_weight_estimate(self, transition=False, max_iterations=100, tolerance=0.01, plot=False):
         """
         Perform an iterative weight estimate until convergence.
         """
@@ -126,7 +126,7 @@ class Drone:
         S_history = [self.wing.S]
         for i in range(max_iterations):
             MTOW_prev = self.MTOW
-            self.class_2_weight_estimate()
+            self.class_2_weight_estimate(transition)
             mtow_history.append(self.MTOW)
             self.wing.S = self.perf.wing_area(self.MTOW)
             S_history.append(self.wing.S)
