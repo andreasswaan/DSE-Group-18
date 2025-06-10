@@ -31,6 +31,9 @@ class MissionPhase:
             toml["config"]["mission"]["cruise_height"]
         ),
         cruise_speed: float = toml["config"]["mission"]["cruise_speed"],
+        transition_h: float = ImperialConverter.len_ft_m(
+            toml["config"]["mission"]["transition_height"]
+        ),
     ):
         logging.debug("Initializing MissionPhase class...")
 
@@ -42,9 +45,12 @@ class MissionPhase:
         self.LD_speed = LD_speed
         self.distance = distance
         self.cruise_h = cruise_h
+        self.transition_h = transition_h
         self.cruise_speed = cruise_speed
         self.TO_time = cruise_h / TO_speed
         self.LD_time = cruise_h / LD_speed
+        self.TO_time_w_trans = transition_h / TO_speed
+        self.LD_time_w_trans = transition_h / LD_speed
 
 
 class Mission:
