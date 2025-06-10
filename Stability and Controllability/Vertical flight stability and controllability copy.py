@@ -58,7 +58,7 @@ def vertical_stability_state(
     Ktau = (Cq * rho * Dv**5) / (4 * (math.pi) ** 2)
     A = (m * g + Fez - Kd * zdot * abs(zdot) - m * z2dot) / (2 * Kt)
     B = (Iz * psi2dot - Mez) / (2 * Ktau)
-    C = -(Mey + Kd * zdot * abs(zdot)) / (math.sqrt(2) * Rt * Kt)
+    C = -(Mey + Kd * zdot * abs(zdot) * Rdx) / (math.sqrt(2) * Rt * Kt)
     D = -(Mex) / (math.sqrt(2) * Rt * Kt)
     E = math.sqrt(Fexy / Kth)
     if choice == 1:
@@ -111,7 +111,13 @@ def vertical_stability_state(
         w7 = 0
         w8 = w7
         wh = E
-    return w1, w2, w3, w4, w5, w6, w7, w8, wh
+    return (
+        math.sqrt(2) * w1 / (2 * math.pi / 60),
+        w3 * math.sqrt(2) / (2 * math.pi / 60),
+        w5 * math.sqrt(2) / (2 * math.pi / 60),
+        w7 * math.sqrt(2) / (2 * math.pi / 60),
+        wh / (2 * math.pi / 60),
+    )
 
 
 print(
