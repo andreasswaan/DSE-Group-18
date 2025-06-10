@@ -2446,32 +2446,7 @@ def run_structure_analysis(
             for boom, orig_area in zip(section.booms, orig_areas):
                 boom.area = orig_area
 
-        # --- FUSELAGE SIZING ---
-        fuselage_weight_per_section = fuselage.compute_weight_distribution()
-        # For fuselage, use only point loads (no distributed lift)
-        all_fuselage_point_loads_mode = list(point_loads) + fuselage_point_loads_mode
-
-        # print(f"[INFO] Fuselage dimensions (case {fuselage_case}): width={fuselage_width:.3f} m, height={fuselage_height:.3f} m, length={fuselage_length:.3f} m")
-        # print(f"[INFO] Fuselage initial structural mass: {fuselage.mass():.3f} kg")
-
-        min_fuselage_mass, fuselage_scale = size_fuselage_for_min_mass(
-            fuselage,
-            distributed_loads=fuselage_weight_per_section,
-            shear_thickness=0.002,
-            safety_factor=SAFETY_FACTOR,
-            area_scale_start=3.0,
-            area_scale_step=0.02,
-            min_scale=0.01,
-            max_iter=200,
-            fuselage_point_loads=all_fuselage_point_loads_mode,
-            min_boom_area=1e-5,
-        )
-        # Restore original boom areas for fuselage
-        for orig_areas, (_, section) in zip(original_fuselage_areas, fuselage.sections):
-            for boom, orig_area in zip(section.booms, orig_areas):
-                boom.area = orig_area
-
-        # Sizing for the tail
+        # --- TAIL SIZING ---
         min_tail_mass, tail_scale = size_tail_for_min_mass(
             tail,
             horiz_loads,
@@ -2501,6 +2476,45 @@ def run_structure_analysis(
             ],
             tail.vert_sections,
         ):
+            for boom, orig_area in zip(section.booms, orig_areas):
+                boom.area = orig_area
+
+        # After tail sizing and before fuselage sizing in your loop:
+        tail_weight = tail.mass() * g  # [N]
+        tail_root_x = tail.x0
+        tail_root_y = 0.0
+        tail_root_z = tail.z0
+
+        tail_weight_load = {
+            "x": tail_root_x,
+            "y": tail_root_y,
+            "z": tail_root_z,
+            "Pz": -tail_weight,  # Downward force
+        }
+        point_loads.append(tail_weight_load)
+
+        # --- FUSELAGE SIZING ---
+        fuselage_weight_per_section = fuselage.compute_weight_distribution()
+        # For fuselage, use only point loads (no distributed lift)
+        all_fuselage_point_loads_mode = list(point_loads) + fuselage_point_loads_mode
+
+        # print(f"[INFO] Fuselage dimensions (case {fuselage_case}): width={fuselage_width:.3f} m, height={fuselage_height:.3f} m, length={fuselage_length:.3f} m")
+        # print(f"[INFO] Fuselage initial structural mass: {fuselage.mass():.3f} kg")
+
+        min_fuselage_mass, fuselage_scale = size_fuselage_for_min_mass(
+            fuselage,
+            distributed_loads=fuselage_weight_per_section,
+            shear_thickness=0.002,
+            safety_factor=SAFETY_FACTOR,
+            area_scale_start=3.0,
+            area_scale_step=0.02,
+            min_scale=0.01,
+            max_iter=200,
+            fuselage_point_loads=all_fuselage_point_loads_mode,
+            min_boom_area=1e-5,
+        )
+        # Restore original boom areas for fuselage
+        for orig_areas, (_, section) in zip(original_fuselage_areas, fuselage.sections):
             for boom, orig_area in zip(section.booms, orig_areas):
                 boom.area = orig_area
 
