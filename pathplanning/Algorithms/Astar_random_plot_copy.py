@@ -67,6 +67,9 @@ def a_star_search_8dir(start, end, walkable, density_map=None,
         for dx, dy in [(-1,0), (1,0), (0,-1), (0,1), (-1,-1), (-1,1), (1,-1), (1,1)]:
             nx, ny = x + dx, y + dy
             if 0 <= nx < width and 0 <= ny < height and walkable[ny, nx]:
+                if abs(dx) == 1 and abs(dy) == 1:
+                    if not walkable[y, ny] and not walkable[ny, x]:
+                        continue  # Both adjacent cells are not walkable, so skip this diagonal move
                 step_cost = sqrt(dx**2 + dy**2) /sqrt (2) #devide over sqrt 2 to normalize
 
                 # Use numeric cost from weight grid (e.g., population density, height, etc.)

@@ -10,7 +10,7 @@ from shapely.geometry import LineString, Polygon
 from skimage import measure
 from scipy.interpolate import splprep, splev
 
-def load_delft_grid(path="pathplanning/data/delft_grid_data.npz"):
+def load_delft_grid(path="pathplanning/data/delft_grid_data_70_border.npz"):
     data = np.load(path, allow_pickle=True)
     return {
         'weight_grid': data["weight_grid"],
@@ -68,6 +68,36 @@ def path_is_safe_spline(smoothed_path, obstacle_mask):
             if obstacle_mask[yi, xi]:
                 return False
     return True
+
+
+def fix_corner_jumps(path, walkable):
+    """
+    For each diagonal step in the path, if both adjacent cardinal cells are not walkable (i.e., a corner cut),
+    insert the cell across from the obstacle into the path to force the path to go around the obstacle.
+    Returns a new path with the fix applied.
+    """
+    if not path or len(path) < 3:
+        return path
+
+    fixed_path = [path[0]]
+    for i in range(1, len(path)):
+        x0, y0 = fixed_path[-1]
+        x1, y1 = path[i]
+        dx, dy = x1 - x0, y1 - y0
+
+        # Check for diagonal move
+        if abs(dx) == 1 and abs(dy) == 1:
+            # Check if both adjacent cardinal cells are not walkable (corner cut)
+            if not walkable[y0, x1] or not walkable[y1, x0]:
+                # Insert the cell across from the obstacle before the diagonal move
+                # Prefer the cardinal direction that is walkable, or just pick one
+                if walkable[y0, x1]:
+                    fixed_path.append((x1, y0))
+                elif walkable[y1, x0]:
+                    fixed_path.append((x0, y1))
+        fixed_path.append((x1, y1))
+    return fixed_path
+
 
 def plot_path(grid, walkable, start, end, paths):
     weight_grid = grid['weight_grid'].copy()
@@ -140,14 +170,14 @@ end = (212, 524) #select_near_center(walkable, center_x, center_y, width, height
 print(f"  Start: {start}")
 print(f"  End:   {end}")
 
-MIN_TURN_RADIUS_M = 60
+MIN_TURN_RADIUS_M = 70
 GRID_RES = grid["resolution"]
 MIN_TURN_RADIUS_GRID = MIN_TURN_RADIUS_M / GRID_RES  # e.g., 6 for 10m/cell
 
 alphas = np.linspace(0.1,1.1,10)  # You can extend as needed
 
-start = (212, 324)
-end = (212, 524)
+start = (30, 49)
+end = (40, 73)
 print(f"  Start: {start}")
 print(f"  End:   {end}")
 
@@ -157,6 +187,7 @@ obstacle_mask = np.isinf(grid['weight_grid'])
 for alpha in alphas:
     t0 = time.time()
     path = a_star_search_8dir(start, end, walkable, density_map=grid['weight_grid'], alpha=alpha)
+    path = fix_corner_jumps(path, walkable)
     t1 = time.time()
     duration = t1 - t0
 
@@ -165,9 +196,9 @@ for alpha in alphas:
         continue
 
     # --- Spline smoothing with radius constraint ---
-    s = 1.0
+    s = 0.1
     s_max = 25.0
-    s_step = 0.5
+    s_step = 0.1
     last_smoothed = None
     last_min_radius = None
     while s <= s_max:

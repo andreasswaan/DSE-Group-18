@@ -6,7 +6,7 @@ import matplotlib.colors as mcolors
 import matplotlib.cm as cm
 from matplotlib.patches import Patch
 
-def load_delft_grid(path="pathplanning/data/delft_grid_data.npz"):
+def load_delft_grid(path="pathplanning/data/delft_grid_data_10_border.npz"):
     data = np.load(path, allow_pickle=True)
     return {
         'weight_grid': data["weight_grid"],
@@ -57,7 +57,7 @@ if not path:
 
 paths_n = []
 alpha_step = 0.1
-alphas = np.arange(0.0, 1, alpha_step)
+alphas = np.arange(0.1, 1, alpha_step)
 num_runs = 10
 np.random.seed(3)
 
@@ -65,6 +65,8 @@ for i in range(num_runs):
     print(f"------ Run {i+1}/{num_runs} ------")
     start = tuple(restaurant_coords[np.random.randint(len(restaurant_coords))][::-1])
     end = tuple([np.random.randint(0, width), np.random.randint(0, height)])
+    # start = tuple([200,300])
+    # end = tuple([250,500])
     print(f"Start point: {start}, End point: {end}")
     
     paths = []
@@ -143,14 +145,14 @@ fig2, ax2 = plt.subplots()
 for paths in paths_n: 
     distances = [p[1] for p in paths]
     noises = [p[2] for p in paths]
-    ax2.plot(distances, noises, marker='o', label='Varying alpha lines')
+    ax2.plot(distances, noises, marker='o', alpha=0.5)
     
 # Transpose paths_n so that each element is a list of results for a single alpha across runs
 paths_n_T = list(zip(*paths_n))  # shape: (num_alphas, num_runs)
 
 avg_distances = [np.mean([p[1] for p in alpha_group]) for alpha_group in paths_n_T]
 avg_noises = [np.mean([p[2] for p in alpha_group]) for alpha_group in paths_n_T]
-ax2.plot(avg_distances, avg_noises, color='black', linewidth=2, label='Average varying alpha line')
+ax2.plot(avg_distances, avg_noises, color='black', label='Average varying alpha line', marker='x',)
     
 
     

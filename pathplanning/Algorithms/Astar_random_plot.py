@@ -38,9 +38,15 @@ def smooth_path(path, walkable):
         i = j
     return smoothed
 
+def point_line_distance(px, py, x0, y0, x1, y1):
+    # Distance from (px,py) to the line through (x0,y0)-(x1,y1)
+    num = abs((y1 - y0)*px - (x1 - x0)*py + x1*y0 - y1*x0)
+    den = sqrt((y1 - y0)**2 + (x1 - x0)**2)
+    return num / den if den != 0 else 0
+
 # ---------- A* ALGORITHM ----------
 
-def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=None, alpha=0.3):
+def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=None, alpha=0.3, beta=0.005):
     """
     start, end: (x, y)
     walkable: boolean 2D array
@@ -52,6 +58,7 @@ def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=
     open_set = []
     heapq.heappush(open_set, (0 + heuristic(start, end), 0, start, []))
     visited = set()
+
 
     while open_set:
         _, current_cost, current, path = heapq.heappop(open_set)
@@ -79,13 +86,26 @@ def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=
         for dx, dy in [(-1,0), (1,0), (0,-1), (0,1), (-1,-1), (-1,1), (1,-1), (1,1)]:
             nx, ny = x + dx, y + dy
             if 0 <= nx < width and 0 <= ny < height and walkable[ny, nx]:
+                # Prevent corner cutting: if moving diagonally, at least one adjacent cardinal cell must be walkable
+                if abs(dx) == 1 and abs(dy) == 1:
+                    if not walkable[y, ny] and not walkable[ny, x]:
+                        continue  # Both adjacent cells are not walkable, so skip this diagonal move
+
                 step_cost = sqrt(dx**2 + dy**2) / sqrt(2)
 
                 if density_map is not None:
                     extra_cost = float(density_map[ny, nx])
                     if np.isinf(extra_cost):
                         continue  # skip impassable
-                    total_cost = alpha * step_cost + (1-alpha) * extra_cost
+                    # deviation from straight line cost
+                    deviation = point_line_distance(nx, ny, start[0], start[1], end[0], end[1])
+                    scale = np.pow(heuristic((nx, ny), end), 0.6) # <-- scale by distance to goal
+                    
+                    # total cost = (distance cost)  + (public disturbance cost) + (deviation from straight line cost)
+                    total_cost = (alpha * step_cost) + ((1-alpha) * extra_cost) + (alpha * beta * deviation * scale)
+                    # total_cost = (alpha * step_cost) + ((1-alpha) * extra_cost)
+                    
+                    #print(f"Node: ({nx}, {ny}), Step cost: {step_cost:.2f}, Extra cost: {extra_cost:.2f}, Deviation cost: {(alpha * beta * deviation * scale):.2f} Total cost: {total_cost:.2f}")
                     if extra_cost == 0:
                         total_cost = alpha * step_cost
                 else:
@@ -97,6 +117,85 @@ def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=
                     path
                 ))
     return [], 0, 0 
+
+def theta_star_search_8dir(start, end, walkable, density_map=None, alpha=0.3):
+    """
+    Theta* pathfinding algorithm (8 directions).
+    Returns: path, total_step_cost, total_weight_cost
+    """
+    height, width = walkable.shape
+    open_set = []
+    heapq.heappush(open_set, (heuristic(start, end), 0, start))
+    came_from = {start: None}
+    g_score = {start: 0}
+    weight_score = {start: 0}
+
+    while open_set:
+        _, current_g, current = heapq.heappop(open_set)
+        if current == end:
+            # Reconstruct path
+            path = []
+            node = end
+            while node is not None:
+                path.append(node)
+                node = came_from[node]
+            path = path[::-1]
+            # Calculate costs
+            total_step_cost = 0.0
+            total_weight_cost = 0.0
+            for i in range(1, len(path)):
+                x0, y0 = path[i-1]
+                x1, y1 = path[i]
+                step_cost = sqrt((x1 - x0)**2 + (y1 - y0)**2)
+                total_step_cost += step_cost
+                if density_map is not None:
+                    w1 = float(density_map[y0, x0])
+                    w2 = float(density_map[y1, x1])
+                    avg_weight = 0.5 * (w1 + w2)
+                    total_weight_cost += avg_weight
+            return path, total_step_cost, total_weight_cost
+
+        for dx, dy in DIRECTIONS:
+            nx, ny = current[0] + dx, current[1] + dy
+            neighbor = (nx, ny)
+            if not (0 <= nx < width and 0 <= ny < height and walkable[ny, nx]):
+                continue
+
+            # Theta*: Try to connect neighbor to current's parent if line of sight exists
+            parent = came_from[current]
+            if parent is not None and is_line_clear(parent, neighbor, walkable):
+                # Connect neighbor to parent
+                tentative_g = g_score[parent] + heuristic(parent, neighbor)
+                if density_map is not None:
+                    w1 = float(density_map[parent[1], parent[0]])
+                    w2 = float(density_map[ny, nx])
+                    avg_weight = 0.5 * (w1 + w2)
+                    tentative_weight = weight_score[parent] + avg_weight
+                else:
+                    tentative_weight = 0
+                prev = parent
+            else:
+                # Connect neighbor to current
+                tentative_g = g_score[current] + heuristic(current, neighbor)
+                if density_map is not None:
+                    w1 = float(density_map[current[1], current[0]])
+                    w2 = float(density_map[ny, nx])
+                    avg_weight = 0.5 * (w1 + w2)
+                    tentative_weight = weight_score[current] + avg_weight
+                else:
+                    tentative_weight = 0
+                prev = current
+
+            # Combine step and weight cost
+            total_cost = alpha * tentative_g + (1 - alpha) * tentative_weight
+
+            if neighbor not in g_score or tentative_g < g_score[neighbor]:
+                g_score[neighbor] = tentative_g
+                weight_score[neighbor] = tentative_weight
+                came_from[neighbor] = prev
+                heapq.heappush(open_set, (total_cost + heuristic(neighbor, end), tentative_g, neighbor))
+
+    return [], 0, 0
 
 
 # ---------- TEST ENTRY ----------
