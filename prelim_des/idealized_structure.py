@@ -1396,7 +1396,7 @@ class TailStructure:
         mappable.set_array(all_stresses)
         cbar = plt.colorbar(mappable, ax=ax, pad=0.1)
         cbar.set_label("Bending Stress [Pa]")
-        
+
         ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
         ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
         ax.zaxis.set_major_locator(ticker.MaxNLocator(4))
@@ -2334,7 +2334,7 @@ def run_structure_analysis(
         x0=1.1 * fuselage_length,  # example: place at rear of fuselage
         z0=0.0,
     )
-    
+
     arrow_scale = 0.01
 
     vert_half_idx = tail.n_sections // 2
@@ -2525,6 +2525,7 @@ def run_structure_analysis(
     print(
         f"Fuselage: Critical mode is '{fuselage_critical_mode}' with mass {results[fuselage_critical_mode]['fuselage_mass']:.2f} kg"
     )
+    print(f"Tail: Mass {results[fuselage_critical_mode]['tail_mass']:.2f} kg")
     print("==============================\n")
 
     # --- Store critical mode variables for further use ---
