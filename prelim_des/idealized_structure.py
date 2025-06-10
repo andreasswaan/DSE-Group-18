@@ -772,6 +772,24 @@ class FuselageStructure:
             My_list.append(0.0)  # Not used, but kept for compatibility
         return Mz_list, My_list
 
+    def compute_torsional_moments(self, point_loads: list[dict]) -> list[float]:
+        """
+        Returns a list of torsional moments (about x-axis) at each fuselage section.
+        """
+        Mx_list = []
+        section_positions = [x for x, _ in self.sections]
+        for i, x in enumerate(section_positions):
+            Mx = 0.0
+            for pl in point_loads:
+                if pl["x"] >= x:
+                    # Direct torsional moment
+                    Mx += pl.get("Mx", 0)
+                    # Torsion from side force (Py) at a lever arm (z)
+                    Py = pl.get("Py", 0)
+                    Mx += Py * (pl.get("z", 0))
+            Mx_list.append(Mx)
+        return Mx_list
+
 
 class WingStructure:
     def __init__(
@@ -1661,11 +1679,22 @@ def size_fuselage_for_min_mass(
             shear_stresses = sec.shear_stress(Vz=Vz, thickness=shear_thickness)
             shear_stresses_per_section.append(shear_stresses)
 
+        # After computing torsional moments:
+        torsional_moments = fuselage.compute_torsional_moments(
+            fuselage_point_loads or []
+        )
+        torsional_stresses_per_section = []
+        for (x, sec), Mx in zip(fuselage.sections, torsional_moments):
+            tau_torsion = sec.torsional_shear_stress(Mx)
+            # For compatibility with find_critical_stress, make a list for each boom
+            torsional_stresses_per_section.append([tau_torsion] * len(sec.booms))
+
         # --- Find critical stress (yield/shear) ---
         critical = find_critical_stress(
             [sec for _, sec in fuselage.sections],
             stresses_per_section,
             shear_stresses_per_section,
+            torsional_stresses_per_section,
         )
         allowable_with_sf = critical["allowable"] / safety_factor
         utilization_with_sf = (
@@ -2361,6 +2390,7 @@ def run_structure_analysis(
     results = {}
 
     for flight_mode in ["cruise", "vtol"]:
+        point_loads = []
         if flight_mode == "cruise":
             # All lift from wings, no propeller loads
             lift_per_section = [
@@ -2406,6 +2436,12 @@ def run_structure_analysis(
                 arm = pos[2]  # z-position (vertical)
                 moment_vert += vert_loads[i] * arm
 
+            # Compute torsional moment from vertical tail loads
+            torsion_from_tail = 0.0
+            for i, (pos, _) in enumerate(tail.vert_sections):
+                z_arm = pos[2] - tail_root_z  # tail_root_z = tail.z0
+                torsion_from_tail += vert_loads[i] * z_arm
+
             # Add as point loads/moments to fuselage
             tail_reaction_load = {
                 "x": tail_root_x,
@@ -2415,6 +2451,7 @@ def run_structure_analysis(
                 "My": moment_horiz,  # moment from horizontal tail
                 "Px": 0,
                 "Mz": moment_vert,  # moment from vertical tail
+                "Mx": torsion_from_tail,
             }
             # Add tail_reaction_load to your fuselage point loads list
             point_loads.append(tail_reaction_load)
