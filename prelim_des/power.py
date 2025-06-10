@@ -24,10 +24,12 @@ class PropulsionSystem:
         self.motor = Motor()
         self.hor_prop = HorPropeller()
         self.ver_prop = VertPropeller()
+        self.η_elec = toml["config"]["motor"]["eff_elec"]
+        self.η_prop = toml["config"]["propeller"]["eff_prop"]
 
     def weight(self, energy_required: float = None) -> float:
         return (
-            self.battery.weight(energy_required)
+            self.battery.calc_weight(energy_required)
             + self.motor.weight()
             + self.ver_prop.weight()
             + self.hor_prop.weight()
@@ -35,6 +37,7 @@ class PropulsionSystem:
 
 
 class Battery:
+    weight: float  # Placeholder for battery weight
     def __init__(self):
         logging.debug("Initializing Battery class...")
 
@@ -46,8 +49,13 @@ class Battery:
             1
         )  # J/kg
 
-    def weight(self, energy_required: float) -> float:
-        return energy_required / (self.energy_density * self.batt_energy_ratio)
+    def calc_weight(self, energy_required: float) -> float:
+        weight = energy_required / (self.energy_density * self.batt_energy_ratio)
+        if weight < 0:
+            logging.error("Calculated battery weight is negative. Check energy requirements.")
+            raise ValueError("Battery weight cannot be negative.")
+        self.weight = weight
+        return weight
 
 
 class Motor:
@@ -63,7 +71,9 @@ class Motor:
         Returns:
         int: Number of motors required.
         """
-        return 8
+        n_vert = 8
+        n_hor = 2
+        return n_vert + n_hor  # Total number of motors (8 vertical + 2 horizontal)
 
     def weight(self):
         """
@@ -74,6 +84,15 @@ class Motor:
         return (
             0.16 * self.n_motors()
         )  # Placeholder value, should be replaced with a real calculation
+    
+    def max_thrust(self) -> float:
+        """
+        Placeholder method to calculate the maximum thrust produced by the motor.
+        Returns:
+        float: Maximum thrust including all motors in Newtons.
+        """
+        T_motor_AS2820_KV880_max_thrust = 24.153779 # N
+        return T_motor_AS2820_KV880_max_thrust * self.n_motors()  # N
 
 
 class VertPropeller:
@@ -108,7 +127,17 @@ class VertPropeller:
         Returns:
         float: Power in Watts.
         """
-        return thrust**1.5 / np.sqrt(2 * ρ * self.area * self.η_prop) / FM
+        power = thrust**1.5 / np.sqrt(2 * ρ * self.area * self.η_prop) / FM
+        print(f"Power required for propeller: {power} W")
+        thrust_per_prop = thrust / self.n_vert_prop()
+        power_per_power = 40.518 * thrust_per_prop - 645.22
+        if thrust < 28 or thrust > 110:
+            logging.warning(
+                f"Thrust {thrust} N is outside the expected range (30-100 N). Power calculation may not be accurate."
+            )
+        total_power = power_per_power * self.n_vert_prop()  # Total power for all vertical propellers
+        print(f"Power required for vertical propellers: {total_power} W")
+        return total_power
 
     def n_vert_prop(self) -> int:
         """
@@ -116,7 +145,7 @@ class VertPropeller:
         Returns:
         int: Number of vertical propellers.
         """
-        return 8
+        return 4
 
     def weight(self) -> float:
         """

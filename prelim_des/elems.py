@@ -72,6 +72,12 @@ class Wing:
         return (
             (2 / 3) * self.c_root * (1 + self.taper + self.taper**2) / (1 + self.taper)
         )
+    
+    @property
+    def x_ac_lemac(self):
+        """X-coordinate of the aerodynamic center (AC) of the wing [m]"""
+        # Assuming AC is at 25% chord
+        return self.x_chord(0.25 * self.MAC)
 
     @property
     def yLEMAC(self):
@@ -142,8 +148,10 @@ class Wing:
             * self.geom_AR**1.712
         )
 
+        weight_folding = toml["config"]["wing"]["wing_folding_weight"]
+        
         # Placeholder estimate for the wing weight based
-        return 0.4 * self.S + 0.06 * self.drone.MTOW
+        return 0.4 * self.S + 0.06 * self.drone.MTOW + weight_folding
 
     def plot_planform(self, save_plot=False, filename="wing_planform.png"):
         """
@@ -229,7 +237,7 @@ class Wing:
             folder = os.path.join("prelim_des", "plots", "weight_estimate")
             os.makedirs(folder, exist_ok=True)
             plt.savefig(os.path.join(folder, filename), dpi=300, bbox_inches="tight")
-        plt.show()
+        plt.close()
 
 
 class Fuselage:
