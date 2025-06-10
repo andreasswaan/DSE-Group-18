@@ -8,6 +8,12 @@ from constants import ρ
 from prelim_des.utils.import_toml import load_toml
 import utils.define_logging  # do not remove this line, it sets up logging configuration
 import logging
+from utils.CFD_simulation_results import (
+    average_cl_alpha,
+    AOA,
+    tip_chord_cl_alpha,
+    root_chord_cl_alpha,
+)
 
 
 toml = load_toml()
@@ -43,6 +49,38 @@ class Aerodynamics:
             self.CL_cruise**2
             / (np.pi * self.oswald_efficiency * self.drone.wing.geom_AR)
         )
+
+    def base_cl_cruise(self, alpha):
+        """
+        Estimate the cl of the drone based on alpha (deg).
+
+        Parameters:
+        alpha (float): The angle of attack (deg).
+
+        Returns:
+        float: The cl.
+        """
+        if alpha > 12:
+            raise ValueError("the angle of attack is to large", alpha)
+        if alpha < 0:
+            raise ValueError("the angle of attack is to little", alpha)
+
+        avg_cl_alpha = average_cl_alpha()
+        cl_at_req_alpha = np.interp(alpha, AOA, avg_cl_alpha)
+        return cl_at_req_alpha
+
+    @property
+    def cl_alpha(self):
+        root_chord = self.drone.wing.c_root
+        tip_chord = self.drone.wing.c_tip
+
+        cl_alpha_tip = tip_chord_cl_alpha(tip_chord)
+        cl_alpha_root = root_chord_cl_alpha(root_chord)
+        cl_alpha = []
+        for i in range(len(AOA)):
+            cl_alpha.append(np.average([cl_alpha_tip[i], cl_alpha_root[i]]))
+
+        return cl_alpha
 
     def lift(self, V: float, CL) -> float:
         """
