@@ -1275,6 +1275,7 @@ class TailStructure:
         
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
+        ax.view_init(azim=210)
 
         # Combine all stresses for color normalization
         all_stresses = [s for sec in horiz_stresses_per_section for s in sec] + \
@@ -1342,6 +1343,14 @@ class TailStructure:
         mappable.set_array(all_stresses)
         cbar = plt.colorbar(mappable, ax=ax, pad=0.1)
         cbar.set_label("Bending Stress [Pa]")
+        
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
+        ax.zaxis.set_major_locator(ticker.MaxNLocator(4))
+
+        ax.set_xlim(0.5, 1.5)
+        ax.set_ylim(-0.5, 0.5)
+        ax.set_zlim(-0.1, 0.3)
 
         plt.tight_layout()
         plt.show()
@@ -2337,11 +2346,11 @@ def run_structure_analysis(
     horiz_span = 0.6
     horiz_chord = 0.15
     vert_span = 0.25
-    vert_chord = 0.12
+    vert_chord = 0.3
 
     horiz_section = create_rectangular_section(
         width=horiz_chord,
-        height=0.02,
+        height=0.5,
         n_regular_booms=8,
         spar_cap_area=1e-5,
         regular_boom_area=5e-6,
