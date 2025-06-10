@@ -1,3 +1,8 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,7 +12,6 @@ import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
-from prelim_des.drone import Drone
 
 # === CONFIG & MATERIALS ===
 

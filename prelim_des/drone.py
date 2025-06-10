@@ -95,9 +95,9 @@ class Drone:
             else "Propeller Weight: Not available"
         )
         print(
-            f"Component Weights: Wing = {self.wing.weight()[0]:.2f} kg, "
-            f"Fuselage = {self.fuselage.weight()[0]:.5f} kg, "
-            f"Landing Gear = {self.landing_gear.weight()[0]:.2f} kg, "
+            f"Component Weights: Wing = {self.wing.weight():.2f} kg, "
+            f"Fuselage = {self.fuselage.weight():.2f} kg, "
+            f"Landing Gear = {float(self.landing_gear.weight()):.2f} kg, "
             f"Propulsion = {self.propulsion.weight(mission_energy)[0]:.2f} kg"
         )
 
