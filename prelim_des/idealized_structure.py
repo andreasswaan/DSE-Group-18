@@ -1745,8 +1745,8 @@ def get_fuselage_dimensions(case: int):
     Returns (width, height, length) for the fuselage based on the selected case.
     All dimensions in meters.
     """
-    # FIX FIX FIX FIX PLACEHOLDERS (realistic)
-    # Pull these values from somewhere in the python code
+    # FIX FIX FIX PLACEHOLDERS (realistic)
+    # Pull these values from somewhere in the python code, from Simonas
     if case == 1:
         width = 0.675
         height = 0.450
@@ -1758,7 +1758,6 @@ def get_fuselage_dimensions(case: int):
     else:
         raise ValueError("Invalid case. Choose 1 or 2.")
 
-    # FIX FIX FIX Placeholder for clearance
     clearance = 0.2  # 20% clearance
     width = width * (1 + clearance)
     height = height * (1 + clearance)
@@ -1775,7 +1774,7 @@ def get_fuselage_payload_weights(case: int):
     sensors_weight = 0.1 * g
     computing_module_weight = 0.1 * g
     miscellaneous_weight = 0.1 * g
-    # FIX FIX FIX
+    # FIX FIX FIX, from Simonas, Andreas (?) and Ishaan
     # These values are placeholders and should be replaced with actual values
 
     if case == 1:
@@ -1801,9 +1800,6 @@ def get_fuselage_payload_weights(case: int):
         mechanisms_weight,
         payload_insulator_weight,
     )
-
-
-# FIX FIX FIX
 
 
 def size_tail_for_min_mass(
@@ -1903,10 +1899,12 @@ def run_structure_analysis(
     prop_connection: str = "wing",
     # prop_connection: "wing" or "fuselage"
     fuselage_case=2,  # or 2, (1 for chubby, 2 for elongated fuselage)
-    banked=True,  # Set to False for normal cruise, True for banked case
+    banked=False,  # Set to False for normal cruise, True for banked case
 ):
-    # FIX FIX FIX
+    # FIX FIX FIX, those values are educated guesses, but what values should they have? These might be correct
     SAFETY_FACTOR = 2.0
+    shear_thickness = 0.002  # meters, skin thickness for shear stress calculations
+    min_boom_area = 1e-5  # m^2, minimum area for a boom
 
     # Create root cross-section
     # FIX THIS -> call correct values
@@ -2171,18 +2169,17 @@ def run_structure_analysis(
     fuselage_weight_per_section = fuselage.compute_weight_distribution()
 
     # Call the sizing function
-    # FIX FIX FIX IMPLEMENT SHEAR THICKNESS SOMEWHERE
     min_fuselage_mass, fuselage_area_scale = size_fuselage_for_min_mass(
         fuselage,
         distributed_loads=fuselage_weight_per_section,
-        shear_thickness=0.002,
+        shear_thickness=shear_thickness,
         safety_factor=SAFETY_FACTOR,
         area_scale_start=10.0,
         area_scale_step=0.02,
         min_scale=0.01,
         max_iter=200,
         fuselage_point_loads=all_fuselage_point_loads,
-        min_boom_area=1e-5,
+        min_boom_area=min_boom_area,
     )
 
     # print(f"Minimal safe fuselage mass: {min_fuselage_mass:.2f} kg (area scale factor: {fuselage_area_scale:.2f})")
@@ -2258,7 +2255,7 @@ def run_structure_analysis(
         )
 
     # --- Banked flight option ---
-    # FIX FIX FIX PULL THEM PROPERLY
+    # FIX FIX FIX PULL THEM PROPERLY - FIXED I think? It doesn't seem like we even use this load factor anywhere
     phi_deg = 30  # Bank angle in degrees
     phi_rad = np.radians(phi_deg)
     n_load = 1 / np.cos(phi_rad) if banked else 1.0
@@ -2306,11 +2303,10 @@ def run_structure_analysis(
         shear_forces.insert(0, running_shear)
 
     # Compute shear stresses per section
-    # FIX FIX FIX SHEAR THICKNESS
     shear_stresses_per_section = []
     for (y, sec), Vz in zip(wing.sections, shear_forces):
         shear_stresses = sec.shear_stress(
-            Vz=Vz, thickness=0.002
+            Vz=Vz, thickness=shear_thickness
         )  # adjust thickness if needed
         shear_stresses_per_section.append(shear_stresses)
 
@@ -2336,7 +2332,7 @@ def run_structure_analysis(
     vertical_deflections = wing.compute_vertical_deflections(total_vertical_load)
     # wing.plot_deformed_wing(vertical_deflections)
 
-    # Tail Creation - CHANGE VALUES !!!!!!!!!! --- !!!!!!!!!!!
+    # Tail Creation - CHANGE VALUES !!!!!!!!!! --- !!!!!!!!!!! FIX FIX FIX
 
     horiz_span = 0.6
     horiz_chord = 0.15
@@ -2482,12 +2478,11 @@ def run_structure_analysis(
         weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
 
         # --- WING SIZING ---
-        # FIX FIX FIX SHEAR THICKNESS
         min_wing_mass, wing_scale = size_wing_for_min_mass(
             wing,
             lift_per_section,
             weight_per_section,
-            shear_thickness=0.002,
+            shear_thickness=shear_thickness,
             safety_factor=SAFETY_FACTOR,
             wing_point_loads=wing_point_loads_mode,
         )
@@ -2497,18 +2492,17 @@ def run_structure_analysis(
                 boom.area = orig_area
 
         # --- TAIL SIZING ---
-        # FIX FIX FIX SHEAR THICKNESS
         min_tail_mass, tail_scale = size_tail_for_min_mass(
             tail,
             horiz_loads,
             vert_loads,
-            shear_thickness=0.002,
+            shear_thickness=shear_thickness,
             safety_factor=SAFETY_FACTOR,
             area_scale_start=3.0,
             area_scale_step=0.02,
             min_scale=0.01,
             max_iter=200,
-            min_boom_area=1e-5,
+            min_boom_area=min_boom_area,
         )
         # Restore original boom areas for tail (optional, for next mode)
         for orig_areas, (_, section) in zip(
@@ -2552,18 +2546,17 @@ def run_structure_analysis(
         # print(f"[INFO] Fuselage dimensions (case {fuselage_case}): width={fuselage_width:.3f} m, height={fuselage_height:.3f} m, length={fuselage_length:.3f} m")
         # print(f"[INFO] Fuselage initial structural mass: {fuselage.mass():.3f} kg")
 
-        # FIX FIX FIX SHEAR THICKNESS
         min_fuselage_mass, fuselage_scale = size_fuselage_for_min_mass(
             fuselage,
             distributed_loads=fuselage_weight_per_section,
-            shear_thickness=0.002,
+            shear_thickness=shear_thickness,
             safety_factor=SAFETY_FACTOR,
             area_scale_start=3.0,
             area_scale_step=0.02,
             min_scale=0.01,
             max_iter=200,
             fuselage_point_loads=all_fuselage_point_loads_mode,
-            min_boom_area=1e-5,
+            min_boom_area=min_boom_area,
         )
         # Restore original boom areas for fuselage
         for orig_areas, (_, section) in zip(original_fuselage_areas, fuselage.sections):
@@ -2583,6 +2576,7 @@ def run_structure_analysis(
 
     wing_critical_mode = max(results, key=lambda m: results[m]["wing_mass"])
     fuselage_critical_mode = max(results, key=lambda m: results[m]["fuselage_mass"])
+    tail_critical_mode = max(results, key=lambda m: results[m]["tail_mass"])
 
     print("\n=== STRUCTURE SIZING SUMMARY ===")
     print(
@@ -2591,7 +2585,7 @@ def run_structure_analysis(
     print(
         f"Fuselage: Critical mode is '{fuselage_critical_mode}' with mass {results[fuselage_critical_mode]['fuselage_mass']:.2f} kg"
     )
-    print(f"Tail: Mass {results[fuselage_critical_mode]['tail_mass']:.2f} kg")
+    print(f"Tail: Mass {results[tail_critical_mode]['tail_mass']:.2f} kg")
     print("==============================\n")
 
     # --- Store critical mode variables for further use ---
@@ -2599,6 +2593,8 @@ def run_structure_analysis(
     wing_critical_scale = results[wing_critical_mode]["wing_scale"]
     fuselage_critical_mass = results[fuselage_critical_mode]["fuselage_mass"]
     fuselage_critical_scale = results[fuselage_critical_mode]["fuselage_scale"]
+    tail_critical_mass = results[tail_critical_mode]["tail_mass"]
+    tail_critical_scale = results[tail_critical_mode]["tail_scale"]
 
     # Example: print or use these variables
     print(f"Wing critical scale: {wing_critical_scale:.2f}")
@@ -2790,4 +2786,4 @@ def run_structure_analysis(
                 ]
             )
 
-    return None
+    return wing_critical_mass, fuselage_critical_mass, tail_critical_mass

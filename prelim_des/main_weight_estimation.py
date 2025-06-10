@@ -58,4 +58,5 @@ drone.wing.plot_planform(save_plot=True)
 #             drone, prop_connection=prop_connection, fuselage_case=fuselage_case
 #         )
 
-run_structure_analysis(drone, "fuselage", fuselage_case=1)
+
+run_structure_analysis(drone, "fuselage", fuselage_case=2)
