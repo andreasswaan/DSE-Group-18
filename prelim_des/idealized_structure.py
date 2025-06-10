@@ -1868,6 +1868,7 @@ def run_structure_analysis(
     # (Copy everything from the current if __name__ == "__main__": block here)
 
     # Create root cross-section
+    # FIX THIS -> call correct values
     root_section = create_rectangular_section(
         width=0.6,
         height=0.072,
@@ -2344,39 +2345,6 @@ def run_structure_analysis(
         vert_loads=vert_loads,
     )
 
-    # After computing tail loads (e.g., horiz_loads, vert_loads)
-    # Calculate total vertical force and moment at the root (x0, y0, z0)
-    tail_root_x = tail.x0
-    tail_root_y = 0.0
-    tail_root_z = tail.z0
-
-    # For horizontal tail (bending about z)
-    total_horiz_force = sum(horiz_loads)
-    moment_horiz = 0.0
-    for i, (pos, _) in enumerate(tail.horiz_sections):
-        arm = pos[1]  # y-position (spanwise)
-        moment_horiz += horiz_loads[i] * arm
-
-    # For vertical tail (bending about y)
-    total_vert_force = sum(vert_loads)
-    moment_vert = 0.0
-    for i, (pos, _) in enumerate(tail.vert_sections):
-        arm = pos[2]  # z-position (vertical)
-        moment_vert += vert_loads[i] * arm
-
-    # Add as point loads/moments to fuselage
-    tail_reaction_load = {
-        "x": tail_root_x,
-        "y": tail_root_y,
-        "z": tail_root_z,
-        "Pz": total_horiz_force,  # vertical force from horizontal tail
-        "My": moment_horiz,  # moment from horizontal tail
-        "Px": 0,
-        "Mz": moment_vert,  # moment from vertical tail
-    }
-    # Add tail_reaction_load to your fuselage point loads list
-    point_loads.append(tail_reaction_load)
-
     # --- SIZING FOR BOTH FLIGHT MODES ---
 
     results = {}
@@ -2406,6 +2374,39 @@ def run_structure_analysis(
                     "Pz": -wing_reaction,
                 },
             ]
+
+            # After computing tail loads (e.g., horiz_loads, vert_loads)
+            # Calculate total vertical force and moment at the root (x0, y0, z0)
+            tail_root_x = tail.x0
+            tail_root_y = 0.0
+            tail_root_z = tail.z0
+
+            # For horizontal tail (bending about z)
+            total_horiz_force = sum(horiz_loads)
+            moment_horiz = 0.0
+            for i, (pos, _) in enumerate(tail.horiz_sections):
+                arm = pos[1]  # y-position (spanwise)
+                moment_horiz += horiz_loads[i] * arm
+
+            # For vertical tail (bending about y)
+            total_vert_force = sum(vert_loads)
+            moment_vert = 0.0
+            for i, (pos, _) in enumerate(tail.vert_sections):
+                arm = pos[2]  # z-position (vertical)
+                moment_vert += vert_loads[i] * arm
+
+            # Add as point loads/moments to fuselage
+            tail_reaction_load = {
+                "x": tail_root_x,
+                "y": tail_root_y,
+                "z": tail_root_z,
+                "Pz": total_horiz_force,  # vertical force from horizontal tail
+                "My": moment_horiz,  # moment from horizontal tail
+                "Px": 0,
+                "Mz": moment_vert,  # moment from vertical tail
+            }
+            # Add tail_reaction_load to your fuselage point loads list
+            point_loads.append(tail_reaction_load)
         elif flight_mode == "vtol":
             # All lift from propellers, no aerodynamic lift
             lift_per_section = [0.0 for _ in wing.sections]
