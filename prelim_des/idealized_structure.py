@@ -2333,6 +2333,8 @@ def run_structure_analysis(
         x0=1.1 * fuselage_length,  # example: place at rear of fuselage
         z0=0.0,
     )
+    
+    arrow_scale = 0.01
 
     vert_half_idx = tail.n_sections // 2
     z_half = tail.vert_sections[vert_half_idx][0][2]
