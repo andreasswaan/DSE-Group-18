@@ -1313,6 +1313,7 @@ class TailStructure:
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
+        ax.view_init(azim=210)
 
         # Combine all stresses for color normalization
         all_stresses = [s for sec in horiz_stresses_per_section for s in sec] + [
@@ -1395,6 +1396,14 @@ class TailStructure:
         mappable.set_array(all_stresses)
         cbar = plt.colorbar(mappable, ax=ax, pad=0.1)
         cbar.set_label("Bending Stress [Pa]")
+        
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
+        ax.zaxis.set_major_locator(ticker.MaxNLocator(4))
+
+        ax.set_xlim(0.5, 1.5)
+        ax.set_ylim(-0.5, 0.5)
+        ax.set_zlim(-0.1, 0.3)
 
         plt.tight_layout()
         plt.show()
@@ -2325,6 +2334,8 @@ def run_structure_analysis(
         x0=1.1 * fuselage_length,  # example: place at rear of fuselage
         z0=0.0,
     )
+    
+    arrow_scale = 0.01
 
     vert_half_idx = tail.n_sections // 2
     z_half = tail.vert_sections[vert_half_idx][0][2]
