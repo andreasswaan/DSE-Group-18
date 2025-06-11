@@ -95,6 +95,8 @@ class Drone(Point):
         self.state = 'idle'  # state of the drone, can be 'idle', 'charging', 'delivering', etc.
         self.load = 0  # current load of the drone, in number of pizzas
         self.restaurant_order_nodes = []  # list of restaurant order nodes, used for mission planning
+        self.path = []  # list of points in the path, used for plotting
+        self.movement_path = []  # list of points in the path, used for movement
         # define static characteristics
 
         super().__init__(self.depot.xpos, self.depot.ypos)
@@ -491,11 +493,11 @@ def animate_simulation(sim, steps=100, interval=200):
     silent_zone_overlay[silent_zone_mask] = [0.2, 0.2, 0.2, 1]
     ax.imshow(silent_zone_overlay, origin='lower')
 
-    scat_orders = ax.scatter([], [], c='cyan', label='Orders', s=30)
+    scat_orders = ax.scatter([], [], c='cyan', label='Orders', s=20)
     scat_restaurants = ax.scatter(
         [r.xpos for r in city.restaurants],
         [r.ypos for r in city.restaurants],
-        c='blue', marker='s', label='Restaurants', s=30
+        c='blue', marker='s', label='Restaurants', s=20, edgecolors=''
     )
     scat_depots = ax.scatter(
         [d.xpos for d in city.depots],
@@ -572,7 +574,7 @@ def animate_simulation(sim, steps=100, interval=200):
     plt.show()
 n_steps = int(constants.time_window / my_sim.dt)
 my_sim.change_order_volume(0.01)
-animate_simulation(my_sim, n_steps, interval=10)
+animate_simulation(my_sim, n_steps, interval=20)
 for i in range(n_steps):
    my_sim.take_step()
 print(my_sim.financial_model.calculate_revenue())
