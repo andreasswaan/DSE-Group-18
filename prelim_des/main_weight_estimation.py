@@ -30,7 +30,7 @@ drone.class_2_weight_estimate(transition=True)
 # print("Drone MTOW after class 2 estimate:", drone.MTOW)
 # print("Drone OEW after class 2 estimate:", drone.OEW)
 
-drone.iterative_weight_estimate(transition=True, plot=False, max_iterations=100, tolerance=0.01)
+drone.iterative_weight_estimate(transition=True, plot=False, max_iterations=100, tolerance=0.001)
 if print:
     print("Drone MTOW after iterative estimate:", drone.MTOW)
     print("Drone mass breakdown:", 
