@@ -160,3 +160,13 @@ class Aerodynamics:
         V_max = toml["config"]["mission"]["max_velocity"]
         L_total = float(self.drone.aero.lift(V_max, CL_cruise))  # Total lift at max velocity
         return (4 * L_total / (np.pi * b)) * np.sqrt(1 - (2 * y / b) ** 2)
+    
+    def constant_drag_distribution(self) -> float:
+        """
+        Returns drag per unit span (N/m) at spanwise position y.
+        Assumes constant drag distribution along the wing.
+        """
+        b = float(self.drone.wing.span)
+        D_total = float(self.drone.aero.drag(toml["config"]["mission"]["max_velocity"]))
+
+        return D_total / (b / 2)  # Divide by half-span (modelling half wing)

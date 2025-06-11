@@ -51,19 +51,10 @@ materials = load_materials(toml)
 #     return W_total / (b / 2)  # Divide by half-span (modelling half wing)
 
 
-def constant_drag_distribution(drone: Drone) -> float:
-    """
-    Returns drag per unit span (N/m) at spanwise position y.
-    Assumes constant drag distribution along the wing.
-    """
-    b = float(drone.wing.span)
-    D_total = float(drone.aero.drag(toml["config"]["mission"]["max_velocity"]))
 
-    return D_total / (b / 2)  # Divide by half-span (modelling half wing)
 
 
 # === STRUCTURAL CLASSES ===
-
 
 class Boom:
     def __init__(
@@ -2348,7 +2339,7 @@ def run_structure_analysis(
         ]
         weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
         drag_per_section = [
-            constant_drag_distribution(drone) * dy for y, _ in wing.sections
+            drone.aero.constant_drag_distribution() * dy for y, _ in wing.sections
         ]
 
         # Calculate total forces on the wing
@@ -2812,7 +2803,7 @@ def run_structure_analysis(
         stresses_per_section_plot.append(stresses)
 
     drag_per_section_plot = [
-        constant_drag_distribution(drone) * dy for y, _ in wing.sections
+        drone.aero.constant_drag_distribution() * dy for y, _ in wing.sections
     ]
 
     # --- Compute a global arrow scale for all plots ---
