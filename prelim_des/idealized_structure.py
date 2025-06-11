@@ -2003,9 +2003,9 @@ class StructuralAnalysis:
             wing_point_loads=self.wing_point_loads_cruise,
         )
         
-        wing_weight = np.max([min_wing_mass_cruise,min_wing_mass_vtol])
-        self.wing_weight = wing_weight *2
-        return wing_weight
+        wing_weight = np.max([min_wing_mass_cruise,min_wing_mass_vtol])*2
+        self.wing_weight = wing_weight 
+        return wing_weight 
 
 def run_structure_analysis(
     drone: Drone,
