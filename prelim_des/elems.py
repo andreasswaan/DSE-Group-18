@@ -157,7 +157,7 @@ class Wing:
         wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
             self.drone, "fuselage", fuselage_case=2
         )
-        return wing_mass
+        return wing_mass + weight_folding
 
     def plot_planform(self, save_plot=False, filename="wing_planform.png"):
         """
@@ -296,7 +296,7 @@ class Fuselage:
         wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
             self.drone, "fuselage", fuselage_case=2
         )
-        return fuselage_mass
+        return fuselage_mass + self.drone.structure.delivery_mechanism_weight()
 
 
 class LandingGear:

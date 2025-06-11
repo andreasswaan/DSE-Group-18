@@ -1,11 +1,17 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from matplotlib import cm
+import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
-from prelim_des.drone import Drone
 
 # === CONFIG & MATERIALS ===
 
@@ -967,9 +973,6 @@ class WingStructure:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
 
-        from matplotlib import cm
-        import matplotlib.colors as mcolors
-
         # --- Flatten all stresses for color normalization ---
         all_stresses = [
             stress
@@ -1900,6 +1903,7 @@ def run_structure_analysis(
     # prop_connection: "wing" or "fuselage"
     fuselage_case=2,  # or 2, (1 for chubby, 2 for elongated fuselage)
     banked=False,  # Set to False for normal cruise, True for banked case
+    plot=False,
 ):
     # FIX FIX FIX, those values are educated guesses, but what values should they have? These might be correct
     SAFETY_FACTOR = 2.0
@@ -2384,7 +2388,8 @@ def run_structure_analysis(
     horiz_loads[-1] = 50.0  # 50 N at right tip
 
     h_stress, v_stress = tail.compute_bending_stresses(horiz_loads, vert_loads)
-    tail.plot_3d_tail(
+    if plot:
+        tail.plot_3d_tail(
         h_stress,
         v_stress,
         arrow_scale=arrow_scale,
@@ -2658,14 +2663,15 @@ def run_structure_analysis(
     arrow_scale = max(all_loads) / 0.1 if all_loads and max(all_loads) != 0 else 1.0
 
     # Plot the critical wing case
-    wing.plot_3d_wing(
-        stresses_per_section_plot,
-        lift_per_section=lift_per_section_plot,
-        weight_per_section=weight_per_section_plot,
-        point_loads=wing_point_loads_plot,
-        drag_per_section=drag_per_section_plot,
-        arrow_scale=arrow_scale,
-    )
+    if plot:
+        wing.plot_3d_wing(
+            stresses_per_section_plot,
+            lift_per_section=lift_per_section_plot,
+            weight_per_section=weight_per_section_plot,
+            point_loads=wing_point_loads_plot,
+            drag_per_section=drag_per_section_plot,
+            arrow_scale=arrow_scale,
+        )
 
     # --- Prepare and plot the critical case for the FUSELAGE ---
     if fuselage_critical_mode == "cruise":
@@ -2685,12 +2691,13 @@ def run_structure_analysis(
     )
 
     # Plot the critical fuselage case
-    fuselage.plot_3d_fuselage(
-        fuselage_stresses_per_section_plot,
-        point_loads=all_fuselage_point_loads_plot,
-        weight_per_section=fuselage_weight_per_section,
-        arrow_scale=arrow_scale,
-    )
+    if plot:
+        fuselage.plot_3d_fuselage(
+            fuselage_stresses_per_section_plot,
+            point_loads=all_fuselage_point_loads_plot,
+            weight_per_section=fuselage_weight_per_section,
+            arrow_scale=arrow_scale,
+        )
 
     """
     critical = find_critical_stress(

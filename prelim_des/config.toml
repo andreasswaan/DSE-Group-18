@@ -17,8 +17,11 @@ CL_slope_aircraft = 5.7                   # [1/rad]
 
 [config.mission]
 
-cruise_speed = 15                         # m/s
+cruise_speed = 14                         # m/s
 cruise_height = 200                       # ft
+transition_height = 60                    # ft
+transition_energy = 22380                 # [J]
+default_transition_MTOW = 10              # [kg]
 max_velocity = 20                         # m/s
 
 [config.mission.loitering_times]
@@ -58,7 +61,7 @@ wing_span = 3.0                           # m
 quarter_chord_sweep = 0                   # deg
 thickness_over_chord = 0.18               # -
 dihedral = 1                              # deg
-wing_folding_weight = 0.6                 # kg
+wing_folding_weight = 0.5                 # kg
 
 #-----------------------------------------------------------------------------------------------------------------------
 
@@ -89,7 +92,7 @@ box_length = 0.45                         # m
 n_pax = 0                                 # people
 box_weight = 0.5                          # kg
 n_box = 5                                 # -
-del_mech_weight = 0.8                     # kg
+del_mech_weight = 1.5                     # kg
 pizza_diameter = 0.42                     # m
 static_friction_coeff = 0.4               # -, for cardboard to cardboard, lower is more conservative
 #-----------------------------------------------------------------------------------------------------------------------

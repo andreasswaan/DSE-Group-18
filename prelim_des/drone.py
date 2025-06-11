@@ -43,7 +43,8 @@ class Drone:
         self.max_payload = (
             toml["config"]["payload"]["n_box"] * toml["config"]["payload"]["box_weight"]
         )
-        self.MTOW = get_MTOW_from_payload(self.max_payload)
+        design_payload = self.structure.delivery_mechanism_weight() + self.max_payload
+        self.MTOW = get_MTOW_from_payload(design_payload)
         self.OEW = self.MTOW - self.max_payload
         if self.OEW <= 0:
             logging.error(
@@ -54,7 +55,7 @@ class Drone:
             )
         return self.MTOW, self.OEW
 
-    def class_2_weight_estimate(self):
+    def class_2_weight_estimate(self, transition=False):
         """
         Estimate the weight of the drone using a class 2 weight estimate.
         """
@@ -66,7 +67,7 @@ class Drone:
                 "Wing area (S) must be defined before performing class 2 weight estimate."
             )
 
-        mission_energy = self.perf.mission_energy()
+        mission_energy = self.perf.mission_energy(transition)
         self.OEW = (
             self.wing.weight()
             + self.fuselage.weight()
@@ -94,9 +95,9 @@ class Drone:
             else "Propeller Weight: Not available"
         )
         print(
-            f"Component Weights: Wing = {self.wing.weight()[0]:.2f} kg, "
-            f"Fuselage = {self.fuselage.weight()[0]:.5f} kg, "
-            f"Landing Gear = {self.landing_gear.weight()[0]:.2f} kg, "
+            f"Component Weights: Wing = {self.wing.weight():.2f} kg, "
+            f"Fuselage = {self.fuselage.weight():.2f} kg, "
+            f"Landing Gear = {float(self.landing_gear.weight()):.2f} kg, "
             f"Propulsion = {self.propulsion.weight(mission_energy)[0]:.2f} kg"
         )
 
@@ -110,7 +111,7 @@ class Drone:
 
         return self.MTOW, self.OEW
 
-    def iterative_weight_estimate(self, max_iterations=100, tolerance=0.01, plot=False):
+    def iterative_weight_estimate(self, transition=False, max_iterations=100, tolerance=0.01, plot=False):
         """
         Perform an iterative weight estimate until convergence.
         """
@@ -126,7 +127,7 @@ class Drone:
         S_history = [self.wing.S]
         for i in range(max_iterations):
             MTOW_prev = self.MTOW
-            self.class_2_weight_estimate()
+            self.class_2_weight_estimate(transition)
             mtow_history.append(self.MTOW)
             self.wing.S = self.perf.wing_area(self.MTOW)
             S_history.append(self.wing.S)
