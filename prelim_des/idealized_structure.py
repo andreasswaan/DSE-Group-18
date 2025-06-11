@@ -1821,6 +1821,7 @@ class StructuralAnalysis:
         self.SAFETY_FACTOR = toml["config"]["structures"]["SAFETY_FACTOR"]
         self.shear_thickness = toml["config"]["structures"]["shear_thickness"]
         self.min_boom_area = toml["config"]["structures"]["min_boom_area"]
+        self.ratio_width_box_to_root_chord = toml["config"]["structures"]["ratio_width_box_to_root_chord"]
         self.fuselage_case = fuselage_case
         self.prop_connection = prop_connection
         (
@@ -1859,7 +1860,7 @@ class StructuralAnalysis:
     @property
     def fuselage_root_section(self):
         return create_rectangular_section(
-            width=float(self.drone.wing.c_root), #Assumption
+            width=float(self.drone.wing.c_root)*self.ratio_width_box_to_root_chord, #Assumption
             height=float(
                 self.drone.wing.thick_over_chord * self.drone.wing.chord(y=0.0)
             ),
@@ -2426,8 +2427,7 @@ def run_structure_analysis(
     # wing.plot_deformed_wing(vertical_deflections)
 
     # Tail Creation - CHANGE VALUES !!!!!!!!!! --- !!!!!!!!!!! FIX FIX FIX
-    
-    _, _, _, b_h, c_h_small, c_h_big, b_v, c_v_small, c_v_big = 
+ 
 
     horiz_span = 0.6
     horiz_chord = 0.15
