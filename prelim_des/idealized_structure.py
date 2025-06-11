@@ -18,6 +18,7 @@ from prelim_des.utils.import_toml import load_toml
 
 from prelim_des.utils.load_materials import load_materials
 from prelim_des.utils.import_toml import load_toml
+from structure import Boom
 
 
 # === CONFIG & MATERIALS ===
@@ -56,37 +57,7 @@ materials = load_materials(toml)
 
 # === STRUCTURAL CLASSES ===
 
-class Boom:
-    def __init__(
-        self,
-        x: float,
-        y: float,
-        area: float,
-        material: Material | None = None,
-        material_name: str = None,
-        materials: dict[str, Material] = None,
-        boom_type="regular",
-    ):
-        self.x = x  # [m]
-        self.y = y  # [m]
-        self.area = area  # [m^2]
-        self.type = boom_type
 
-        if material:  # Use direct material object
-            self.material = material
-        elif material_name and materials:  # Look up from dictionary
-            if material_name not in materials:
-                raise ValueError(
-                    f"Material '{material_name}' not found in materials dictionary."
-                )
-            self.material = materials[material_name]
-        else:
-            raise ValueError(
-                "You must specify either a `material` or `material_name` with `materials` dictionary."
-            )
-
-    def __repr__(self):
-        return f"Boom({self.x:.2f}, {self.y:.2f}, A={self.area}, Type={self.type}, Material={self.material.name})"
 
 
 class IdealizedSection:
