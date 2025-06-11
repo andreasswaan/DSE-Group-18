@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import scipy.stats as stats
 import copy
@@ -189,6 +190,19 @@ class Drone(Point):
             self.available_time = self.simulation.timestamp + self.target.waiting_time
         #self.target = self.get_target()
         self.state = 'waiting'
+        
+    def calculate_path(self):
+        
+        minimum_turn_radius = 70 # [m]
+        map_resolution = 10 # [m]
+        conversion_factor = minimum_turn_radius / map_resolution
+        
+        idx_start = [self.xpos // conversion_factor, self.ypos // conversion_factor]
+        idx_target = [self.target.xpos // conversion_factor, self.target.ypos // conversion_factor]
+        
+        # path = MP.get_path(idx_start, idx_target)
+        
+        
 
 
 class Depot(Point):
@@ -212,28 +226,32 @@ class City:
         self.silent_zones = city_dict['silent_zones']
         self.population = city_dict['population']
 
-        self.reso = 100
-        self.map = np.zeros((self.reso, self.reso, 5))
-        # 100 x 100 2d map, 4 pieces of info at each coordinate - restaurant, depot, tall building, silent zone
+        # Use bounds from population data to set the resolution
+        max_x = max([cell['xpos'] for cell in self.population]) + 1
+        max_y = max([cell['ypos'] for cell in self.population]) + 1
+        
+        self.map = np.zeros((max_x, max_y, 4))
+        # 3 pieces of info at each coordinate - restaurant, depot, silent zone
         # each coordinate corresponds to a 1x1 square in the city
-        self.map[:, :, 0] = self.population / (self.reso * self.reso)
+        for population_cell in self.population:
+            self.map[population_cell['xpos'], population_cell['ypos'], 0] = population_cell['value']
+        # self.map[:, :, 0] = self.population
         for restaurant in self.restaurants: 
             self.map[restaurant.xpos, restaurant.ypos, 1] = 1
         for depot in self.depots:
             self.map[depot.xpos, depot.ypos, 2] = 1
-        for tall_building in self.tall_buildings:
-            self.map[tall_building.xpos, tall_building.ypos, 3] = tall_building.height
         for silent_zone in self.silent_zones:
-            self.map[silent_zone.xpos, silent_zone.ypos, 4] = 1
+            self.map[silent_zone.xpos, silent_zone.ypos, 3] = 1
         
         self.population_density = self.map[:, :, 0]
+        
     
     def generate_order_location(self):
         weights = self.population_density.flatten()
         weights /= np.sum(weights)
-        index = np.random.choice(np.arange(self.reso * self.reso), p=weights)
-        x = index % self.reso
-        y = index // self.reso
+        index = np.random.choice(np.arange(self.map.shape[0] * self.map.shape[1]), p=weights)
+        x = index // self.map.shape[1]
+        y = index % self.map.shape[1]
         return x, y
     
     def reset(self):
@@ -325,61 +343,33 @@ class Simulation:
         order_time = int(np.round(order_time / 300) * 300)
         return order_time
     
+    
+# Helper functions
+def load_city_data_from_json(filename):
+    """
+    Loads city_name, population, restaurants, and silent_zones from a JSON city grid file.
+    Returns: city_name, population (as np.array), restaurants (list), silent_zones (list)
+    """
+    with open(filename, 'r') as f:
+        city_dict = json.load(f)
+    city_name = city_dict['city_name']
+    population = np.array(city_dict['population'])
+    restaurants = city_dict['restaurants']
+    silent_zones = city_dict['silent_zones']
+    return city_name, population, restaurants, silent_zones
+
 
  
 # -------- SIMULATION SETUP --------
 
-city_name = 'Delft'   
-pop_dens_df, restaurants_df, no_fly_zones_df = create_city_data(city_name)
-min_x, min_y, max_x, max_y = pop_dens_df.total_bounds
-
-# Target grid resolution
-reso = 100
-meters_per_pixel = (max_x - min_x) / reso
-
-# Compute scaling factors
-x_scale = reso / (max_x - min_x)
-print(f"x_scale: {x_scale}")
-y_scale = reso / (max_y - min_y)
-
-# Shift and scale population polygons
-pop_dens_df = pop_dens_df.copy()
-pop_dens_df['geometry'] = pop_dens_df['geometry'].translate(-min_x, -min_y)
-pop_dens_df['geometry'] = pop_dens_df['geometry'].scale(xfact=x_scale, yfact=y_scale, origin=(0, 0))
-
-# Shift and scale restaurant and no-fly zone coordinates (if RD columns exist)
-restaurants_df = restaurants_df.copy()
-if 'rd_x' in restaurants_df.columns and 'rd_y' in restaurants_df.columns:
-    restaurants_df['x'] = np.round((restaurants_df['rd_x'] - min_x) * x_scale).astype(int)
-    restaurants_df['y'] = np.round((restaurants_df['rd_y'] - min_y) * y_scale).astype(int)
-
-no_fly_zones_df = no_fly_zones_df.copy()
-if 'rd_x' in no_fly_zones_df.columns and 'rd_y' in no_fly_zones_df.columns:
-    no_fly_zones_df['x'] = np.round((no_fly_zones_df['rd_x'] - min_x) * x_scale).astype(int)
-    no_fly_zones_df['y'] = np.round((no_fly_zones_df['rd_y'] - min_y) * y_scale).astype(int)
-# buffer No fly zones to take up a 50m radius
-n_boxes = 50/ meters_per_pixel / 2  # number of pixels to buffer
-# make the surrounding n_boxes in each direction also no fly zones
-
-
-# Create restaurant objects
-restaurant_dict = []
-
-# iterate through each row of the dataframe and create a Restaurant object
-restaurants = restaurants_df.to_dict(orient='records')
-
-for i, restaurant in enumerate(restaurants):
-    print(restaurant)
-    restaurant_dict.append({
-        'xpos': restaurant['x'],
-        'ypos': restaurant['y'],
-        'restaurant_id': i,
-        'name': restaurant['name'],
-        'mean_nr_orders': 400,  # Placeholder value
-        'mean_order_size': {'small': 0, 'medium': 3, 'large': 0}  # Placeholder value
-    })
+city_name, population_dict, restaurant_dict, silent_zones_dict = \
+load_city_data_from_json("temporary_files/operations/delft_city_grid_10_test.json")
+    
 restaurants = [Restaurant(r) for r in restaurant_dict]
-        
+
+# make each silent zone a point object:
+silent_zones = [Point(s['xpos'], s['ypos']) for s in silent_zones_dict if s.get('value')]
+
 # Create depot objects
 depot_dict = [{
 'depot_id': 0,
@@ -388,8 +378,8 @@ depot_dict = [{
 'capacity': 10,
 }, {
 'depot_id': 1,
-'xpos': 90,
-'ypos': 80,
+'xpos': 35,
+'ypos': 35,
 'capacity': 10,
 }]
 
@@ -407,34 +397,44 @@ city_dict = {
     'restaurants': restaurants,
     'depots': depots,
     'tall_buildings': [],  # Placeholder, can be populated later
-    'silent_zones': [],  # Assuming no_fly_zones is a list of Point objects
-    'population': 10000  # Placeholder value
+    'silent_zones': silent_zones,
+    'population': population_dict
 }
 
 my_sim = Simulation(
     city=City(city_dict),
     logger=Logger()
 )
+        
 
+# -------- SIMULATION ANIMATION --------
 
 def animate_simulation(sim, steps=100, interval=200):
     city = sim.city
     fig, ax = plt.subplots(figsize=(6, 6))
-    im = ax.imshow(city.map[:, :, 0], cmap='Greys', alpha=0.3, origin='lower')
-    scat_orders = ax.scatter([], [], c='red', label='Orders', s=30)
+    im = ax.imshow(city.map[:, :, 0].T, cmap='YlOrRd', alpha=1, origin='lower')
+
+    # Show silent zones as dark gray where silent zone is true
+    silent_zone_mask = city.map[:, :, 3].T > 0  # Transpose to match imshow orientation
+    # Create an RGBA mask: dark gray with alpha where silent zone is present, transparent elsewhere
+    silent_zone_overlay = np.zeros((city.map.shape[1], city.map.shape[0], 4))  # (y, x, 4)
+    silent_zone_overlay[silent_zone_mask] = [0.2, 0.2, 0.2, 1]  # RGBA for dark gray
+    ax.imshow(silent_zone_overlay, origin='lower')
+
+    scat_orders = ax.scatter([], [], c='cyan', label='Orders', s=30)
     scat_restaurants = ax.scatter(
         [r.xpos for r in city.restaurants],
         [r.ypos for r in city.restaurants],
-        c='blue', marker='s', label='Restaurants', s=60
+        c='blue', marker='s', label='Restaurants', s=30
     )
     scat_depots = ax.scatter(
         [d.xpos for d in city.depots],
         [d.ypos for d in city.depots],
-        c='green', marker='^', label='Depots', s=60
+        c='green', marker='^', label='Depots', s=30
     )
-    scat_drones = ax.scatter([], [], c='orange', label='Drones', s=40, marker='o')
-    ax.set_xlim(0, city.reso)
-    ax.set_ylim(0, city.reso)
+    scat_drones = ax.scatter([], [], c='orange', label='Drones', s=20, marker='o')
+    ax.set_xlim(0, city.map.shape[0])
+    ax.set_ylim(0, city.map.shape[1])
     ax.legend(loc='upper right')
     title_text = ax.text(0.5, 1.01, '', transform=ax.transAxes, ha='center', va='bottom', fontsize=12)
 
@@ -486,8 +486,8 @@ def animate_simulation(sim, steps=100, interval=200):
     )
     plt.show()
 n_steps = int(constants.time_window / my_sim.dt)
-my_sim.change_order_volume(3)
+my_sim.change_order_volume(0.1)
 animate_simulation(my_sim, n_steps, interval=10)
-#for i in range(n_steps):
-#    my_sim.take_step()
+for i in range(n_steps):
+   my_sim.take_step()
 print(my_sim.financial_model.calculate_revenue())
