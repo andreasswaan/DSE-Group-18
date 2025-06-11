@@ -156,6 +156,7 @@ mat_delta_y_2 = 180                         # MPa (Flexural)
 SAFETY_FACTOR = 1.5
 shear_thickness = 0.002
 min_boom_area=1e-5
+ratio_width_box_to_root_chord = 0.5
 #-----------------------------------------------------------------------------------------------------------------------
 
 [config.horizontal_sc]

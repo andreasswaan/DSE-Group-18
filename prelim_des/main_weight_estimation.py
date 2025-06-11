@@ -81,4 +81,8 @@ if print:
 #         )
 
 
+<<<<<<< HEAD
 # run_structure_analysis(drone, "fuselage", fuselage_case=2, plot=False, PRINT=True)
+=======
+run_structure_analysis(drone, "fuselage", fuselage_case=2, plot=False, PRINT=True)
+>>>>>>> 5012abc6d8ad2bba53600fa8baa6d803407701f2
