@@ -37,6 +37,7 @@ class Drone:
         self.structure = Structure(self)
         self.propulsion = PropulsionSystem(self)
         self.structural_analysis = StructuralAnalysis(self,2,"wing")
+        self.sensor_mass = toml["config"]["sensors"]["mass"]
 
     def class_1_weight_estimate(self):
         """
@@ -58,7 +59,7 @@ class Drone:
             )
         return self.MTOW, self.OEW
 
-    def class_2_weight_estimate(self, transition=False, print=False):
+    def class_2_weight_estimate(self, transition=False, PRINT=False):
         """
         Estimate the weight of the drone using a class 2 weight estimate.
         """
@@ -72,11 +73,12 @@ class Drone:
 
         mission_energy = self.perf.mission_energy(transition)
         self.OEW = (
-            self.wing.calc_weight
+            self.wing.calc_weight()
             + self.fuselage.calc_weight
             + self.tail.calc_weight
             + self.landing_gear.calc_weight
             + self.propulsion.weight(mission_energy)
+            + self.sensor_mass
         )
         if print:
             print(
@@ -117,7 +119,7 @@ class Drone:
         return self.MTOW, self.OEW
 
     def iterative_weight_estimate(
-        self, transition=False, max_iterations=100, tolerance=0.01, plot=False
+        self, transition=False, max_iterations=100, tolerance=0.01, plot=False, PRINT=False
     ):
         """
         Perform an iterative weight estimate until convergence.
@@ -134,7 +136,7 @@ class Drone:
         S_history = [self.wing.S]
         for i in range(max_iterations):
             MTOW_prev = self.MTOW
-            self.class_2_weight_estimate(transition)
+            self.class_2_weight_estimate(transition, PRINT=PRINT)
             mtow_history.append(self.MTOW)
             self.wing.S = self.perf.wing_area(self.MTOW)
             S_history.append(self.wing.S)

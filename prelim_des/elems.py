@@ -160,7 +160,6 @@ class Wing:
         )
         return roskam_w
 
-    @property
     def calc_weight(self):
         mass_folding = toml["config"]["wing"]["wing_folding_weight"]
 
