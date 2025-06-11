@@ -187,3 +187,4 @@ cython_debug/
 
 # PyCharm temp files
 .idea
+wing_sections.csv

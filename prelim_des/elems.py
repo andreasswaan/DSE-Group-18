@@ -318,7 +318,7 @@ class LandingGear:
         logging.debug("Initializing LandingGear class...")
 
         self.drone = drone
-        # self.n_legs = toml["config"]["landing_gear"]["n_legs"]
+        self.n_legs = toml["config"]["landing_gear"]["n_legs"]
         # self.wheel_diameter = toml["config"]["landing_gear"]["wheel_diameter"]
         # self.wheel_width = toml["config"]["landing_gear"]["wheel_width"]
 
@@ -328,7 +328,7 @@ class LandingGear:
         # Placeholder: replace with real calculation
         return toml["config"]["landing_gear"]["shock_strut_length_MG"]
 
-    def weight(self):
+    def roskam_weight(self):
         """Estimate the landing gear weight using Cessna method from Roskam V:
         Placeholder method used: Update with better method once design is more clear.
         """
@@ -348,6 +348,12 @@ class LandingGear:
             0.013 * ImperialConverter.mass_kg_lbs(self.drone.MTOW)
             + +ImperialConverter.mass_kg_lbs(wheel_tire_assembly_weight)
         )
+        
+    def weight(self):
+        
+        weight_per_leg = 0.017
+        
+        return self.n_legs * weight_per_leg
 
 class Tail_Hori_Veri:
     def __init__(self, drone: Drone):
