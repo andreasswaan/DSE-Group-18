@@ -1,11 +1,168 @@
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+import tomllib
+
+# from prelim_des.elems import Wing, Fuselage, LandingGear
+# from prelim_des.drone import Drone
+
+with open("prelim_des/config.toml", "rb") as f:
+    data = tomllib.load(f)
+
+# Structures Values
+W_fuselage = 15  # kg
+X_fuselage = 5  # m
+W_wing = 5  # kg
+L_fuselage = 10  # m
+S_wing = 10  # m^2, wing area
+Dxw = 0.2  # m , from LEMAC to wing CG
+
+# Aerodynamics Values
+Cl_alpha_h = 4  # tail Cl alpha
+Cl_alpha_tailless = 5  # no tail Cl alpha
+Cm_ac = -0.1  # ac moment constant
+Cl_h = -0.2  # tail cl
+Cl_tailless = 0.3  # tailess aircraft cl
+
+
+# MAIN
+def main_horizontal_stability(
+    W_fuselage,
+    X_fuselage,
+    W_wing,
+    L_fuselage,
+    mac,
+    Dxw,
+    Cl_alpha_h,
+    Cl_alpha_tailless,
+    Cm_ac,
+    Cl_h,
+    Cl_tailless,
+    S_wing,
+    drone: Drone,
+    graph=False,
+):
+    S_M = data["config"]["horizontal_sc"]["S_M"]  # safety margin
+    LEMAC_In = data["config"]["horizontal_sc"][
+        "LEMAC_In"
+    ]  # m, front limit of wing positioning
+    LEMAC_Out = data["config"]["horizontal_sc"][
+        "LEMAC_Out"
+    ]  # m, back limit of wing positioning
+    Vh_V = data["config"]["horizontal_sc"]["Vh_V"]
+    taper_ratio_tail = data["config"]["horizontal_sc"][
+        "taper_ratio_tail"
+    ]  # horizontal tail
+    Aspect_ratio_tail = data["config"]["horizontal_sc"][
+        "Aspect_ratio_tail"
+    ]  # horizontal tail
+    d_e_d_alpha = data["config"]["horizontal_sc"][
+        "d_e_d_alpha"
+    ]  # downwash effect something
+    mac = drone.wing.mac
+    X_ac = 0.25 * mac
+    Lh = L_fuselage
+    LEMAC_In = LEMAC_In * L_fuselage
+    LEMAC_Out = LEMAC_Out * L_fuselage
+
+    X_list, W_list, X_reverse, W_reverse = item_input_sort()
+
+    x_cg_start, x_cg_end, wing_position, tail_area_ratio = find_wing_position(
+        W_fuselage,
+        X_fuselage,
+        W_wing,
+        L_fuselage,
+        mac,
+        Dxw,
+        LEMAC_In,
+        LEMAC_Out,
+        S_M,
+        X_ac,
+        Cl_alpha_h,
+        Cl_alpha_tailless,
+        d_e_d_alpha,
+        Lh,
+        Vh_V,
+        Cm_ac,
+        Cl_h,
+        Cl_tailless,
+        X_list,
+        W_list,
+        X_reverse,
+        W_reverse,
+    )
+
+    # print("most infront x_cg:",x_cg_start,"\n","most back x_cg:",x_cg_end,"\n","wing position:",wing_position,"\n","tail_area_ratio:",tail_area_ratio,)
+    b, c_small, c_big = horizontal_tail_area_sizing(
+        tail_area_ratio, S_wing, taper_ratio_tail, Aspect_ratio_tail
+    )
+
+    # Extra initial values
+
+    X_LEMAC = wing_position
+    X_wing = X_LEMAC + Dxw  # m
+
+    if graph:
+        main_cg_range_with_graph(
+            W_fuselage,
+            X_fuselage,
+            W_wing,
+            X_wing,
+            X_LEMAC,
+            L_fuselage,
+            mac,
+            X_list,
+            W_list,
+            X_reverse,
+            W_reverse,
+        )
+        main_cg_range_with_wing_variation_with_plot(
+            W_fuselage,
+            X_fuselage,
+            W_wing,
+            L_fuselage,
+            mac,
+            Dxw,
+            LEMAC_In,
+            LEMAC_Out,
+            X_list,
+            W_list,
+            X_reverse,
+            W_reverse,
+        )
+
+        y_tail, x_stab, x_control = stab_cont_lines(
+            S_M,
+            mac,
+            X_ac,
+            Cl_alpha_h,
+            Cl_alpha_tailless,
+            d_e_d_alpha,
+            Lh,
+            Vh_V,
+            Cm_ac,
+            L_fuselage,
+            Cl_h,
+            Cl_tailless,
+            wing_position,
+        )
+        stab_cont_lines_plot(
+            y_tail, x_stab, x_control, x_cg_start, x_cg_end, tail_area_ratio
+        )
+    return x_cg_start, x_cg_end, wing_position, b, c_small, c_big
 
 
 # CG range graph
 def cg_shift(W_old, X_old, W_item, X_item):
     return W_old + W_item, (W_old * X_old + W_item * X_item) / (W_old + W_item)
+
+
+def horizontal_tail_area_sizing(area_ratio, S_wing, t, A):
+    S = S_wing * area_ratio
+    b = math.sqrt(S * A)
+    c_small = 2 * t / (1 + t) * math.sqrt(S / A)
+    c_big = 2 / (1 + t) * math.sqrt(S / A)
+    return b, c_small, c_big
 
 
 def item_input_sort():
@@ -180,8 +337,7 @@ def stab_cont_lines(
     Cl_alpha_tailless,
     d_e_d_alpha,
     Lh,
-    Vh,
-    V,
+    Vh_V,
     Cm_ac,
     L_fuselage,
     Cl_h,
@@ -195,7 +351,7 @@ def stab_cont_lines(
         x_c = (
             X_ac / mac
             - Cm_ac / Cl_tailless
-            + Cl_h / Cl_tailless * y_t * Lh / mac * (Vh / V) ** 2
+            + Cl_h / Cl_tailless * y_t * Lh / mac * (Vh_V) ** 2
         )
         x_control.append(x_c)
         x_s = (
@@ -206,7 +362,7 @@ def stab_cont_lines(
             * y_t
             * Lh
             / mac
-            * (Vh / V) ** 2
+            * (Vh_V) ** 2
             - S_M
         )
         x_stab.append(x_s)
@@ -244,8 +400,7 @@ def find_wing_position(
     Cl_alpha_tailless,
     d_e_d_alpha,
     Lh,
-    Vh,
-    V,
+    Vh_V,
     Cm_ac,
     Cl_h,
     Cl_tailless,
@@ -288,8 +443,7 @@ def find_wing_position(
             Cl_alpha_tailless,
             d_e_d_alpha,
             Lh,
-            Vh,
-            V,
+            Vh_V,
             Cm_ac,
             L_fuselage,
             Cl_h,
@@ -323,32 +477,7 @@ def find_wing_position(
     )
 
 
-# INITIAL VALUES
-W_fuselage = 15  # kg
-X_fuselage = 5  # m
-W_wing = 5  # kg
-L_fuselage = 10  # m
-mac = 2.5  # m
-Dxw = 0.2  # m , from LEMAC to wing CG
-LEMAC_In = 2  # m, front limit of wing positioning
-LEMAC_Out = 3  # m, back limit of wing positioning
-S_M = 0.05  # safety margin
-X_ac = 0.25 * mac  # m , ac position from lemac
-Cl_alpha_h = 4  # tail Cl alpha
-Cl_alpha_tailless = 5  # no tail Cl alpha
-d_e_d_alpha = 0.5  # downwash effect something
-Lh = L_fuselage  # tail arm
-Vh = 15  # tail stream velocity , m/s
-V = 15  # tail stream velocity, m/s
-Cm_ac = -0.1  # ac moment constant
-Cl_h = -0.2  # tail cl
-Cl_tailless = 0.3  # tailess aircraft cl
-
-# MAIN
-
-X_list, W_list, X_reverse, W_reverse = item_input_sort()
-
-x_cg_start, x_cg_end, wing_position, tail_area_ratio = find_wing_position(
+main_horizontal_stability(
     W_fuselage,
     X_fuselage,
     W_wing,
@@ -363,79 +492,12 @@ x_cg_start, x_cg_end, wing_position, tail_area_ratio = find_wing_position(
     Cl_alpha_tailless,
     d_e_d_alpha,
     Lh,
-    Vh,
-    V,
+    Vh_V,
     Cm_ac,
     Cl_h,
     Cl_tailless,
-    X_list,
-    W_list,
-    X_reverse,
-    W_reverse,
+    S_wing,
+    taper_ratio_tail,
+    Aspect_ratio_tail,
+    graph=True,
 )
-
-print(
-    "most infront x_cg:",
-    x_cg_start,
-    "\n",
-    "most back x_cg:",
-    x_cg_end,
-    "\n",
-    "wing position:",
-    wing_position,
-    "\n",
-    "tail_area_ratio:",
-    tail_area_ratio,
-)
-
-# Extra initial values
-
-X_LEMAC = wing_position
-X_wing = X_LEMAC + Dxw  # m
-
-
-main_cg_range_with_graph(
-    W_fuselage,
-    X_fuselage,
-    W_wing,
-    X_wing,
-    X_LEMAC,
-    L_fuselage,
-    mac,
-    X_list,
-    W_list,
-    X_reverse,
-    W_reverse,
-)
-main_cg_range_with_wing_variation_with_plot(
-    W_fuselage,
-    X_fuselage,
-    W_wing,
-    L_fuselage,
-    mac,
-    Dxw,
-    LEMAC_In,
-    LEMAC_Out,
-    X_list,
-    W_list,
-    X_reverse,
-    W_reverse,
-)
-
-y_tail, x_stab, x_control = stab_cont_lines(
-    S_M,
-    mac,
-    X_ac,
-    Cl_alpha_h,
-    Cl_alpha_tailless,
-    d_e_d_alpha,
-    Lh,
-    Vh,
-    V,
-    Cm_ac,
-    L_fuselage,
-    Cl_h,
-    Cl_tailless,
-    wing_position,
-)
-stab_cont_lines_plot(y_tail, x_stab, x_control, x_cg_start, x_cg_end, tail_area_ratio)

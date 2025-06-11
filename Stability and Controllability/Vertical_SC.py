@@ -21,6 +21,9 @@ Cq = 0.01  # aerodynamic drag for blade rotation constant
 Cd = 0.5  # drag coefficient for the drone
 S = 10  # area of the drone in the XY plane in m^2
 g = 9.81
+max_rpm = 6000
+
+
 choice = int(
     input(
         "What stability analysis case?:\n 1. All engines \n 2.Engine 1-2 failure \n 3. Engine 3-4 failure \n 4.Engine 5-6 failure \n 5.Engine 7-8 failure"
