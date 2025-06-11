@@ -12,6 +12,7 @@ import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
+from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
 
 # === CONFIG & MATERIALS ===
 
@@ -1933,11 +1934,12 @@ def run_structure_analysis(
     fuselage_case=2,  # or 2, (1 for chubby, 2 for elongated fuselage)
     # banked=False,  # Set to False for normal cruise, True for banked case
     plot=False,
+    print_bool=False,
 ):
-    from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
 
-    n_max = float(plot_maneuver_and_gust_envelope(drone, plot=False))
-    print(f"{n_max} g's maximum load factor from maneuver envelope.")
+    n_max = plot_maneuver_and_gust_envelope(drone, plot=False)
+    if print_bool:
+        print(f"{n_max} g's maximum load factor from maneuver envelope.")
 
     # FIX FIX FIX, those values are educated guesses, but what values should they have? These might be correct
     SAFETY_FACTOR = 1.5
@@ -2824,15 +2826,16 @@ def run_structure_analysis(
     fuselage_critical_mode = max(results, key=lambda m: results[m]["fuselage_mass"])
     tail_critical_mode = max(results, key=lambda m: results[m]["tail_mass"])
 
-    print("\n=== STRUCTURE SIZING SUMMARY ===")
-    print(
-        f"Wing: Critical mode is '{wing_critical_mode}' with mass {2* results[wing_critical_mode]['wing_mass']:.2f} kg"
-    )
-    print(
-        f"Fuselage: Critical mode is '{fuselage_critical_mode}' with mass {results[fuselage_critical_mode]['fuselage_mass']:.2f} kg"
-    )
-    print(f"Tail: Mass {results[tail_critical_mode]['tail_mass']:.2f} kg")
-    print("==============================\n")
+    if print_bool:
+        print("\n=== STRUCTURE SIZING SUMMARY ===")
+        print(
+            f"Wing: Critical mode is '{wing_critical_mode}' with mass {2* results[wing_critical_mode]['wing_mass']:.2f} kg"
+        )
+        print(
+            f"Fuselage: Critical mode is '{fuselage_critical_mode}' with mass {results[fuselage_critical_mode]['fuselage_mass']:.2f} kg"
+        )
+        print(f"Tail: Mass {results[tail_critical_mode]['tail_mass']:.2f} kg")
+        print("==============================\n")
 
     # --- Store critical mode variables for further use ---
     wing_critical_mass = results[wing_critical_mode]["wing_mass"]
@@ -2843,7 +2846,7 @@ def run_structure_analysis(
     tail_critical_scale = results[tail_critical_mode]["tail_scale"]
 
     # Example: print or use these variables
-    if print == True:
+    if print_bool == True:
         print(f"Wing critical scale: {wing_critical_scale:.2f}")
         print(f"Fuselage critical scale: {fuselage_critical_scale:.2f}")
 
