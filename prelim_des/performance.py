@@ -159,12 +159,12 @@ class Performance:
         hover_energy = hover_power * leg["loitering_time"]
 
         leg_energy = cruise_energy + take_off_energy + landing_energy + hover_energy + transition_energy
-        print(f"Energy breakdown: Cruise Energy: {cruise_energy[0]:.2f} J, "
-              f"Takeoff Energy: {take_off_energy[0]:.2f} J, "
-              f"Landing Energy: {landing_energy[0]:.2f} J, "
-              f"Transition Energy: {transition_energy:.2f} J, "
-              f"Hover Energy: {hover_energy[0]:.2f} J",
-              f"Leg Mass: {self.drone.OEW + PL_mass} kg")
+        # print(f"Energy breakdown: Cruise Energy: {cruise_energy[0]:.2f} J, "
+        #       f"Takeoff Energy: {take_off_energy[0]:.2f} J, "
+        #       f"Landing Energy: {landing_energy[0]:.2f} J, "
+        #       f"Transition Energy: {transition_energy:.2f} J, "
+        #       f"Hover Energy: {hover_energy[0]:.2f} J",
+        #       f"Leg Mass: {self.drone.OEW + PL_mass} kg")
 
         return leg_energy, cruise_power, takeoff_power, landing_power, hover_power
 
