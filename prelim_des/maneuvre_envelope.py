@@ -12,7 +12,7 @@ from constants import ρ, g
 from globals import main_dir
 
 
-def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=True):
+def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=False):
     """
     Plot the maneuvering and gust envelope for a given aircraft.
     """
@@ -33,7 +33,7 @@ def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=True):
 
     # Gust velocities at each reference speed (example values, adjust as needed)
     # U_gusts = [12.5, 10.0, 5.0]  # [at V_B, V_cruise, V_dive]
-    U_gusts = [8.0, 7.0, 5.0]  # [at V_B, V_cruise, V_dive]
+    U_gusts = [7.0, 6.0, 4.0]  # [at V_B, V_cruise, V_dive]
     
     # Calculate delta_n at each reference speed
     V_refs = [V_B, V_cruise, V_dive]
@@ -145,6 +145,7 @@ def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=True):
 
 # Example usage:
 if __name__ == "__main__":
+    from prelim_des.drone import Drone
     mission = Mission("DRCCRCCRCCD")
     drone = Drone()
     perf = Performance(drone, mission)
@@ -155,5 +156,5 @@ if __name__ == "__main__":
     drone.class_2_weight_estimate()
 
     # drone.iterative_weight_estimate(plot=True, tolerance=0.01)
-    n_max = plot_maneuver_and_gust_envelope(drone)
+    n_max = plot_maneuver_and_gust_envelope(drone, plot=True)
     print(f"Maximum load factor (n_max): {n_max:.2f}")

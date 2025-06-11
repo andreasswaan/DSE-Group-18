@@ -11,7 +11,8 @@ from prelim_des.idealized_structure import run_structure_analysis
 logging.info("Starting drone performance estimation...")
 
 
-mission = Mission("DRCCRCCRCCD")
+# mission = Mission("DRCCRCCRCCD")
+mission = Mission("DRCCRCD")
 # print("Mission phases:", mission.phases_str)
 # print("Mission phase objects:", mission.legs_dict)
 

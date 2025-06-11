@@ -1,11 +1,205 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+import tomllib
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
+
+
+# from prelim_des.elems import Wing, Fuselage, LandingGear
+# from prelim_des.drone import Drone
+
+with open("prelim_des/config.toml", "rb") as f:
+    data = tomllib.load(f)
+
+# Structures Values
+Dxw = 0.2  # m , from LEMAC to wing CG
+X_fuselage = 0.5  # m, distance from nose to fuselage CG
+
+# Aerodynamics Values
+Cl_alpha_h = 4  # tail Cl alpha
+Cl_alpha_tailless = 5  # no tail Cl alpha
+Cm_ac = -0.1  # ac moment constant
+Cl_h = -0.2  # tail cl
+Cl_tailless = 0.3  # tailess aircraft cl
+
+#Vertical tail
+X_cg = 7  # m
+aspect_ratio = 5
+v_taper_ratio = 0.5
+
+
+# MAIN
+def main_horizontal_stability(
+    drone: Drone,
+    X_fuselage, # Talk to Andy
+    Dxw, # Talk to Andy
+    Cl_alpha_h, # Constant, talk to Andreas
+    Cl_alpha_tailless, # Constant, talk to Andreas
+    Cm_ac, # Constant, talk to Andreas
+    Cl_h, # Constant, talk to Andreas
+    Cl_tailless, # Constant, talk to Andreas,
+    X_cg,
+    aspect_ratio,
+    v_taper_ratio,   
+    graph=False,
+    ):
+    
+    W_fuselage = drone.fuselage.weight  # kg, fuselage weight
+    W_wing = drone.wing.weight  # kg, wing weight
+    S_M = data["config"]["horizontal_sc"]["S_M"]  # safety margin
+    LEMAC_In = data["config"]["horizontal_sc"][
+        "LEMAC_In"
+    ]  # m, front limit of wing positioning
+    LEMAC_Out = data["config"]["horizontal_sc"][
+        "LEMAC_Out"
+    ]  # m, back limit of wing positioning
+    Vh_V = data["config"]["horizontal_sc"]["Vh_V"]
+    taper_ratio_tail = data["config"]["horizontal_sc"][
+        "taper_ratio_tail"
+    ]  # horizontal tail
+    Aspect_ratio_tail = data["config"]["horizontal_sc"][
+        "Aspect_ratio_tail"
+    ]  # horizontal tail
+    d_e_d_alpha = data["config"]["horizontal_sc"][
+        "d_e_d_alpha"
+    ]  # downwash effect something
+    
+    V_g = data["config"]["horizontal_sc"]["V_g"]
+    V = data["config"]["mission"]["cruise_speed"]
+    drone_thickness = data["config"]["mission"]["cruise_speed"]
+    
+    mac = drone.wing.mac
+    L_fuselage = drone.fuselage.length  # m, fuselage length
+    X_ac = 0.25 * mac
+    Lh = L_fuselage
+    S_wing = drone.wing.S  # m^2, wing area
+    
+    LEMAC_In = LEMAC_In * L_fuselage
+    LEMAC_Out = LEMAC_Out * L_fuselage
+
+    X_list, W_list, X_reverse, W_reverse = item_input_sort()
+
+    x_cg_start, x_cg_end, wing_position, tail_area_ratio = find_wing_position(
+        W_fuselage,
+        X_fuselage,
+        W_wing,
+        L_fuselage,
+        mac,
+        Dxw,
+        LEMAC_In,
+        LEMAC_Out,
+        S_M,
+        X_ac,
+        Cl_alpha_h,
+        Cl_alpha_tailless,
+        d_e_d_alpha,
+        Lh,
+        Vh_V,
+        Cm_ac,
+        Cl_h,
+        Cl_tailless,
+        X_list,
+        W_list,
+        X_reverse,
+        W_reverse,
+    )
+
+    # print("most infront x_cg:",x_cg_start,"\n","most back x_cg:",x_cg_end,"\n","wing position:",wing_position,"\n","tail_area_ratio:",tail_area_ratio,)
+    b_h, c_h_small, c_h_big = horizontal_tail_area_sizing(
+        tail_area_ratio, S_wing, taper_ratio_tail, Aspect_ratio_tail
+    )
+    
+    # Extra initial values
+
+    X_LEMAC = wing_position
+    X_wing = X_LEMAC + Dxw  # m
+    
+    b_v, c_v_small,c_v_big = vertical_tail_sizing(L_fuselage, V_g, X_cg, V, aspect_ratio, v_taper_ratio,drone_thickness)
+
+    if graph:
+        main_cg_range_with_graph(
+            W_fuselage,
+            X_fuselage,
+            W_wing,
+            X_wing,
+            X_LEMAC,
+            L_fuselage,
+            mac,
+            X_list,
+            W_list,
+            X_reverse,
+            W_reverse,
+        )
+        main_cg_range_with_wing_variation_with_plot(
+            W_fuselage,
+            X_fuselage,
+            W_wing,
+            L_fuselage,
+            mac,
+            Dxw,
+            LEMAC_In,
+            LEMAC_Out,
+            X_list,
+            W_list,
+            X_reverse,
+            W_reverse,
+        )
+
+        y_tail, x_stab, x_control = stab_cont_lines(
+            S_M,
+            mac,
+            X_ac,
+            Cl_alpha_h,
+            Cl_alpha_tailless,
+            d_e_d_alpha,
+            Lh,
+            Vh_V,
+            Cm_ac,
+            L_fuselage,
+            Cl_h,
+            Cl_tailless,
+            wing_position,
+        )
+        stab_cont_lines_plot(
+            y_tail, x_stab, x_control, x_cg_start, x_cg_end, tail_area_ratio
+        )
+    return x_cg_start, x_cg_end, wing_position, b_h, c_h_small, c_h_big, b_v, c_v_small, c_v_big
 
 
 # CG range graph
 def cg_shift(W_old, X_old, W_item, X_item):
     return W_old + W_item, (W_old * X_old + W_item * X_item) / (W_old + W_item)
+
+def vertical_tail_sizing(
+    L_fuselage, V_g, X_cg, V, aspect_ratio, v_taper_ratio,drone_thickness
+):
+    S_lat = drone_thickness * L_fuselage
+    S = (
+        (2 * X_cg - L_fuselage)
+        * V_g**2
+        * S_lat
+        / (math.pi * V**2 * (L_fuselage - X_cg))
+    ) / aspect_ratio
+    b = math.sqrt(S * aspect_ratio)
+    c_small = 2 * v_taper_ratio / (1 + v_taper_ratio) * math.sqrt(S / aspect_ratio)
+    c_big = 2 / (1 + v_taper_ratio) * math.sqrt(S / aspect_ratio)
+    if b <= 0 or c_small <= 0 or c_big <= 0:
+        b = 0
+        c_small = 0
+        c_big = 0
+        print("error: vertical tail model failure")
+    return c_small, c_big, b
+
+
+def horizontal_tail_area_sizing(area_ratio, S_wing, t, A):
+    S = S_wing * area_ratio
+    b = math.sqrt(S * A)
+    c_small = 2 * t / (1 + t) * math.sqrt(S / A)
+    c_big = 2 / (1 + t) * math.sqrt(S / A)
+    return b, c_small, c_big
 
 
 def item_input_sort():
@@ -180,8 +374,7 @@ def stab_cont_lines(
     Cl_alpha_tailless,
     d_e_d_alpha,
     Lh,
-    Vh,
-    V,
+    Vh_V,
     Cm_ac,
     L_fuselage,
     Cl_h,
@@ -195,7 +388,7 @@ def stab_cont_lines(
         x_c = (
             X_ac / mac
             - Cm_ac / Cl_tailless
-            + Cl_h / Cl_tailless * y_t * Lh / mac * (Vh / V) ** 2
+            + Cl_h / Cl_tailless * y_t * Lh / mac * (Vh_V) ** 2
         )
         x_control.append(x_c)
         x_s = (
@@ -206,7 +399,7 @@ def stab_cont_lines(
             * y_t
             * Lh
             / mac
-            * (Vh / V) ** 2
+            * (Vh_V) ** 2
             - S_M
         )
         x_stab.append(x_s)
@@ -244,8 +437,7 @@ def find_wing_position(
     Cl_alpha_tailless,
     d_e_d_alpha,
     Lh,
-    Vh,
-    V,
+    Vh_V,
     Cm_ac,
     Cl_h,
     Cl_tailless,
@@ -288,8 +480,7 @@ def find_wing_position(
             Cl_alpha_tailless,
             d_e_d_alpha,
             Lh,
-            Vh,
-            V,
+            Vh_V,
             Cm_ac,
             L_fuselage,
             Cl_h,
@@ -323,119 +514,27 @@ def find_wing_position(
     )
 
 
-# INITIAL VALUES
-W_fuselage = 15  # kg
-X_fuselage = 5  # m
-W_wing = 5  # kg
-L_fuselage = 10  # m
-mac = 2.5  # m
-Dxw = 0.2  # m , from LEMAC to wing CG
-LEMAC_In = 2  # m, front limit of wing positioning
-LEMAC_Out = 3  # m, back limit of wing positioning
-S_M = 0.05  # safety margin
-X_ac = 0.25 * mac  # m , ac position from lemac
-Cl_alpha_h = 4  # tail Cl alpha
-Cl_alpha_tailless = 5  # no tail Cl alpha
-d_e_d_alpha = 0.5  # downwash effect something
-Lh = L_fuselage  # tail arm
-Vh = 15  # tail stream velocity , m/s
-V = 15  # tail stream velocity, m/s
-Cm_ac = -0.1  # ac moment constant
-Cl_h = -0.2  # tail cl
-Cl_tailless = 0.3  # tailess aircraft cl
+if __name__ == "__main__":
+    from prelim_des.drone import Drone
+    from prelim_des.mission import Mission
+    from prelim_des.performance import Performance
 
-# MAIN
+    mission = Mission("DRCCRCCRCCD")
+    drone = Drone()
+    perf = Performance(drone, mission)
+    drone.perf = perf
+    drone.class_1_weight_estimate()
+    drone.class_2_weight_estimate(transition=True)
+ 
 
-X_list, W_list, X_reverse, W_reverse = item_input_sort()
-
-x_cg_start, x_cg_end, wing_position, tail_area_ratio = find_wing_position(
-    W_fuselage,
-    X_fuselage,
-    W_wing,
-    L_fuselage,
-    mac,
-    Dxw,
-    LEMAC_In,
-    LEMAC_Out,
-    S_M,
-    X_ac,
-    Cl_alpha_h,
-    Cl_alpha_tailless,
-    d_e_d_alpha,
-    Lh,
-    Vh,
-    V,
-    Cm_ac,
-    Cl_h,
-    Cl_tailless,
-    X_list,
-    W_list,
-    X_reverse,
-    W_reverse,
-)
-
-print(
-    "most infront x_cg:",
-    x_cg_start,
-    "\n",
-    "most back x_cg:",
-    x_cg_end,
-    "\n",
-    "wing position:",
-    wing_position,
-    "\n",
-    "tail_area_ratio:",
-    tail_area_ratio,
-)
-
-# Extra initial values
-
-X_LEMAC = wing_position
-X_wing = X_LEMAC + Dxw  # m
-
-
-main_cg_range_with_graph(
-    W_fuselage,
-    X_fuselage,
-    W_wing,
-    X_wing,
-    X_LEMAC,
-    L_fuselage,
-    mac,
-    X_list,
-    W_list,
-    X_reverse,
-    W_reverse,
-)
-main_cg_range_with_wing_variation_with_plot(
-    W_fuselage,
-    X_fuselage,
-    W_wing,
-    L_fuselage,
-    mac,
-    Dxw,
-    LEMAC_In,
-    LEMAC_Out,
-    X_list,
-    W_list,
-    X_reverse,
-    W_reverse,
-)
-
-y_tail, x_stab, x_control = stab_cont_lines(
-    S_M,
-    mac,
-    X_ac,
-    Cl_alpha_h,
-    Cl_alpha_tailless,
-    d_e_d_alpha,
-    Lh,
-    Vh,
-    V,
-    Cm_ac,
-    L_fuselage,
-    Cl_h,
-    Cl_tailless,
-    wing_position,
-)
-stab_cont_lines_plot(y_tail, x_stab, x_control, x_cg_start, x_cg_end, tail_area_ratio)
+    main_horizontal_stability(
+        drone,
+        X_fuselage,
+        Dxw,
+        Cl_alpha_h,
+        Cl_alpha_tailless,
+        Cm_ac,
+        Cl_h,
+        Cl_tailless,
+        graph=True,
+    )
