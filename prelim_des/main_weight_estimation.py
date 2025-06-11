@@ -11,7 +11,8 @@ from prelim_des.idealized_structure import run_structure_analysis
 logging.info("Starting drone performance estimation...")
 
 
-mission = Mission("DRCCRCCRCCD")
+# mission = Mission("DRCCRCCRCCD")
+mission = Mission("DRCCRCD")
 # print("Mission phases:", mission.phases_str)
 # print("Mission phase objects:", mission.legs_dict)
 
@@ -36,10 +37,11 @@ if print:
     print("Drone mass breakdown:", 
       "Battery weight:", drone.propulsion.battery.weight,
       "Wing weight:", drone.wing.weight,
-      "Fuselage weight:", drone.fuselage.weight(),
-      "Tail weight:", drone.tail.weight(),
-        "Landing gear weight:", drone.landing_gear.weight(),
+    #   "Fuselage weight:", drone.fuselage.weight,
+      "Tail weight:", drone.tail.weight,
+        "Landing gear weight:", drone.landing_gear.weight,
         "Propulsion weight:", drone.propulsion.weight(drone.perf.mission_energy(transition=True)[0]),
+        "Mission energy:", drone.perf.mission_energy(transition=True)[0]
     )
 # print(f"Wing surface area: {drone.wing.S}")
 
