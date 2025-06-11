@@ -31,8 +31,10 @@ D = 10                                    # s
 
 [config.mission.payload_masses]
 DR = 0                                    # kg
-RC = 2.5                                  # kg
-CC = 2                                    # kg
+# RC = 2.5                                  # kg
+RC = 2.0                                  # kg
+# CC = 2                                    # kg
+CC = 1.5                                  # kg
 CD = 0                                    # kg
 CR = 0                                    # kg
 
