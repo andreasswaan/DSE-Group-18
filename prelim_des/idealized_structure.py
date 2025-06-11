@@ -19,7 +19,7 @@ from prelim_des.utils.import_toml import load_toml
 from prelim_des.utils.load_materials import load_materials
 from prelim_des.utils.import_toml import load_toml
 from structure import Boom
-
+from stability_and_controllability.Horizontal_tail_SC import main_horizontal_stability
 
 # === CONFIG & MATERIALS ===
 
@@ -2226,6 +2226,8 @@ def run_structure_analysis(
     # wing.plot_deformed_wing(vertical_deflections)
 
     # Tail Creation - CHANGE VALUES !!!!!!!!!! --- !!!!!!!!!!! FIX FIX FIX
+    
+    _, _, _, b_h, c_h_small, c_h_big, b_v, c_v_small, c_v_big = 
 
     horiz_span = 0.6
     horiz_chord = 0.15
