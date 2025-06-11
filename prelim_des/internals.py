@@ -4,6 +4,7 @@ from CG_calculation_structures import (
     compute_wing_cg_xz,
     compute_tail_cg_xz,
 )
+import CG_calculation_structures
 
 if TYPE_CHECKING:
     from idealized_structure import FuselageStructure, WingStructure, TailStructure
@@ -40,13 +41,17 @@ def get_cg(comps: dict) -> dict:
     return cg_dict
 
 
-def get_cg_constant(
-    fuselage: FuselageStructure, wing: WingStructure, tail: TailStructure
+def get_cg_groups(
+    comps_const: dict,
+    fuselage: FuselageStructure,
+    wing: WingStructure,
+    tail: TailStructure,
 ) -> dict:
     """
     Get the center of gravity (CG) of all constant components.
 
     Args:
+        comps_const (dict): Dictionary containing the constant components and their masses and CG positions.
         fuselage (FuselageStructure): Fuselage structure.
         wing (WingStructure): Wing structure.
         tail (TailStructure): Tail structure.
@@ -56,43 +61,35 @@ def get_cg_constant(
     """
 
     # Define structural components
-    fuselage_cg_x, fuselage_cg_z = compute_fuselage_cg_xz(fuselage)
+    fuse_cg_x, fuse_cg_z = compute_fuselage_cg_xz(fuselage)
     wing_cg_x, wing_cg_z = compute_wing_cg_xz(wing)
     tail_cg_x, tail_cg_z = compute_tail_cg_xz(tail)
-    h_fuselage = fuselage.fuselage_height
+    h_fuse = fuselage.fuselage_height
 
     layout_struc = {  # TODO get masses
         "fuselage": {
             "m": 1.0,
-            "x": fuselage_cg_x,
+            "x": fuse_cg_x,
             "y": 0.0,
-            "z": fuselage_cg_z + h_fuselage / 2,
+            "z": fuse_cg_z + h_fuse / 2,
         },
-        "wing": {"m": 1.0, "x": wing_cg_x, "y": 0.0, "z": wing_cg_z + h_fuselage / 2},
-        "tail": {"m": 1.0, "x": tail_cg_x, "y": 0.0, "z": tail_cg_z + h_fuselage / 2},
+        "wing": {"m": 1.0, "x": wing_cg_x, "y": 0.0, "z": wing_cg_z + h_fuse / 2},
+        "tail": {"m": 1.0, "x": tail_cg_x, "y": 0.0, "z": tail_cg_z + h_fuse / 2},
     }
 
-    # Define other internal components that are constant
-    layout_const = {
-        # PAYLOAD
-        "insulation": {"m": 0.500, "x": 750.0, "y": 0.0, "z": 170.0},
-        # ELEC
-        "cpu": {"m": 0.077, "x": 95.0, "y": 0.0, "z": 0.0},
-        # SENSOR TODO: placebolder masses
-        "cam1": {"m": 0.050, "x": 55.0, "y": 0.0, "z": 0.0},  # forward
-        "cam2": {"m": 0.050, "x": 1300.0, "y": 0.0, "z": 0.0},  # backward
-        "cam3": {"m": 0.050, "x": 100.0, "y": 230.0, "z": 0.0},  # left
-        "cam4": {"m": 0.050, "x": 100.0, "y": -230.0, "z": 0.0},  # right
-        "cam5": {"m": 0.050, "x": 115.0, "y": 0.0, "z": 0.0},  # up
-        "cam6": {"m": 0.050, "x": 100.0, "y": 0.0, "z": 0.0},  # down
-        "gnss": {"m": 0.030, "x": 200.0, "y": 0.0, "z": 300.0},
-        # TODO: payload sensors
-        # POWER TODO add motors
+    # fuselage, with constant components, and tail
+    fuselage_total = {
+        **layout_struc["fuselage"],
+        **layout_struc["tail"],
+        **comps_const,
     }
 
-    components = {**layout_struc, **layout_const}
+    cg_groups = {
+        "fuselage": get_cg(fuselage_total),
+        "wing": layout_struc["wing"],
+    }
 
-    return get_cg(components)
+    return cg_groups
 
 
 # Dictionary for all internal variable components. Mass [kg] + (x,y,z) coordinates [mm] of individual CGs.
@@ -110,3 +107,29 @@ layout_var = {
     "bat3": {"m": 1.974, "x": 1300.0, "y": 75.0, "z": 130.0},
     "bat4": {"m": 1.974, "x": 1300.0, "y": -75.0, "z": 130.0},
 }
+
+# Define other internal components that are constant
+layout_const = {
+    # PAYLOAD
+    "insulation": {"m": 0.500, "x": 750.0, "y": 0.0, "z": 170.0},
+    # ELEC
+    "cpu": {"m": 0.077, "x": 95.0, "y": 0.0, "z": 0.0},
+    # SENSOR TODO: placeholder masses
+    "cam1": {"m": 0.050, "x": 55.0, "y": 0.0, "z": 0.0},  # forward
+    "cam2": {"m": 0.050, "x": 1300.0, "y": 0.0, "z": 0.0},  # backward
+    "cam3": {"m": 0.050, "x": 100.0, "y": 230.0, "z": 0.0},  # left
+    "cam4": {"m": 0.050, "x": 100.0, "y": -230.0, "z": 0.0},  # right
+    "cam5": {"m": 0.050, "x": 115.0, "y": 0.0, "z": 0.0},  # up
+    "cam6": {"m": 0.050, "x": 100.0, "y": 0.0, "z": 0.0},  # down
+    "gnss": {"m": 0.030, "x": 200.0, "y": 0.0, "z": 300.0},
+    # TODO: payload sensors
+    # POWER TODO add motors
+}
+
+print(
+    get_cg_constant(
+        CG_calculation_structures.fuselage,
+        CG_calculation_structures.wing,
+        CG_calculation_structures.tail,
+    )
+)
