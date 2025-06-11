@@ -43,13 +43,36 @@ class Performance:
         self.drone = drone
         self.mission = mission
         self.V_cruise = toml["config"]["mission"]["cruise_speed"]
+        self.AOA_cruise = toml["config"]["performance"]["AOA_cruise"]
 
     def wing_area(self, mass):
         """Calculate required wing surface area for given weight and cruise speed."""
+
+        AOA = self.AOA_cruise
+        cl_cruise = self.drone.aero.cl_alpha(AOA)
         S = (
-            mass * g / (0.5 * ρ * self.V_cruise**2 * self.drone.aero.CL_cruise)
+            mass * g / (0.5 * ρ * self.V_cruise**2 * cl_cruise)
         )  # Using lift equation with horizontal equilibrium
         return S
+
+    def wing_area_iterations(self, mass):
+        AOA = self.AOA_cruise
+        difference_S = 10
+        old_wing_surface = 1000000
+        n = 0
+        while abs(difference_S) > 0.001:
+            if n > 1000:
+                raise RuntimeError("the wing did not converge")
+            cl_cruise = self.drone.aero.cl_alpha(AOA)
+            self.drone.wing.S = (
+                mass * g / (0.5 * ρ * self.V_cruise**2 * cl_cruise)
+            )  # Using lift equation with horizontal equilibrium
+            difference_S = old_wing_surface - self.drone.wing.S
+            old_wing_surface = self.drone.wing.S
+            print(self.drone.wing.S)
+
+            n = +1
+        self.drone.wing.plot_planform()
 
     def cruise_thrust(self, D):
         """Calculate thrust required during cruise."""
@@ -98,18 +121,24 @@ class Performance:
         )  # Energy required for cruise
 
         return energy_cruise
-    
+
     def transition_energy(self, current_mass):
         """
         Calculate the energy required for the transition phase.
         This is a hardcoded function and its results should be carefully considered based on drone characteristics.
         """
-        default_transition_energy = toml["config"]["mission"]["transition_energy"] # for MTOW = 10 kg
-        default_transition_MTOW = toml["config"]["mission"]["default_transition_MTOW"]  # MTOW for which the default energy is defined
-        transition_energy = default_transition_energy * float(current_mass) / default_transition_MTOW
+        default_transition_energy = toml["config"]["mission"][
+            "transition_energy"
+        ]  # for MTOW = 10 kg
+        default_transition_MTOW = toml["config"]["mission"][
+            "default_transition_MTOW"
+        ]  # MTOW for which the default energy is defined
+        transition_energy = (
+            default_transition_energy * float(current_mass) / default_transition_MTOW
+        )
 
         return transition_energy  # Energy required for transition phase in Joules
-    
+
     def cruise_range(self, energy):
         """
         Calculate the range during cruise based on available energy.
@@ -138,33 +167,47 @@ class Performance:
             leg["distance"] / leg["cruise_speed"]
         )  # Power = Energy / Time
 
-        takeoff_thrust = self.takeoff_thrust(self.drone.OEW + PL_mass, leg["TO_speed"], use_T_over_W=False)
+        takeoff_thrust = self.takeoff_thrust(
+            self.drone.OEW + PL_mass, leg["TO_speed"], use_T_over_W=False
+        )
         takeoff_power = self.drone.propulsion.ver_prop.power(takeoff_thrust)
 
-        landing_thrust = self.landing_thrust(self.drone.OEW + PL_mass, leg["LD_speed"], use_T_over_W=False)
+        landing_thrust = self.landing_thrust(
+            self.drone.OEW + PL_mass, leg["LD_speed"], use_T_over_W=False
+        )
         landing_power = self.drone.propulsion.ver_prop.power(landing_thrust)
 
         hover_thrust = self.hover_thrust(self.drone.OEW + PL_mass)
         hover_power = self.drone.propulsion.ver_prop.power(hover_thrust)
-        
+
         if transition:
             take_off_energy = takeoff_power * (leg["TO_time_w_trans"])
             landing_energy = landing_power * (leg["LD_time_w_trans"])
-            transition_energy = self.transition_energy(self.drone.OEW + PL_mass) * 2  # Assuming transition happens both at takeoff and landing
+            transition_energy = (
+                self.transition_energy(self.drone.OEW + PL_mass) * 2
+            )  # Assuming transition happens both at takeoff and landing
         else:
             take_off_energy = takeoff_power * (leg["TO_time"])
             landing_energy = landing_power * (leg["LD_time"])
             transition_energy = 0.0  # No transition energy if not transitioning
-        
+
         hover_energy = hover_power * leg["loitering_time"]
 
-        leg_energy = cruise_energy + take_off_energy + landing_energy + hover_energy + transition_energy
-        print(f"Energy breakdown: Cruise Energy: {cruise_energy[0]:.2f} J, "
-              f"Takeoff Energy: {take_off_energy[0]:.2f} J, "
-              f"Landing Energy: {landing_energy[0]:.2f} J, "
-              f"Transition Energy: {transition_energy:.2f} J, "
-              f"Hover Energy: {hover_energy[0]:.2f} J",
-              f"Leg Mass: {self.drone.OEW + PL_mass} kg")
+        leg_energy = (
+            cruise_energy
+            + take_off_energy
+            + landing_energy
+            + hover_energy
+            + transition_energy
+        )
+        print(
+            f"Energy breakdown: Cruise Energy: {cruise_energy[0]:.2f} J, "
+            f"Takeoff Energy: {take_off_energy[0]:.2f} J, "
+            f"Landing Energy: {landing_energy[0]:.2f} J, "
+            f"Transition Energy: {transition_energy:.2f} J, "
+            f"Hover Energy: {hover_energy[0]:.2f} J",
+            f"Leg Mass: {self.drone.OEW + PL_mass} kg",
+        )
 
         return leg_energy, cruise_power, takeoff_power, landing_power, hover_power
 

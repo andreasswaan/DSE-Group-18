@@ -1,6 +1,8 @@
 from __future__ import annotations
+import os
 from typing import TYPE_CHECKING
 import numpy as np
+import matplotlib.pyplot as plt
 
 if TYPE_CHECKING:
     from prelim_des.drone import Drone
@@ -20,8 +22,6 @@ toml = load_toml()
 
 
 class Aerodynamics:
-
-    S: float
 
     def __init__(
         self,
@@ -50,7 +50,7 @@ class Aerodynamics:
             / (np.pi * self.oswald_efficiency * self.drone.wing.geom_AR)
         )
 
-    def base_cl_cruise(self, alpha):
+    def __base_cl_cruise(self, alpha):
         """
         Estimate the cl of the drone based on alpha (deg).
 
@@ -69,8 +69,21 @@ class Aerodynamics:
         cl_at_req_alpha = np.interp(alpha, AOA, avg_cl_alpha)
         return cl_at_req_alpha
 
-    @property
-    def cl_alpha(self):
+    def cl_alpha(self, alpha, save_plot=True):
+        """
+        Estimate the cl of the drone based on alpha (deg).
+        If the root chord and tip chord are defined it will
+        return an estimation otherwise it will use the base cl/alpha curve
+
+        Parameters:
+        alpha (float): The angle of attack (deg).
+
+        Returns:
+        float: The cl.
+        """
+        if self.drone.wing.c_root == None or self.drone.wing.c_tip == None:
+            return self.__base_cl_cruise(alpha)
+
         root_chord = self.drone.wing.c_root
         tip_chord = self.drone.wing.c_tip
 
@@ -79,8 +92,22 @@ class Aerodynamics:
         cl_alpha = []
         for i in range(len(AOA)):
             cl_alpha.append(np.average([cl_alpha_tip[i], cl_alpha_root[i]]))
+        cl_at_req_alpha = np.interp(alpha, AOA, cl_alpha)
 
-        return cl_alpha
+        if save_plot:
+            plt.figure()
+            plt.plot(AOA, cl_alpha, label="cl_alpha vs AOA")
+            plt.xlabel("Angle of Attack (deg)")
+            plt.ylabel("cl_alpha")
+            plt.title("AOA vs cl_alpha")
+            plt.grid(True)
+            plt.ylim(bottom=0)  # Ensure y-axis starts at 0
+            folder = os.path.join("prelim_des", "plots", "Aerodynamics")
+            os.makedirs(folder, exist_ok=True)
+            plt.savefig(os.path.join(folder, "AOA vs Cl"), dpi=300, bbox_inches="tight")
+            plt.close()
+
+        return cl_at_req_alpha
 
     def lift(self, V: float, CL) -> float:
         """
