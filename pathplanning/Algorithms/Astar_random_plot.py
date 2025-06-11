@@ -46,7 +46,7 @@ def point_line_distance(px, py, x0, y0, x1, y1):
 
 # ---------- A* ALGORITHM ----------
 
-def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=None, alpha=0.3, beta=0.005):
+def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=None, alpha=0.3, beta=0.003):
     """
     start, end: (x, y)
     walkable: boolean 2D array
@@ -88,7 +88,12 @@ def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=
             if 0 <= nx < width and 0 <= ny < height and walkable[ny, nx]:
                 # Prevent corner cutting: if moving diagonally, at least one adjacent cardinal cell must be walkable
                 if abs(dx) == 1 and abs(dy) == 1:
-                    if not walkable[y, ny] and not walkable[ny, x]:
+                    # Only check corner filling if both adjacent cells are within the map
+                    check1 = (0 <= y < height) and (0 <= nx < width)
+                    check2 = (0 <= ny < height) and (0 <= x < width)
+                    block1 = not walkable[y, nx] if check1 else False
+                    block2 = not walkable[ny, x] if check2 else False
+                    if block1 and block2:
                         continue  # Both adjacent cells are not walkable, so skip this diagonal move
 
                 step_cost = sqrt(dx**2 + dy**2) / sqrt(2)
@@ -99,19 +104,16 @@ def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=
                         continue  # skip impassable
                     # deviation from straight line cost
                     deviation = point_line_distance(nx, ny, start[0], start[1], end[0], end[1])
-                    scale = np.pow(heuristic((nx, ny), end), 0.6) # <-- scale by distance to goal
+                    scale = np.pow(heuristic((nx, ny), end), 0.6) + 1 # <-- scale by distance to goal
                     
                     # total cost = (distance cost)  + (public disturbance cost) + (deviation from straight line cost)
                     total_cost = (alpha * step_cost) + ((1-alpha) * extra_cost) + (alpha * beta * deviation * scale)
-                    # total_cost = (alpha * step_cost) + ((1-alpha) * extra_cost)
-                    
-                    #print(f"Node: ({nx}, {ny}), Step cost: {step_cost:.2f}, Extra cost: {extra_cost:.2f}, Deviation cost: {(alpha * beta * deviation * scale):.2f} Total cost: {total_cost:.2f}")
                     if extra_cost == 0:
                         total_cost = alpha * step_cost
                 else:
                     total_cost = alpha * step_cost
                 heapq.heappush(open_set, (
-                    current_cost + total_cost + heuristic((nx, ny), end)*(alpha + 0.01),
+                    current_cost + total_cost + heuristic((nx, ny), end)*(alpha + 0.05),
                     current_cost + total_cost,
                     (nx, ny),
                     path
