@@ -9,7 +9,7 @@ import scipy.stats as stats
 # pizza size to weight guide in kg
 np.random.seed(4)  # for reproducibility
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
-n_drones = 10
+n_drones = 20
 class Point():
     def __init__(self, xpos: float, ypos: float) -> None:
         self.xpos = xpos
@@ -19,7 +19,7 @@ class Point():
         return np.sqrt((self.xpos - other.xpos)**2 + (self.ypos - other.ypos)**2)
     
     def nearest(self, places: list['Point']) -> 'Point':
-        distance = 10000000
+        distance = float('inf')
         nearest_place = None
         for i in places:
             if self.distance(i) < distance:
@@ -66,11 +66,13 @@ class Order(Point):
         self.demand = self.s + self.m + self.l
         self.arrival_time = order_dict['arrival_time']
         self.waiting_time = constants.waiting_time_customer  # seconds
+        #print(self.restaurant_id, self.order_id)
 
 class Drone(Point):
     def __init__(self,
                  drone_dict: dict):
         self.drone_id = drone_dict['drone_id']
+        self.mission_log = []  # list of missions the drone has completed
         self.depot = depots[drone_dict['depot']]
         self.depot.current_drones.append(self)
         self.targets = []
@@ -78,9 +80,9 @@ class Drone(Point):
         self.target = None
         self.max_battery_level = 100
         self.energy_per_meter = constants.energy_per_metre  # kWh per meter, this is a placeholder value
-        self.speed = 10*100/6000*5  # m/s, horizontal speed
-        self.distance_travelled = 0
-        self.max_capacity = 10 # max number of pizzas it can carry
+        self.speed = 15 * constants.reso / 6000  # m/s, horizontal speed
+        self.distance_travelled = [0, 0, 0, 0, 0, 0]
+        self.max_capacity = 5 # max number of pizzas it can carry
         self.battery = 100  # battery level in percentage
         self.departure_times = []  # list of departure times for each mission
         self.arrival_times = []  # list of arrival times for each mission
@@ -115,8 +117,6 @@ class Drone(Point):
             self.departure_times.pop(0)
             self.arrival_times.pop(0)
             self.targets.pop(0)
-            #if isinstance(self.target, Restaurant):
-            #    self.restaurant_order_nodes.pop(0)
             if isinstance(self.target, Order):
                 self.target.status = True
             self.target = self.targets[0] if self.targets else None 
@@ -138,6 +138,7 @@ class Drone(Point):
             self.depot = None
     
     def set_targets(self, targets: list[Point]):
+        self.mission_log.append(list(targets))  # log the current targets before setting new ones
         if self.target is None:
             self.state = 'waiting'
         self.targets = targets
@@ -148,7 +149,7 @@ class Drone(Point):
         #self.available_time = self.departure_times[-1] if self.departure_times else 0
         for target in self.targets:
             if isinstance(target, Order):
-                target.being_delivered = True  #ToDo: we might want to remove this restriction later
+                target.being_delivered = True 
 
     def update_drone(self, dt):
         """self.xpos += 0.5 * self.xacc * dt**2 + self.xvel * dt
@@ -166,23 +167,43 @@ class Drone(Point):
         direction_vector = np.array([self.target.xpos - self.xpos, self.target.ypos - self.ypos])
         norm = np.linalg.norm(direction_vector)
         if norm == 0:
-            step_vector = np.array([0.0, 0.0])
+            return
         else:
             step_vector = direction_vector / norm * self.speed * dt
         if np.linalg.norm(direction_vector) <= np.linalg.norm(step_vector):
             self.xpos, self.ypos = self.target.xpos, self.target.ypos
             self.arrive()
-            self.distance_travelled += np.linalg.norm(direction_vector)
+            self.distance_travelled[int(self.load)] += np.linalg.norm(direction_vector) * 6000 / constants.reso  # convert to meters
         else:
             self.xpos += step_vector[0]
             self.ypos += step_vector[1]
-            self.distance_travelled += np.linalg.norm(step_vector)
+            self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 6000 / constants.reso  # convert to meters
+            self.battery -= self.energy_per_meter * np.linalg.norm(step_vector) * 6000 / constants.reso  # energy consumption in kWh
 
     def arrive(self):
+        self.battery -= constants.TO_land_energy
         if isinstance(self.target, Depot):
             self.target.current_drones.append(self)
             self.depot = self.target
             self.available_time = self.simulation.timestamp + self.target.waiting_time
+            self.depot.charge_drone(self)
+            if self.load != 0:
+                print(f"----------------------------------------------------------------------------------------------Drone {self.drone_id} has load {self.load} at depot {self.depot.depot_id}.-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
+        elif isinstance(self.target, Order):
+            print(f"drone {self.drone_id} has arrived at order {self.target.order_id} with load {self.load}.")
+            self.load -= self.target.demand
+            print(f"drone {self.drone_id} has arrived at order {self.target.order_id} with load {self.load}.")
+            if self.load < 0:
+                print(f"----------------------------------------------------------------------------------------------Drone {self.drone_id} has negative load: {self.load}.-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
+        elif isinstance(self.target, Restaurant):
+            print(f"drone {self.drone_id} has arrived at restaurant {self.target.restaurant_id} with load {self.load}.")
+            self.load += self.restaurant_order_nodes[0].demand
+            print(f"drone {self.drone_id} has arrived at restaurant {self.target.restaurant_id} with load {self.load}.")
+            self.restaurant_order_nodes.pop(0) 
+            if self.load > self.max_capacity:
+                print(f"----------------------------------------------------------------------------------------------Drone {self.drone_id} has too high load: {self.load}.-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
+
+        
         #self.target = self.get_target()
         self.state = 'waiting'
 
@@ -198,6 +219,11 @@ class Depot(Point):
         self.name = f'Depot {self.depot_id}'
         self.waiting_time = constants.battery_swap_time
 
+    def charge_drone(self, drone:Drone):
+        energy_needed = drone.max_battery_level - drone.battery
+        self.energy_spent += energy_needed * 0.00444
+        drone.battery = drone.max_battery_level
+
 class City:
     def __init__(self,
                  city_dict: dict):
@@ -208,7 +234,7 @@ class City:
         self.silent_zones = city_dict['silent_zones']
         self.population = city_dict['population']
 
-        self.reso = 100
+        self.reso = constants.reso
         self.map = np.zeros((self.reso, self.reso, 5))
         # 100 x 100 2d map, 4 pieces of info at each coordinate - restaurant, depot, tall building, silent zone
         # each coordinate corresponds to a 1x1 square in the city
@@ -288,10 +314,13 @@ class Simulation:
                         order['order_id'] = order_id
                         self.order_book[order_id] = Order(order)
 
+                        #logorder = copy.deepcopy(order)
+                        #logorder['order_id'] = order_id
+                        #del logorder['time']
+                        #self.logger.order_log[order['time']] = logorder
+
                         logorder = copy.deepcopy(order)
-                        logorder['order_id'] = order_id
-                        del logorder['time']
-                        self.logger.order_log[order['time']] = logorder
+                        self.logger.order_log[order['order_id']] = logorder
 
     def take_step(self):        
         self.take_orders()
@@ -326,9 +355,9 @@ restaurant_dict = [{
     'xpos': 50,
     'ypos': 20,
     'restaurant_id': 0,
-    'name': 'Pizza Place0',
+    'name': 'Pizza Place10',
     'mean_nr_orders': 400,
-    'mean_order_size': {'small': 0, 'medium': 3, 'large': 0}
+    'mean_order_size': {'small': 0, 'medium': 2, 'large': 0}
 },
 {
     'xpos': 50,
@@ -336,7 +365,7 @@ restaurant_dict = [{
     'restaurant_id': 1,
     'name': 'Pizza Place1',
     'mean_nr_orders': 400,
-    'mean_order_size': {'small': 0, 'medium': 3, 'large': 0}
+    'mean_order_size': {'small': 0, 'medium': 2, 'large': 0}
 },
 {
     'xpos': 20,
@@ -344,7 +373,7 @@ restaurant_dict = [{
     'restaurant_id': 2,
     'name': 'Pizza Place2',
     'mean_nr_orders': 400,
-    'mean_order_size': {'small': 0, 'medium': 3, 'large': 0}
+    'mean_order_size': {'small': 0, 'medium': 2, 'large': 0}
 }]
 
 Restaurant0 = Restaurant(restaurant_dict[0])
@@ -476,8 +505,14 @@ def animate_simulation(sim, steps=100, interval=200):
     )
     plt.show()
 n_steps = int(constants.time_window / my_sim.dt)
-my_sim.change_order_volume(3)
-animate_simulation(my_sim, n_steps, interval=10)
+my_sim.change_order_volume(1)
+#animate_simulation(my_sim, n_steps, interval=10)
 for i in range(n_steps):
     my_sim.take_step()
+print(my_sim.financial_model.calculate_daily_profit())
 print(my_sim.financial_model.calculate_revenue())
+for i in range (my_sim.drones[0].max_capacity):
+    print(f"average distance travelled at capacity {i}: {sum(drone.distance_travelled[i] for drone in my_sim.drones) / sum(len(drone.mission_log) for drone in my_sim.drones)} m")
+average_num_TO_landings = sum(
+    sum(len(drone.mission_log[i]) - 1 for i in range(len(drone.mission_log))) / len(drone.mission_log) for drone in my_sim.drones) / len(my_sim.drones)
+print(f"Average number of TO landings per drone: {average_num_TO_landings}")

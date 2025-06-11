@@ -4,27 +4,28 @@ velocity_hori=15
 velocity_climb=6
 velocity_descent=3
 cruise_height=50
-waiting_time_restaurant=90
-waiting_time_customer=90
+waiting_time_restaurant=120
+waiting_time_customer=150
 loading_time=60
 unloading_time_customer=60
 buffer_time=60
 battery_swap_time=300
 peak_order_volume=350
-time_window=3600*4 # time window to place orders
+time_window= 3600 * 4 # time window to place orders
 min_order_delay=0*60
 scale=30*60 # scale for order time distribution
 pizza_cooling_time=30*60
-time_to_consider_order=60*15
-max_waiting_time=60*2 # maximum waiting time at restaurant or customer location
+time_to_consider_order=60*30
+max_waiting_time=60*4 # maximum waiting time at restaurant or customer location
 max_extra_travel_time=60*2
 TO_land_energy=7.5 # based on 1.6 Mj battery and 120 kj To_land_energy
-energy_per_metre=0.0078 # based on 12.5 kj per km and 1.6 Mj battery
-initial_orders_time = 30*60
+energy_per_metre=0.000078 # based on 12.5 kj per km and 1.6 Mj battery
+initial_orders_time = 60
 max_hover_time=60*3
-max_orders_per_mission=7
+max_orders_per_mission=10
 mp_interval=60*2
 deliver_time_window=60*10
+reso = 100
 
 # financial constants
 #initial costs
@@ -72,38 +73,3 @@ m_price = 13
 l_price = 16
 order_fee=0.25  # reimbursement per delivery
 order_volume_ratios = [0.786, 0.857, 0.929, 1, 1.494, 1.67, 1.494]
-
-class Point():
-    def __init__(self, xpos: float, ypos: float) -> None:
-        self.xpos = xpos
-        self.ypos = ypos
-
-    def distance(self, other: 'Point') -> float:
-        return np.sqrt((self.xpos - other.xpos)**2 + (self.ypos - other.ypos)**2)
-    
-    def nearest(self, places: list['Point']) -> 'Point':
-        distance = 10000000
-        nearest_place = None
-        for i in places:
-            if self.distance(i) < distance:
-                distance = self.distance(i)
-                nearest_place = i
-        return nearest_place
-
-class Order(Point):
-    def __init__(self,
-                 order_dict: dict):
-        super().__init__(order_dict['x_delivery_loc'], order_dict['y_delivery_loc'])
-        self.order_id = order_dict['order_id']
-        self.name = self.order_id
-        self.restaurant_id = order_dict['restaurant_id']
-        self.restaurant = order_dict['restaurant']
-        self.status = order_dict['status']  # True if delivered, False otherwise
-        self.time = order_dict['time']
-        self.s = order_dict['s']
-        self.m = order_dict['m']
-        self.l = order_dict['l']
-        self.being_delivered = False  # True if a drone is currently delivering this order
-        self.demand = self.s + self.m + self.l
-        self.arrival_time = order_dict['arrival_time']
-        self.waiting_time = waiting_time_customer  # seconds

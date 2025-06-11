@@ -86,6 +86,17 @@ class FinancialModel:
         energy_costs = total_energy_consumed * self.calculate_costs_per_kWh()
         return energy_costs
     
+    def calculate_daily_profit(self):
+        # Calculate daily profit
+        daily_revenue = self.calculate_revenue()
+        orders = [self.simulation.order_book[order_id] for order_id in self.simulation.order_book if self.simulation.order_book[order_id].status]
+        daily_costs = (
+            self.calculate_costs_per_delivery() * len(orders) +  # Costs per delivery
+            self.calculate_energy_costs()  # Energy costs
+        )
+        daily_profit = daily_revenue - daily_costs   
+        return daily_profit
+    
     def calculate_weekly_profit(self):
         # Calculate weekly profit
         weekly_revenue = 0
@@ -96,7 +107,7 @@ class FinancialModel:
                 self.simulation.take_step()
             daily_revenue = self.calculate_revenue()
             daily_costs = (
-                self.calculate_costs_per_delivery() * len(self.orders) +  # Costs per delivery
+                self.calculate_costs_per_delivery() * len([order for order in self.orders if order.status]) +  # Costs per delivery
                 self.calculate_energy_costs()  # Energy costs
             )
             weekly_revenue += daily_revenue
