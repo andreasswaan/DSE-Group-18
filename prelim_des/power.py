@@ -71,8 +71,8 @@ class Motor:
         Returns:
         int: Number of motors required.
         """
-        n_vert = 8
-        n_hor = 2
+        n_vert = 4
+        n_hor = 1
         return n_vert + n_hor  # Total number of motors (8 vertical + 2 horizontal)
 
     def weight(self):
