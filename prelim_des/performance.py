@@ -159,7 +159,8 @@ class Performance:
         hover_energy = hover_power * leg["loitering_time"]
 
         leg_energy = cruise_energy + take_off_energy + landing_energy + hover_energy + transition_energy
-        print(f"Energy breakdown: Cruise Energy: {cruise_energy[0]:.2f} J, "
+        if print == True:
+            print(f"Energy breakdown: Cruise Energy: {cruise_energy[0]:.2f} J, "
               f"Takeoff Energy: {take_off_energy[0]:.2f} J, "
               f"Landing Energy: {landing_energy[0]:.2f} J, "
               f"Transition Energy: {transition_energy:.2f} J, "
