@@ -1649,9 +1649,14 @@ def size_fuselage_for_min_mass(
 
         dz = fuselage.dz
         # distributed_loads = [section.mass(dz) * g for _, section in fuselage.sections]
-        self_weight_per_section = [section.mass(dz) * g for _, section in fuselage.sections]
+        self_weight_per_section = [
+            section.mass(dz) * g for _, section in fuselage.sections
+        ]
         # Add self-weight to the external distributed loads
-        total_distributed_loads = [ext + selfw for ext, selfw in zip(distributed_loads, self_weight_per_section)]
+        total_distributed_loads = [
+            ext + selfw
+            for ext, selfw in zip(distributed_loads, self_weight_per_section)
+        ]
 
         # --- Bending moments and stresses ---
         Mz_per_section, My_per_section = (
@@ -1727,10 +1732,12 @@ def size_fuselage_for_min_mass(
         # --- Check both criteria ---
         if utilization_with_sf < 1.0 and buckling_utilization < 1.0:
             last_safe = (area_scale, sum(sec.mass(dz) for _, sec in fuselage.sections))
-            # print(f"[DEBUG] Area scale: {area_scale:.3f}, Utilization: {utilization_with_sf:.3f}, Buckling: {buckling_utilization:.3f}")
+            print(
+                f"[DEBUG] Area scale: {area_scale:.3f}, Utilization: {utilization_with_sf:.3f}, Buckling: {buckling_utilization:.3f}"
+            )
             area_scale -= area_scale_step
             if area_scale < min_scale:
-                # print("[DEBUG] Area scale hit minimum allowed value.")
+                print("[DEBUG] Area scale hit minimum allowed value.")
                 break
         else:
             if last_safe is not None:
@@ -1908,7 +1915,7 @@ def run_structure_analysis(
     plot=False,
 ):
     # FIX FIX FIX, those values are educated guesses, but what values should they have? These might be correct
-    SAFETY_FACTOR = 2.0
+    SAFETY_FACTOR = 1.5 * 7.33
     shear_thickness = 0.002  # meters, skin thickness for shear stress calculations
     min_boom_area = 1e-5  # m^2, minimum area for a boom
 
@@ -2393,12 +2400,12 @@ def run_structure_analysis(
     h_stress, v_stress = tail.compute_bending_stresses(horiz_loads, vert_loads)
     if plot:
         tail.plot_3d_tail(
-        h_stress,
-        v_stress,
-        arrow_scale=arrow_scale,
-        horiz_loads=horiz_loads,
-        vert_loads=vert_loads,
-    )
+            h_stress,
+            v_stress,
+            arrow_scale=arrow_scale,
+            horiz_loads=horiz_loads,
+            vert_loads=vert_loads,
+        )
 
     # --- SIZING FOR BOTH FLIGHT MODES ---
 
@@ -2554,7 +2561,6 @@ def run_structure_analysis(
         # print(f"[INFO] Fuselage dimensions (case {fuselage_case}): width={fuselage_width:.3f} m, height={fuselage_height:.3f} m, length={fuselage_length:.3f} m")
         # print(f"[INFO] Fuselage initial structural mass: {fuselage.mass():.3f} kg")
 
-        
         payload_weight = (
             battery_weight
             + sensors_weight
@@ -2565,9 +2571,10 @@ def run_structure_analysis(
             + mechanisms_weight
             + payload_insulator_weight
         )
-        
-        # FIX FIX FIX SHEAR THICKNESS
-        payload_per_section = [payload_weight / fuselage.n_sections for _ in range(fuselage.n_sections)]
+
+        payload_per_section = [
+            payload_weight / fuselage.n_sections for _ in range(fuselage.n_sections)
+        ]
         min_fuselage_mass, fuselage_scale = size_fuselage_for_min_mass(
             fuselage,
             distributed_loads=payload_per_section,
@@ -2810,7 +2817,11 @@ def run_structure_analysis(
                 ]
             )
 
-    return wing_critical_mass, fuselage_critical_mass, tail_critical_mass
+    return 2 * wing_critical_mass, fuselage_critical_mass, tail_critical_mass
 
 
 # TODO: add the horizontal propeller to tail and add weight of all propellers to the fuselage
+# TODO: add weight of wing folding mechanism to the wing, remember to divide by 2
+# TODO: load factor from plot_load something from siddarth in the code
+# TODO: fix fuselage mass loop - seems to be fixed for now, but check it
+# TODO: fix all references in this code
