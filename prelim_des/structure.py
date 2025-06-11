@@ -37,6 +37,7 @@ class Structure:
         return (
             3.5  # Based on https://research.tudelft.nl/files/144857482/6.2022_1485.pdf
         )
+
     def calc_n_min(self):
         """
         Calculate the minimum load factor (n_min) for the drone.
@@ -104,3 +105,28 @@ class Structure:
         """
         # Placeholder: replace with real delivery mechanism weight calculation
         return toml["config"]["payload"]["del_mech_weight"]  # kg
+
+
+class Material:
+    def __init__(
+        self,
+        name: str,
+        E: float,
+        G: float,
+        density: float,
+        yield_strength: float,
+        uts: float,
+        tau_max: float,
+        epsilon_max: float,
+    ):
+        self.name = name
+        self.E = E * 1e9  # GPa → Pa
+        self.G = G * 1e9  # GPa → Pa
+        self.density = density * 1000  # g/cm³ → kg/m³
+        self.yield_strength = yield_strength * 1e6  # MPa → Pa
+        self.uts = uts * 1e6  # MPa → Pa
+        self.tau_max = tau_max * 1e6  # MPa → Pa
+        self.epsilon_max = epsilon_max  # Unitless
+
+    def __repr__(self):
+        return f"Material({self.name}, E={self.E:.2e} Pa, ρ={self.density} kg/m³)"
