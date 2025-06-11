@@ -165,3 +165,4 @@ Vh_V = 0.8
 taper_ratio_tail = 0.5 
 Aspect_ratio_tail = 3
 d_e_d_alpha = 0.5
+V_g = 7 
