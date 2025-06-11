@@ -19,7 +19,7 @@ drone = Drone()
 perf = Performance(drone, mission)
 drone.perf = perf
 drone.class_1_weight_estimate()
-# print("Drone MTOW:", drone.MTOW)
+print("Drone MTOW:", drone.MTOW)
 # print("Drone OEW:", drone.OEW)
 
 drone.wing.S = perf.wing_area(drone.OEW)
