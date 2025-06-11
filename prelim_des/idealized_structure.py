@@ -2464,15 +2464,10 @@ def run_structure_analysis(
     # wing.plot_deformed_wing(vertical_deflections)
 
     # Tail Creation - CHANGE VALUES !!!!!!!!!! --- !!!!!!!!!!! FIX FIX FIX
-<<<<<<< HEAD
-    
-
-=======
     '''
     _, _, _, b_h, c_h_small, c_h_big, b_v, c_v_small, c_v_big = (
         main_horizontal_stability(drone)
     )
->>>>>>> 5012abc6d8ad2bba53600fa8baa6d803407701f2
 
     horiz_span = b_h
     horiz_chord = c_h_big
