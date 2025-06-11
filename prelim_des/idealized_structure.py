@@ -1871,9 +1871,8 @@ class StructuralAnalysis:
 
     @property
     def wing_root_section(self):
-        print(self.ratio_width_box_to_root_chord)
         return create_rectangular_section(
-            width=float(self.drone.wing.c_root)*self.ratio_width_box_to_root_chord,
+            width=float(self.drone.wing.c_root)*self.ratio_width_box_to_root_chord,# Assumption
             height=float(
                 self.drone.wing.thick_over_chord * self.drone.wing.chord(y=0.0)
             ),
@@ -1895,7 +1894,7 @@ class StructuralAnalysis:
     @property
     def fuselage_root_section(self):
         return create_rectangular_section(
-            width=float(self.drone.wing.c_root),  # Assumption
+            width=float(self.drone.wing.c_root),  
             height=float(
                 self.drone.wing.thick_over_chord * self.drone.wing.chord(y=0.0)
             ),
@@ -1930,37 +1929,29 @@ class StructuralAnalysis:
     @property
     def fuselage_prop_loads(self):
         wing = self.wing_structure
+        max_thrust = self.drone.MTOW*2
         return [
-            {"x": 2.5 * wing.width, "y": wing.span / 2 / 3, "z": 0.0, "Pz": 450 / 4},
-            {"x": -1.5 * wing.width, "y": wing.span / 2 / 3, "z": 0.0, "Pz": 450 / 4},
-            {"x": 2.5 * wing.width, "y": -wing.span / 2 / 3, "z": 0.0, "Pz": 450 / 4},
-            {"x": -1.5 * wing.width, "y": -wing.span / 2 / 3, "z": 0.0, "Pz": 450 / 4},
+            {"x": 2.5 * wing.width, "y": wing.span / 2 / 3, "z": 0.0, "Pz": max_thrust / 4},
+            {"x": -1.5 * wing.width, "y": wing.span / 2 / 3, "z": 0.0, "Pz": max_thrust / 4},
+            {"x": 2.5 * wing.width, "y": -wing.span / 2 / 3, "z": 0.0, "Pz": max_thrust / 4},
+            {"x": -1.5 * wing.width, "y": -wing.span / 2 / 3, "z": 0.0, "Pz": max_thrust / 4},
         ]
 
     @property
     def wing_prop_loads(self):
         """all forces of the propellers when activated (in wing context)"""
         wing = self.wing_structure
+        max_thrust = self.drone.MTOW*2
+        print("max thrust", max_thrust)
         return [
-            {"x": 1.5 * wing.width, "y": wing.span / 2 / 3, "z": 0.0, "Pz": 450 / 4},
-            {"x": -1.5 * wing.width, "y": wing.span / 2 / 3, "z": 0.0, "Pz": 450 / 4},
+            {"x": 1.5 * wing.width, "y": wing.span / 2 / 3, "z": 0.0, "Pz": max_thrust / 4},
+            {"x": -1.5 * wing.width, "y": wing.span / 2 / 3, "z": 0.0, "Pz": max_thrust / 4},
         ]
 
     @property
     def motor_weight_loads_wing(self):
         motor_weight = self.drone.propulsion.motor.weight() * g  # [N]
         return [{**pl, "Pz": -motor_weight} for pl in self.wing_prop_loads]
-
-    def run_structure_analysis(self):
-        # Store initial wing and fuselage areas
-        original_wing_areas = [
-            [boom.area for boom in section.booms]
-            for _, section in self.wing_structure.sections
-        ]
-        original_fuselage_areas = [
-            [boom.area for boom in section.booms]
-            for _, section in self.fuselage_structure.sections
-        ]
 
     @property
     def n_max(self):
@@ -1995,6 +1986,7 @@ class StructuralAnalysis:
     def wing_point_loads_vtol(self):
         """all forces on the wing with their coordinates in vtol"""
         if self.prop_connection == "wing":
+            print("inside if")
             wing_point_loads = self.wing_prop_loads  # forces of propellers thrust
             wing_point_loads.extend(
                 self.motor_weight_loads_wing
@@ -2024,7 +2016,7 @@ class StructuralAnalysis:
 
         min_wing_mass_vtol, wing_scale_vtol = size_wing_for_min_mass(
             wing_structure,
-            lift_per_section_cruise,
+             [0.0 for _ in self.wing_structure.sections],
             weight_per_section,
             shear_thickness=self.shear_thickness,
             safety_factor=self.SAFETY_FACTOR,
@@ -2042,8 +2034,10 @@ class StructuralAnalysis:
 
         wing_weight = np.max([min_wing_mass_cruise, min_wing_mass_vtol]) * 2
         self.wing_weight = wing_weight
+        print("wing weight", wing_weight)
         return wing_weight
 
+    
 
 def run_structure_analysis(
     drone: Drone,
