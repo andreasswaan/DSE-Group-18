@@ -128,7 +128,8 @@ class VertPropeller:
         float: Power in Watts.
         """
         power = thrust**1.5 / np.sqrt(2 * ρ * self.area * self.η_prop) / FM
-        print(f"Power required for propeller: {power} W")
+        if print == True:
+            print(f"Power required for propeller: {power} W")
         thrust_per_prop = thrust / self.n_vert_prop()
         power_per_power = 40.518 * thrust_per_prop - 645.22
         if thrust < 28 or thrust > 110:
@@ -136,7 +137,8 @@ class VertPropeller:
                 f"Thrust {thrust} N is outside the expected range (30-100 N). Power calculation may not be accurate."
             )
         total_power = power_per_power * self.n_vert_prop()  # Total power for all vertical propellers
-        print(f"Power required for vertical propellers: {total_power} W")
+        if print == True:
+            print(f"Power required for vertical propellers: {total_power} W")
         return total_power
 
     def n_vert_prop(self) -> int:

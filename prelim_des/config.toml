@@ -9,7 +9,7 @@ config_name = "Drone 1"
 CL_max = 1.0                              # [-]
 CL_cruise = 0.6                           # [-]
 CD0 = 0.05                                # [-]
-oswald_efficiency = 0.80                  # [-]
+oswald_efficiency = 0.80                  # [-] careful to not change this, this was used in the CFD calculations. If needed ask Andreas
 CD_flat_plate = 1.30                      # [-]
 CL_slope_aircraft = 5.7                   # [1/rad]
 
@@ -82,6 +82,7 @@ FM = 0.75
 L_over_D_cruise = 10                      # -
 T_over_D_cruise = 1                       # -
 T_over_W_takeoff = 2                      # -
+AOA_cruise = 6                            # -
 
 #-----------------------------------------------------------------------------------------------------------------------
 
