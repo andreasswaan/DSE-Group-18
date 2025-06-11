@@ -2794,9 +2794,10 @@ def run_structure_analysis(
         payload_per_section = [
             payload_weight / fuselage.n_sections for _ in range(fuselage.n_sections)
         ]
+
         min_fuselage_mass, fuselage_scale = size_fuselage_for_min_mass(
             fuselage,
-            distributed_loads=0,  # payload_per_section,
+            distributed_loads=payload_per_section,  # payload_per_section,
             shear_thickness=shear_thickness,
             safety_factor=SAFETY_FACTOR,
             area_scale_start=3.0,
