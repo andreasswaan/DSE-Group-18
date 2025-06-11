@@ -1935,13 +1935,15 @@ def run_structure_analysis(
     plot=False,
 ):
     from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
-    
+
     n_max = plot_maneuver_and_gust_envelope(drone, plot=False)
     print(f"{n_max} g's maximum load factor from maneuver envelope.")
-    
+
     # FIX FIX FIX, those values are educated guesses, but what values should they have? These might be correct
     SAFETY_FACTOR = 1.5 * n_max
-    shear_thickness = 0.002  # meters, skin thickness for shear stress calculations, WE DECIDE
+    shear_thickness = (
+        0.002  # meters, skin thickness for shear stress calculations, WE DECIDE
+    )
     min_boom_area = 1e-5  # m^2, minimum area for a boom
     motor_weight_kg = 0.2  # 200g per motor, waiting for proper weght from Ishaan
     motor_weight = motor_weight_kg * g  # [N]
@@ -1949,8 +1951,8 @@ def run_structure_analysis(
     # Create root cross-section
     # FIX THIS -> call correct values
     root_section = create_rectangular_section(
-        width=0.6, # drone.wing.c_root,
-        height=0.072, # drone.wing.thick_over_chord * drone.wing.chord(y = 0.0),
+        width=float(drone.wing.c_root),
+        height=float(drone.wing.thick_over_chord * drone.wing.chord(y=0.0)),
         n_regular_booms=12,
         spar_cap_area=1e-4,
         regular_boom_area=5e-5,

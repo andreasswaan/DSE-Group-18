@@ -29,6 +29,8 @@ class Wing:
         self.span = toml["config"]["wing"]["wing_span"]
         self.Γ = toml["config"]["wing"]["dihedral"]
         self.Λ_c4 = np.deg2rad(toml["config"]["wing"]["quarter_chord_sweep"])
+        self.thick_over_chord = toml["config"]["wing"]["thickness_over_chord"]
+
         self.Λ_LE = 0
 
     @property
@@ -138,6 +140,7 @@ class Wing:
         assert y0 >= 0 and y1 >= 0 and y1 > y0, "Specify correct bounds!"
         return (self.chord(y0) + self.chord(y1)) / 2 * (y1 - y0)
 
+    @property
     def roskam_weight(self):
         """Estimate the wing weight using Cessna method from Roskam V:
         https://research.tudelft.nl/files/144857482/6.2022_1485.pdf.
@@ -154,8 +157,11 @@ class Wing:
             * n_ult**0.397
             * self.geom_AR**1.712
         )
+        return roskam_w
 
-        weight_folding = toml["config"]["wing"]["wing_folding_weight"]
+    @property
+    def weight(self):
+        mass_folding = toml["config"]["wing"]["wing_folding_weight"]
 
         # Placeholder estimate for the wing weight based
         # return 0.4 * self.S + 0.06 * self.drone.MTOW + weight_folding
@@ -163,12 +169,7 @@ class Wing:
         wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
             self.drone, "fuselage", fuselage_case=2
         )
-        return wing_mass + weight_folding
-
-    @property
-    def weight(self):
-
-        pass
+        return wing_mass + mass_folding
 
     def plot_planform(self, save_plot=True, filename="wing_planform.png"):
         """
@@ -235,7 +236,8 @@ class Wing:
             f"MAC: {MAC:.2f} m\n"
             f"Aspect Ratio: {float(AR):.2f}\n"
             f"Taper Ratio: {taper:.2f}\n"
-            f"Sweep (Λ_LE): {np.degrees(sweep_LE):.1f}°"
+            f"Sweep (Λ_LE): {np.degrees(sweep_LE):.1f}°\n"
+            f"Weight: {self.weight:.1f} kg"
         )
         props = dict(boxstyle="round", facecolor="white", edgecolor="black", alpha=0.95)
         ax.text(
