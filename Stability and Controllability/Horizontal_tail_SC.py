@@ -15,11 +15,8 @@ with open("prelim_des/config.toml", "rb") as f:
     data = tomllib.load(f)
 
 # Structures Values
-W_fuselage = 15  # kg
-X_fuselage = 5  # m
-W_wing = 5  # kg
-S_wing = 10  # m^2, wing area
 Dxw = 0.2  # m , from LEMAC to wing CG
+X_fuselage = 0.5  # m, distance from nose to fuselage CG
 
 # Aerodynamics Values
 Cl_alpha_h = 4  # tail Cl alpha
@@ -111,7 +108,7 @@ def main_horizontal_stability(
     )
 
     # print("most infront x_cg:",x_cg_start,"\n","most back x_cg:",x_cg_end,"\n","wing position:",wing_position,"\n","tail_area_ratio:",tail_area_ratio,)
-    b, c_small, c_big = horizontal_tail_area_sizing(
+    b_h, c_h_small, c_h_big = horizontal_tail_area_sizing(
         tail_area_ratio, S_wing, taper_ratio_tail, Aspect_ratio_tail
     )
     
@@ -169,7 +166,7 @@ def main_horizontal_stability(
         stab_cont_lines_plot(
             y_tail, x_stab, x_control, x_cg_start, x_cg_end, tail_area_ratio
         )
-    return x_cg_start, x_cg_end, wing_position, b, c_small, c_big, b_v, c_v_small, c_v_big
+    return x_cg_start, x_cg_end, wing_position, b_h, c_h_small, c_h_big, b_v, c_v_small, c_v_big
 
 
 # CG range graph
@@ -527,14 +524,11 @@ if __name__ == "__main__":
     perf = Performance(drone, mission)
     drone.perf = perf
     drone.class_1_weight_estimate()
-    drone.wing.Dxw = Dxw
-    drone.fuselage.weight = W_fuselage
-    drone.wing.weight = W_wing
+    drone.class_2_weight_estimate(transition=True)
+ 
 
     main_horizontal_stability(
         drone,
-        W_fuselage,
-        W_wing,
         X_fuselage,
         Dxw,
         Cl_alpha_h,
