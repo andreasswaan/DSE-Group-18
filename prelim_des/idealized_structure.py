@@ -470,13 +470,33 @@ class FuselageStructure:
         Returns a list of (x_position, IdealizedSection) from nose to tail.
         """
         sections = []
-        for i in range(self.n_sections):
-            x = (i / (self.n_sections - 1)) * self.length
-            scale = 1 - (1 - self.taper_ratio) * (i / (self.n_sections - 1))
+        n = self.n_sections
+        L = self.length
+
+        # Define fractions for each region (adjust as needed)
+        taper_frac = 0.2  # 20% of length for each taper
+        const_frac = 1 - 2 * taper_frac
+
+        for i in range(n):
+            x = (i / (n - 1)) * L
+            frac = x / L
+
+            # Taper-in zone
+            if frac < taper_frac:
+                local_scale = 0.5 + 0.5 * (frac / taper_frac)  # from 0.5 to 1.0
+            # Constant zone
+            elif frac < taper_frac + const_frac:
+                local_scale = 1.0
+            # Taper-out zone
+            else:
+                local_scale = 1.0 - 0.5 * (
+                    (frac - taper_frac - const_frac) / taper_frac
+                )  # from 1.0 to 0.5
+
             scaled_booms = [
                 Boom(
-                    x=boom.x * scale,
-                    y=boom.y * scale,
+                    x=boom.x * local_scale,
+                    y=boom.y * local_scale,
                     area=boom.area,
                     boom_type=boom.type,
                     material=boom.material,
@@ -1732,12 +1752,12 @@ def size_fuselage_for_min_mass(
         # --- Check both criteria ---
         if utilization_with_sf < 1.0 and buckling_utilization < 1.0:
             last_safe = (area_scale, sum(sec.mass(dz) for _, sec in fuselage.sections))
-            print(
-                f"[DEBUG] Area scale: {area_scale:.3f}, Utilization: {utilization_with_sf:.3f}, Buckling: {buckling_utilization:.3f}"
-            )
+            # print(
+            #     f"[DEBUG] Area scale: {area_scale:.3f}, Utilization: {utilization_with_sf:.3f}, Buckling: {buckling_utilization:.3f}"
+            # )
             area_scale -= area_scale_step
             if area_scale < min_scale:
-                print("[DEBUG] Area scale hit minimum allowed value.")
+                # print("[DEBUG] Area scale hit minimum allowed value.")
                 break
         else:
             if last_safe is not None:

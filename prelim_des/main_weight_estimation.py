@@ -59,4 +59,4 @@ print("Drone MTOW after iterative estimate:", drone.MTOW)
 #         )
 
 
-run_structure_analysis(drone, "fuselage", fuselage_case=2)
+run_structure_analysis(drone, "fuselage", fuselage_case=2, plot=True)
