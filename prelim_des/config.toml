@@ -101,7 +101,7 @@ static_friction_coeff = 0.4               # -, for cardboard to cardboard, lower
 [config.landing_gear]
 
 shock_strut_length_MG = 0.15              # m Roskam page 81, update when designed
-n_legs
+n_legs = 4                                # [-]
 
 #-----------------------------------------------------------------------------------------------------------------------
 
