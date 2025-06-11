@@ -12,35 +12,11 @@ import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
+from structure import Material
 
 # === CONFIG & MATERIALS ===
 
 toml = load_toml()
-
-
-class Material:
-    def __init__(
-        self,
-        name: str,
-        E: float,
-        G: float,
-        density: float,
-        yield_strength: float,
-        uts: float,
-        tau_max: float,
-        epsilon_max: float,
-    ):
-        self.name = name
-        self.E = E * 1e9  # GPa → Pa
-        self.G = G * 1e9  # GPa → Pa
-        self.density = density * 1000  # g/cm³ → kg/m³
-        self.yield_strength = yield_strength * 1e6  # MPa → Pa
-        self.uts = uts * 1e6  # MPa → Pa
-        self.tau_max = tau_max * 1e6  # MPa → Pa
-        self.epsilon_max = epsilon_max  # Unitless
-
-    def __repr__(self):
-        return f"Material({self.name}, E={self.E:.2e} Pa, ρ={self.density} kg/m³)"
 
 
 def load_materials(toml: dict) -> dict[str, Material]:
