@@ -156,7 +156,7 @@ class Performance:
         )
         return range_cruise
 
-    def leg_energy(self, leg, transition):
+    def leg_energy(self, leg, transition, print=False):
         """
         Calculate the energy required for a single leg of the mission.
         """
@@ -200,14 +200,15 @@ class Performance:
             + hover_energy
             + transition_energy
         )
-        print(
-            f"Energy breakdown: Cruise Energy: {cruise_energy[0]:.2f} J, "
-            f"Takeoff Energy: {take_off_energy[0]:.2f} J, "
-            f"Landing Energy: {landing_energy[0]:.2f} J, "
-            f"Transition Energy: {transition_energy:.2f} J, "
-            f"Hover Energy: {hover_energy[0]:.2f} J",
-            f"Leg Mass: {self.drone.OEW + PL_mass} kg",
-        )
+        if print:
+            print(
+                f"Energy breakdown: Cruise Energy: {cruise_energy[0]:.2f} J, "
+                f"Takeoff Energy: {take_off_energy[0]:.2f} J, "
+                f"Landing Energy: {landing_energy[0]:.2f} J, "
+                f"Transition Energy: {transition_energy:.2f} J, "
+                f"Hover Energy: {hover_energy[0]:.2f} J",
+                f"Leg Mass: {self.drone.OEW + PL_mass} kg",
+            )
         leg_energy = cruise_energy + take_off_energy + landing_energy + hover_energy + transition_energy
         # print(f"Energy breakdown: Cruise Energy: {cruise_energy[0]:.2f} J, "
         #       f"Takeoff Energy: {take_off_energy[0]:.2f} J, "

@@ -31,6 +31,13 @@ drone.class_2_weight_estimate(transition=True)
 
 drone.iterative_weight_estimate(transition=True, plot=False, max_iterations=100, tolerance=0.01)
 print("Drone MTOW after iterative estimate:", drone.MTOW)
+print("Drone mass breakdown:", 
+      "Battery weight:", drone.propulsion.battery.weight,
+      "Wing weight:", drone.wing.weight,
+      "Fuselage weight:", drone.fuselage.weight(),
+        "Landing gear weight:", drone.landing_gear.weight(),
+        "Propulsion weight:", drone.propulsion.weight(drone.perf.mission_energy(transition=True)[0]),
+)
 # print(f"Wing surface area: {drone.wing.S}")
 
 # drone.wing.plot_planform(save_plot=True)
