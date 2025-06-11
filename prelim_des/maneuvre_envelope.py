@@ -33,8 +33,9 @@ def plot_maneuver_and_gust_envelope(
     V_dive = 1.5 * V_cruise
 
     # Gust velocities at each reference speed (example values, adjust as needed)
-    U_gusts = [12.5, 10.0, 5.0]  # [at V_B, V_cruise, V_dive]
-
+    # U_gusts = [12.5, 10.0, 5.0]  # [at V_B, V_cruise, V_dive]
+    U_gusts = [8.0, 7.0, 5.0]  # [at V_B, V_cruise, V_dive]
+    
     # Calculate delta_n at each reference speed
     V_refs = [V_B, V_cruise, V_dive]
     gust_points = []

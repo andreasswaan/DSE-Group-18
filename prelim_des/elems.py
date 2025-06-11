@@ -27,18 +27,24 @@ class Wing:
 
         self.drone = drone
         self.span = toml["config"]["wing"]["wing_span"]
-        self.thick_over_chord = toml["config"]["wing"]["thickness_over_chord"]
         self.Γ = toml["config"]["wing"]["dihedral"]
         self.Λ_c4 = np.deg2rad(toml["config"]["wing"]["quarter_chord_sweep"])
+        self.Λ_LE = 0
 
     @property
     def c_root(self):
         """Wing surface [m2]"""
+        if not hasattr(self, "S"):
+            return None
+
         return 2 * self.S / (self.span * (1 + self.taper))
 
     @property
     def c_tip(self):
         """Tip chord length [m]"""
+        if not hasattr(self, "S"):
+            return None
+
         return self.taper * self.c_root
 
     @property
@@ -48,8 +54,8 @@ class Wing:
 
     def sweep(self, x):
         """Sweep angle [rad] at a given chord fraction [-]"""
-        sweep0 = self.Λ_c4
-        x0 = 0.25
+        sweep0 = self.Λ_LE
+        x0 = 0
         return np.arctan(
             np.tan(sweep0) + (x0 - x) * (2 * self.c_root / self.span) * (1 - self.taper)
         )
@@ -132,7 +138,7 @@ class Wing:
         assert y0 >= 0 and y1 >= 0 and y1 > y0, "Specify correct bounds!"
         return (self.chord(y0) + self.chord(y1)) / 2 * (y1 - y0)
 
-    def weight(self):
+    def roskam_weight(self):
         """Estimate the wing weight using Cessna method from Roskam V:
         https://research.tudelft.nl/files/144857482/6.2022_1485.pdf.
 
@@ -159,15 +165,20 @@ class Wing:
         )
         return wing_mass + weight_folding
 
-    def plot_planform(self, save_plot=False, filename="wing_planform.png"):
+    @property
+    def weight(self):
+
+        pass
+
+    def plot_planform(self, save_plot=True, filename="wing_planform.png"):
         """
         Plot the wing planform and display key parameters in a box.
         """
         span = self.span
-        c_root = self.c_root[0]
-        c_tip = self.c_tip[0]
-        sweep_LE = self.sweep(0)[0]  # radians
-        MAC = self.MAC[0]
+        c_root = float(self.c_root)
+        c_tip = float(self.c_tip)
+        sweep_LE = float(self.sweep(0))  # radians
+        MAC = float(self.MAC)
         xLEMAC = self.xLEMAC
         yLEMAC = self.yLEMAC
         AR = self.geom_AR
@@ -217,12 +228,12 @@ class Wing:
 
         # Key parameters box in upper right
         param_text = (
-            f"Area (S): {self.S[0]:.2f} m²\n"
+            f"Area (S): {float(self.S):.2f} m²\n"
             f"Span: {span:.2f} m\n"
             f"Root chord: {c_root:.2f} m\n"
             f"Tip chord: {c_tip:.2f} m\n"
             f"MAC: {MAC:.2f} m\n"
-            f"Aspect Ratio: {AR[0]:.2f}\n"
+            f"Aspect Ratio: {float(AR):.2f}\n"
             f"Taper Ratio: {taper:.2f}\n"
             f"Sweep (Λ_LE): {np.degrees(sweep_LE):.1f}°"
         )

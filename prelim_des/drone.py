@@ -69,7 +69,7 @@ class Drone:
 
         mission_energy = self.perf.mission_energy(transition)
         self.OEW = (
-            self.wing.weight()
+            self.wing.roskam_weight()
             + self.fuselage.weight()
             + self.landing_gear.weight()
             + self.propulsion.weight(mission_energy)
@@ -96,7 +96,7 @@ class Drone:
                 else "Propeller Weight: Not available"
             )
             print(
-                f"Component Weights: Wing = {self.wing.weight():.2f} kg, "
+                f"Component Weights: Wing = {self.wing.roskam_weight():.2f} kg, "
                 f"Fuselage = {self.fuselage.weight():.2f} kg, "
                 f"Landing Gear = {float(self.landing_gear.weight()):.2f} kg, "
                 f"Propulsion = {self.propulsion.weight(mission_energy)[0]:.2f} kg"
@@ -112,7 +112,9 @@ class Drone:
 
         return self.MTOW, self.OEW
 
-    def iterative_weight_estimate(self, transition=False, max_iterations=100, tolerance=0.01, plot=False):
+    def iterative_weight_estimate(
+        self, transition=False, max_iterations=100, tolerance=0.01, plot=False
+    ):
         """
         Perform an iterative weight estimate until convergence.
         """
