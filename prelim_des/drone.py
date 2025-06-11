@@ -74,32 +74,33 @@ class Drone:
             + self.landing_gear.weight()
             + self.propulsion.weight(mission_energy)
         )
-        print(
-            f"Mission Energy: {mission_energy[0]:.2f} J"
-            if mission_energy is not None
-            else "Mission Energy: Not calculated"
-        )
-        print(
-            f"Battery Weight: {self.propulsion.battery.calc_weight(energy_required=mission_energy)[0]:.2f} kg"
-            if hasattr(self.propulsion, "battery")
-            else "Battery Weight: Not available"
-        )
-        print(
-            f"Motor Weight: {self.propulsion.motor.weight():.2f} kg"
-            if hasattr(self.propulsion, "motor")
-            else "Motor Weight: Not available"
-        )
-        print(
-            f"Propeller Weight: {self.propulsion.ver_prop.weight():.2f} kg"
-            if hasattr(self.propulsion, "ver_prop")
-            else "Propeller Weight: Not available"
-        )
-        print(
-            f"Component Weights: Wing = {self.wing.weight:.2f} kg, "
-            f"Fuselage = {self.fuselage.weight():.2f} kg, "
-            f"Landing Gear = {float(self.landing_gear.weight()):.2f} kg, "
-            f"Propulsion = {self.propulsion.weight(mission_energy)[0]:.2f} kg"
-        )
+        if print == True:
+            print(
+                f"Mission Energy: {mission_energy[0]:.2f} J"
+                if mission_energy is not None
+                else "Mission Energy: Not calculated"
+            )
+            print(
+                f"Battery Weight: {self.propulsion.battery.calc_weight(energy_required=mission_energy)[0]:.2f} kg"
+                if hasattr(self.propulsion, "battery")
+                else "Battery Weight: Not available"
+            )
+            print(
+                f"Motor Weight: {self.propulsion.motor.weight():.2f} kg"
+                if hasattr(self.propulsion, "motor")
+                else "Motor Weight: Not available"
+            )
+            print(
+                f"Propeller Weight: {self.propulsion.ver_prop.weight():.2f} kg"
+                if hasattr(self.propulsion, "ver_prop")
+                else "Propeller Weight: Not available"
+            )
+            print(
+                f"Component Weights: Wing = {self.wing.roskam_weight():.2f} kg, "
+                f"Fuselage = {self.fuselage.weight():.2f} kg, "
+                f"Landing Gear = {float(self.landing_gear.weight()):.2f} kg, "
+                f"Propulsion = {self.propulsion.weight(mission_energy)[0]:.2f} kg"
+            )
 
         self.max_payload = (
             toml["config"]["payload"]["n_box"] * toml["config"]["payload"]["box_weight"]

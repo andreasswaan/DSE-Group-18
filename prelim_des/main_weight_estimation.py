@@ -19,7 +19,8 @@ drone = Drone()
 perf = Performance(drone, mission)
 drone.perf = perf
 drone.class_1_weight_estimate()
-print("Drone MTOW:", drone.MTOW)
+if print ==True:
+    print("Drone MTOW:", drone.MTOW)
 # print("Drone OEW:", drone.OEW)
 
 drone.wing.S = perf.wing_area(drone.OEW)
@@ -30,7 +31,8 @@ drone.class_2_weight_estimate(transition=True)
 # print("Drone OEW after class 2 estimate:", drone.OEW)
 
 drone.iterative_weight_estimate(transition=True, plot=False, max_iterations=100, tolerance=0.01)
-print("Drone MTOW after iterative estimate:", drone.MTOW)
+if print == True:
+    print("Drone MTOW after iterative estimate:", drone.MTOW)
 # print(f"Wing surface area: {drone.wing.S}")
 
 # drone.wing.plot_planform(save_plot=True)
@@ -59,4 +61,4 @@ print("Drone MTOW after iterative estimate:", drone.MTOW)
 #         )
 
 
-run_structure_analysis(drone, "fuselage", fuselage_case=2, plot=False)
+run_structure_analysis(drone, "fuselage", fuselage_case=2, plot=False, print=False)
