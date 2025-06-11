@@ -69,7 +69,7 @@ class Performance:
             )  # Using lift equation with horizontal equilibrium
             difference_S = old_wing_surface - self.drone.wing.S
             old_wing_surface = self.drone.wing.S
-            print(self.drone.wing.S)
+            
 
             n = +1
         self.drone.wing.plot_planform()

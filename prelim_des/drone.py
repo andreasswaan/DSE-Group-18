@@ -1,6 +1,7 @@
 import os
 import matplotlib.pyplot as plt
 from globals import main_dir
+from prelim_des.idealized_structure import StructuralAnalysis
 from prelim_des.power import PropulsionSystem
 from prelim_des.elems import Wing, Fuselage, LandingGear, Tail_Hori_Veri
 from prelim_des.structure import Structure
@@ -21,7 +22,7 @@ class Drone:
     structure: Structure
     propulsion: PropulsionSystem
     perf: Performance
-
+    structural_analysis:StructuralAnalysis
     MTOW: float
     OEW: float
 
@@ -35,6 +36,7 @@ class Drone:
         self.tail = Tail_Hori_Veri(self)
         self.structure = Structure(self)
         self.propulsion = PropulsionSystem(self)
+        self.structural_analysis = StructuralAnalysis(self,2,"wing")
 
     def class_1_weight_estimate(self):
         """
