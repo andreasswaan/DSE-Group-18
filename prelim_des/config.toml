@@ -101,6 +101,7 @@ static_friction_coeff = 0.4               # -, for cardboard to cardboard, lower
 [config.landing_gear]
 
 shock_strut_length_MG = 0.15              # m Roskam page 81, update when designed
+n_legs = 4                                # [-]
 
 #-----------------------------------------------------------------------------------------------------------------------
 
@@ -146,3 +147,10 @@ mat_E_1 = 19                                # GPa (Tensile)
 mat_E_2 = 16                                # GPa (Flexural)
 mat_delta_y_1 = 130                         # MPa (Tensile)
 mat_delta_y_2 = 180                         # MPa (Flexural)
+
+
+[config.structures]
+
+SAFETY_FACTOR = 1.5
+shear_thickness = 0.002
+min_boom_area=1e-5

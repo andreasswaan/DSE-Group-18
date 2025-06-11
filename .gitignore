@@ -12,6 +12,7 @@ prelim_des/utils/NACA_airfoil_database/**/*.dat
 #exclude plots
 *.svg
 *.png
+*.csv
 
 # C extensions
 *.so
@@ -186,3 +187,4 @@ cython_debug/
 
 # PyCharm temp files
 .idea
+wing_sections.csv

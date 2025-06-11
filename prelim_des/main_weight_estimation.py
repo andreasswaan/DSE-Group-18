@@ -43,6 +43,8 @@ if print:
         drone.wing.weight,
         "Fuselage weight:",
         drone.fuselage.weight(),
+        "Tail weight:",
+        drone.tail.weight(),
         "Landing gear weight:",
         drone.landing_gear.weight(),
         "Propulsion weight:",
