@@ -2629,7 +2629,7 @@ def run_structure_analysis(
 
     print("\n=== STRUCTURE SIZING SUMMARY ===")
     print(
-        f"Wing: Critical mode is '{wing_critical_mode}' with mass {results[wing_critical_mode]['wing_mass']:.2f} kg"
+        f"Wing: Critical mode is '{wing_critical_mode}' with mass {2* results[wing_critical_mode]['wing_mass']:.2f} kg"
     )
     print(
         f"Fuselage: Critical mode is '{fuselage_critical_mode}' with mass {results[fuselage_critical_mode]['fuselage_mass']:.2f} kg"
