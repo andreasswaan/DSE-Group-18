@@ -2417,17 +2417,18 @@ def run_structure_analysis(
         point_loads = []
 
         lift_per_section = [
-            elliptical_lift_distribution(y, drone) * dy for y, _ in wing.sections
+            elliptical_lift_distribution(y, drone) * n_max * dy
+            for y, _ in wing.sections
         ]
         weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
         drag_per_section = [
-            constant_drag_distribution(drone) * dy for y, _ in wing.sections
+            constant_drag_distribution(drone) * n_max**2 * dy for y, _ in wing.sections
         ]
 
         # Calculate total forces on the wing
-        total_lift = sum(lift_per_section) * n_max
+        total_lift = sum(lift_per_section)
         total_weight = sum(weight_per_section)
-        total_drag = sum(drag_per_section) * n_max**2
+        total_drag = sum(drag_per_section)
 
         net_vertical_force = total_lift - total_weight  # Pz (upwards positive)
         net_drag_force = total_drag
@@ -2593,10 +2594,6 @@ def run_structure_analysis(
 
         if flight_mode == "cruise":
             # All lift from wings, no propeller loads
-            lift_per_section = [
-                elliptical_lift_distribution(y, drone) * dy * n_max
-                for y, _ in wing.sections
-            ]
             if prop_connection == "wing":
                 wing_point_loads_mode = wing_prop_loads.copy()
                 fuselage_point_loads_mode = []
@@ -2605,7 +2602,6 @@ def run_structure_analysis(
                 wing_point_loads_mode = []
                 fuselage_point_loads_mode = fuselage_prop_loads.copy()
                 fuselage_point_loads_mode += motor_weight_loads_fuselage
-            total_lift = sum(lift_per_section)
             wing_reaction = total_lift / 2  # assuming two attach points
             # Use correct x, y, z for your attach points
             fuselage_point_loads_mode = [
@@ -2780,16 +2776,7 @@ def run_structure_analysis(
         # print(f"[INFO] Fuselage dimensions (case {fuselage_case}): width={fuselage_width:.3f} m, height={fuselage_height:.3f} m, length={fuselage_length:.3f} m")
         # print(f"[INFO] Fuselage initial structural mass: {fuselage.mass():.3f} kg")
 
-        payload_weight = (
-            battery_weight
-            + sensors_weight
-            + computing_module_weight
-            + miscellaneous_weight
-            + pizza_weight_1
-            + pizza_weight_2
-            + mechanisms_weight
-            + payload_insulator_weight
-        )
+        payload_weight = miscellaneous_weight
 
         payload_per_section = [
             payload_weight / fuselage.n_sections for _ in range(fuselage.n_sections)
@@ -3043,7 +3030,47 @@ def run_structure_analysis(
 
 
 # TODO: add the horizontal propeller to tail and add weight of all propellers to the fuselage
-# TODO: add weight of wing folding mechanism to the wing, remember to divide by 2 - done for now
-# TODO: load factor from plot_load something from siddarth in the code
-# TODO: fix fuselage mass loop - seems to be fixed for now, but check it
 # TODO: fix all references in this code
+
+
+# def check_hollow_cylinder(
+#     axial_load_N, length_m, outer_d_m, inner_d_m, E_Pa, yield_strength_Pa, density
+# ):
+#     """
+#     Checks if a hollow cylinder can support a given axial load.
+#     Returns (is_safe, utilization_ratio, buckling_ratio, sigma_max, sigma_cr)
+#     """
+#     A = np.pi / 4 * (outer_d_m**2 - inner_d_m**2)  # cross-sectional area
+#     I = np.pi / 64 * (outer_d_m**4 - inner_d_m**4)  # moment of inertia
+#     r = np.sqrt(I / A)  # radius of gyration
+
+#     # Compressive stress
+#     sigma_max = axial_load_N / A
+
+#     # Euler buckling (pinned-pinned, K=1)
+#     K = 1.0
+#     sigma_cr = (np.pi**2 * E_Pa) / ((K * length_m / r) ** 2)
+
+#     # Utilization ratios
+#     utilization_ratio = sigma_max / yield_strength_Pa
+#     buckling_ratio = sigma_max / sigma_cr
+
+#     is_safe = utilization_ratio < 1.0 and buckling_ratio < 1.0
+
+#     mass = A * length_m * density  # mass of the cylinder
+
+#     return is_safe, utilization_ratio, buckling_ratio, sigma_max, sigma_cr, mass
+
+
+# is_safe, util, buckl, sigma, sigma_cr, mass = check_hollow_cylinder(
+#     axial_load_N=25 * g / 4,
+#     length_m=0.03,
+#     outer_d_m=0.07,
+#     inner_d_m=0.064,
+#     E_Pa=0.001e9,  # 69e9,
+#     yield_strength_Pa=2e6,  # 250e6,
+#     density=900,  # 2700,
+# )
+# print(
+#     f"Safe: {is_safe}, Utilization: {util:.2f}, Buckling: {buckl:.2f}, Sigma: {sigma:.1f} Pa, Buckling Stress: {sigma_cr:.1f} Pa, Mass: {4*mass:.3f} kg"
+# )
