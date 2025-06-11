@@ -63,6 +63,7 @@ All unit tests that intend to remain in the program should be written using pyte
 - GitLens
 - Rainbow CSV
 - vscode-pdf
+- Live Share
 
 
 ## Setting Up the Virtual Environment

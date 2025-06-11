@@ -15,6 +15,7 @@ toml = load_toml()
 class Structure:
     def __init__(self, drone: Drone):
         self.drone = drone
+        self.mu_static = toml["config"]["payload"]["static_friction_coeff"]
 
     def calc_n_max(self):
         """
@@ -34,8 +35,15 @@ class Structure:
         """
         # Placeholder: replace with real structural analysis
         return (
-            3.2  # Based on https://research.tudelft.nl/files/144857482/6.2022_1485.pdf
+            3.5  # Based on https://research.tudelft.nl/files/144857482/6.2022_1485.pdf
         )
+    def calc_n_min(self):
+        """
+        Calculate the minimum load factor (n_min) for the drone.
+        This is a placeholder method and should be replaced with a real calculation.
+        """
+        # Placeholder: replace with real structural analysis
+        return -1.5
 
     def calc_n_ult(self):
         """
