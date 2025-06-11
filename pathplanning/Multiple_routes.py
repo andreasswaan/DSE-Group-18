@@ -116,7 +116,7 @@ def plot_path(grid, walkable, start, end, paths):
     # 1. Plot obstacle polygons for reference (add this here!)
     for poly in obstacle_polygons:
         x, y = poly.exterior.xy
-        ax.fill(x, y, color='black', alpha=0.3)
+        ax.fill(x, y, color='black', alpha=0.0)
 
 
     for idx, (alpha, final_path, smoothed_path, collided) in enumerate(paths):
@@ -133,7 +133,7 @@ def plot_path(grid, walkable, start, end, paths):
     ax.plot(end[0], end[1], 'go', label='End point', markersize=6)
 
     cbar = plt.colorbar(cm.ScalarMappable(norm=mcolors.Normalize(vmin=0.0, vmax=max_weight), cmap=cmap), ax=ax)
-    cbar.set_label("Navigation Cost (normalized)", fontsize=10)
+    cbar.set_label("Population Density (normalized)", fontsize=10)
 
     ax.legend(loc='upper right', frameon=True)
     ax.axis("off")
@@ -178,6 +178,10 @@ alphas = np.linspace(0.1,1.1,10)  # You can extend as needed
 
 start = (30, 49)
 end = (40, 73)
+start = (31, 46)
+end = (36, 65)
+# start = (190, 355)
+# end = (230, 430)
 print(f"  Start: {start}")
 print(f"  End:   {end}")
 

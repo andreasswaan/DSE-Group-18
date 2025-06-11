@@ -554,22 +554,40 @@ def plot_weighted_grid(grid_data):
 # Example usage
 print("Creating weighted grid for Delft...")
 city = "Delft"
-grid_data = create_weighted_grid(city, resolution=10.0)
+grid_data = create_weighted_grid(city, resolution=100.0)
 no_fly_zone = get_no_fly_zones('Delft')  # 10m resolution
 copy_dutch_city = ('Delft')
 print('Plotting weighted grid...')
 plot_weighted_grid(grid_data)
 
 # --- EXPORT GRID TO DISK ---
-output_path = "pathplanning/data/delft_grid_data_10_border.npz"
-np.savez_compressed(output_path,
-    weight_grid=grid_data['weight_grid'],
-    obstacle_grid=grid_data['obstacle_grid'],
-    restaurant_grid=grid_data['restaurant_grid'],
-    x_coords=grid_data['x_coords'],
-    y_coords=grid_data['y_coords'],
-    bounds=grid_data['bounds'],
-    resolution=grid_data['resolution']
-)
+# output_path = "pathplanning/data/delft_grid_data_test.npz"
+# np.savez_compressed(output_path,
+#     weight_grid=grid_data['weight_grid'],
+#     obstacle_grid=grid_data['obstacle_grid'],
+#     restaurant_grid=grid_data['restaurant_grid'],
+#     x_coords=grid_data['x_coords'],
+#     y_coords=grid_data['y_coords'],
+#     bounds=grid_data['bounds'],
+#     resolution=grid_data['resolution']
+# )
+
+# for res in [5, 10, 20, 30, 40, 50, 60, 80, 90, 100]:
+#     print(f"Creating weighted grid for Delft with resolution {res}m...")
+#     grid_data = create_weighted_grid(city, resolution=res)
+#     print('Done')
+
+    
+#     # Save each grid to a separate file
+#     output_path = f"pathplanning/data/delft_grid_data_{res}_test.npz"
+#     np.savez_compressed(output_path,
+#         weight_grid=grid_data['weight_grid'],
+#         obstacle_grid=grid_data['obstacle_grid'],
+#         restaurant_grid=grid_data['restaurant_grid'],
+#         x_coords=grid_data['x_coords'],
+#         y_coords=grid_data['y_coords'],
+#         bounds=grid_data['bounds'],
+#         resolution=grid_data['resolution']
+#     )
 
 

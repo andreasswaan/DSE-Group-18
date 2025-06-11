@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from Algorithms.Astar_random_plot import a_star_search_8dir, smooth_path
+from Algorithms.Astar_random_plot import a_star_search_8dir, theta_star_search_8dir, smooth_path
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.cm as cm
@@ -17,6 +17,35 @@ def load_delft_grid(path="pathplanning/data/delft_grid_data_10_border.npz"):
         'bounds': data["bounds"],
         'resolution': data["resolution"].item()
     }
+    
+# ------------ 0. Fix corner jumps in path ----------    
+def fix_corner_jumps(path, walkable):
+    """
+    For each diagonal step in the path, if both adjacent cardinal cells are not walkable (i.e., a corner cut),
+    insert the cell across from the obstacle into the path to force the path to go around the obstacle.
+    Returns a new path with the fix applied.
+    """
+    if not path or len(path) < 3:
+        return path
+
+    fixed_path = [path[0]]
+    for i in range(1, len(path)):
+        x0, y0 = fixed_path[-1]
+        x1, y1 = path[i]
+        dx, dy = x1 - x0, y1 - y0
+
+        # Check for diagonal move
+        if abs(dx) == 1 and abs(dy) == 1:
+            # Check if both adjacent cardinal cells are not walkable (corner cut)
+            if not walkable[y0, x1] or not walkable[y1, x0]:
+                # Insert the cell across from the obstacle before the diagonal move
+                # Prefer the cardinal direction that is walkable, or just pick one
+                if walkable[y0, x1]:
+                    fixed_path.append((x1, y0))
+                elif walkable[y1, x0]:
+                    fixed_path.append((x0, y1))
+        fixed_path.append((x1, y1))
+    return fixed_path
 
 # ---------- 1. Load the Delft grid ----------
 grid = load_delft_grid()
@@ -57,8 +86,8 @@ if not path:
 
 paths_n = []
 alpha_step = 0.1
-alphas = np.arange(0.1, 1, alpha_step)
-num_runs = 10
+alphas = np.arange(0.0, 1+alpha_step, alpha_step)
+num_runs = 1
 np.random.seed(3)
 
 for i in range(num_runs):
@@ -67,13 +96,19 @@ for i in range(num_runs):
     end = tuple([np.random.randint(0, width), np.random.randint(0, height)])
     # start = tuple([200,300])
     # end = tuple([250,500])
+    # start = (30, 49)
+    # end = (32, 76)
     print(f"Start point: {start}, End point: {end}")
     
     paths = []
     for i in alphas:
         print(i)
         alpha = i
-        paths.append(a_star_search_8dir(start, end, walkable, density_map=grid['weight_grid'], alpha=alpha))
+        # paths.append(a_star_search_8dir(start, end, walkable, density_map=grid['weight_grid'], alpha=alpha))
+        raw_path = a_star_search_8dir(start, end, walkable, density_map=grid['weight_grid'], alpha=alpha)
+        fixed_path = fix_corner_jumps(raw_path[0], walkable)
+        paths.append((fixed_path, raw_path[1], raw_path[2]))
+        # paths.append(theta_star_search_8dir(start, end, walkable, density_map=grid['weight_grid'], alpha=alpha))
         
     paths_n.append(paths)
 
@@ -103,6 +138,15 @@ for run_idx, paths in enumerate(paths_n):
         color = run_colors[run_idx][:3]  # use only RGB
         for x, y in path_i[0]:
             img[y, x] = color
+            
+        # PLOTTING for Theta* paths
+        # path_points = path_i[0]
+        # # Draw straight lines between consecutive points in the path
+        # for i in range(1, len(path_points)):
+        #     x0, y0 = path_points[i-1]
+        #     x1, y1 = path_points[i]
+        #     rr, cc = np.linspace(y0, y1, 100), np.linspace(x0, x1, 100)
+        #     img[rr.astype(int), cc.astype(int)] = color
 
 # for x, y in path:
 #     img[y, x] = [1, 0, 1]  # blue for raw A* path
@@ -120,13 +164,13 @@ ax.scatter(start[0], start[1], s=120, c='navy', edgecolors='white', linewidths=2
 ax.scatter(end[0], end[1], s=120, c='lime', edgecolors='black', linewidths=2, marker='*', label='End point', zorder=10)
 
 cbar = plt.colorbar(cm.ScalarMappable(norm=mcolors.Normalize(vmin=0.0, vmax=max_weight), cmap=cmap), ax=ax)
-cbar.set_label("Navigation Cost (normalized)", fontsize=10)
+cbar.set_label("Population Density (normalized)", fontsize=10)
 
 legend_elements = [
     Patch(facecolor='black', edgecolor='black', label='No-fly zones / obstacles'),
-    Patch(facecolor='purple', edgecolor='black', label='A* path (low alpha)'),
-    Patch(facecolor='lime', edgecolor='black', label='A* path (high alpha)'),
-    Patch(facecolor='navy', edgecolor='white', label='Start (restaurant)'),
+    # Patch(facecolor='purple', edgecolor='black', label='A* path (low alpha)'),
+    # Patch(facecolor='lime', edgecolor='black', label='A* path (high alpha)'),
+    Patch(facecolor='navy', edgecolor='white', label='Start point'),
     Patch(facecolor='lime', edgecolor='black', label='End point')
 ]
 
@@ -155,11 +199,13 @@ avg_noises = [np.mean([p[2] for p in alpha_group]) for alpha_group in paths_n_T]
 ax2.plot(avg_distances, avg_noises, color='black', label='Average varying alpha line', marker='x',)
     
 
-    
+
 ax2.set_xlabel('Distance')
 ax2.set_ylabel('Public Disurbance (noise)')
 ax2.set_title('Path Distance vs Public Disturbance at varying Alpha')
 ax2.legend()
 plt.tight_layout()
 plt.show()
+
+
 
