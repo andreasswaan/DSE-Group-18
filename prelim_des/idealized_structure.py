@@ -1934,8 +1934,13 @@ def run_structure_analysis(
     banked=False,  # Set to False for normal cruise, True for banked case
     plot=False,
 ):
+    from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
+    
+    n_max = plot_maneuver_and_gust_envelope(drone, plot=False)
+    print(f"{n_max} g's maximum load factor from maneuver envelope.")
+    
     # FIX FIX FIX, those values are educated guesses, but what values should they have? These might be correct
-    SAFETY_FACTOR = 1.5 * 7.33
+    SAFETY_FACTOR = 1.5 * n_max
     shear_thickness = 0.002  # meters, skin thickness for shear stress calculations
     min_boom_area = 1e-5  # m^2, minimum area for a boom
     motor_weight_kg = 0.2  # 200g per motor, waiting for proper weght from Ishaan
