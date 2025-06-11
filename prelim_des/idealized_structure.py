@@ -1942,7 +1942,7 @@ class StructuralAnalysis:
         """all forces of the propellers when activated (in wing context)"""
         wing = self.wing_structure
         max_thrust = self.drone.MTOW*2
-        print("max thrust", max_thrust)
+        # print("max thrust", max_thrust)
         return [
             {"x": 1.5 * wing.width, "y": wing.span / 2 / 3, "z": 0.0, "Pz": max_thrust / 4},
             {"x": -1.5 * wing.width, "y": wing.span / 2 / 3, "z": 0.0, "Pz": max_thrust / 4},
@@ -1986,7 +1986,7 @@ class StructuralAnalysis:
     def wing_point_loads_vtol(self):
         """all forces on the wing with their coordinates in vtol"""
         if self.prop_connection == "wing":
-            print("inside if")
+            # print("inside if")
             wing_point_loads = self.wing_prop_loads  # forces of propellers thrust
             wing_point_loads.extend(
                 self.motor_weight_loads_wing
