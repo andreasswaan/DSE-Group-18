@@ -41,9 +41,9 @@ def elliptical_lift_distribution(y: float, drone: Drone) -> float:
         float: Lift per unit span at y (N/m)
     """
     b = float(drone.wing.span)  # Use the drone's wing span
-    CL_max = drone.aero.CL_max
+    CL_cruise = drone.aero.CL_cruise
     V_max = toml["config"]["mission"]["max_velocity"]
-    L_total = float(drone.aero.lift(V_max, CL_max))  # Total lift at max velocity
+    L_total = float(drone.aero.lift(V_max, CL_cruise))  # Total lift at max velocity
     return (4 * L_total / (np.pi * b)) * np.sqrt(1 - (2 * y / b) ** 2)
 
 
