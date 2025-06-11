@@ -104,14 +104,11 @@ class Drone(Point):
         self.yvel = 0
         self.xacc = 0
         self.yacc = 0
-
         self.current_battery_level = self.max_battery_level
         self.is_charging = False
-
         self.current_payload = {'s': 0, 'm': 0, 'l': 0}
         self.current_payload_weight = self.calculate_payload_weight()
         self.is_delivering = False
-    
 
     def get_target(self):
         if self.targets:

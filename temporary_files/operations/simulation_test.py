@@ -1,20 +1,15 @@
-import json
 import numpy as np
-import scipy.stats as stats
-import copy
 import matplotlib.pyplot as plt
+import copy
 import matplotlib.animation as animation
-
 from temporary_files.operations.mission_planning_2 import MissionPlanning
-
-from pathplanning.path_planning_final import calculate_smooth_path
-
 import financial_model
 import constants
+import scipy.stats as stats
 # pizza size to weight guide in kg
 np.random.seed(4)  # for reproducibility
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
-n_drones = 20
+n_drones = 10
 class Point():
     def __init__(self, xpos: float, ypos: float) -> None:
         self.xpos = xpos
@@ -85,9 +80,9 @@ class Drone(Point):
         self.target = None
         self.max_battery_level = 100
         self.energy_per_meter = constants.energy_per_metre  # kWh per meter, this is a placeholder value
-        self.speed = 15 / 10  # m/s, horizontal speed
-        self.distance_travelled = [0, 0, 0, 0, 0, 0]
-        self.max_capacity = 5 # max number of pizzas it can carry
+        self.speed = 15 * constants.reso / 6000  # m/s, horizontal speed
+        self.max_capacity = 6 # max number of pizzas it can carry
+        self.distance_travelled = np.zeros((self.max_capacity + 1,))  # distance travelled for each load level, in meters
         self.battery = 100  # battery level in percentage
         self.departure_times = []  # list of departure times for each mission
         self.arrival_times = []  # list of arrival times for each mission
@@ -95,19 +90,21 @@ class Drone(Point):
         self.state = 'idle'  # state of the drone, can be 'idle', 'charging', 'delivering', etc.
         self.load = 0  # current load of the drone, in number of pizzas
         self.restaurant_order_nodes = []  # list of restaurant order nodes, used for mission planning
-        self.path = []  # list of points in the path, used for plotting
-        self.movement_path = []  # list of points in the path, used for movement
         # define static characteristics
+
         super().__init__(self.depot.xpos, self.depot.ypos)
         self.xvel = 0
         self.yvel = 0
         self.xacc = 0
         self.yacc = 0
+
         self.current_battery_level = self.max_battery_level
         self.is_charging = False
+
         self.current_payload = {'s': 0, 'm': 0, 'l': 0}
         self.current_payload_weight = self.calculate_payload_weight()
         self.is_delivering = False
+    
 
     def get_target(self):
         if self.targets:
@@ -123,7 +120,6 @@ class Drone(Point):
             if isinstance(self.target, Order):
                 self.target.status = True
             self.target = self.targets[0] if self.targets else None 
-            self.calculate_path()
             self.state = 'moving'  
             
     def calculate_payload_weight(self):
@@ -163,9 +159,8 @@ class Drone(Point):
         self.battery_level -= 0.1 * (self.xvel**2 + self.yvel**2) * dt"""
         if self.departure_times and self.departure_times[0] <= self.simulation.timestamp and self.targets and self.state == 'waiting':
             self.get_target()
-        #self.move_to_target(dt)
-        self.move_to_target_along_path(dt)
-
+        self.move_to_target(dt)
+    
     def move_to_target(self, dt):
         if self.target is None:
             return
@@ -178,49 +173,12 @@ class Drone(Point):
         if np.linalg.norm(direction_vector) <= np.linalg.norm(step_vector):
             self.xpos, self.ypos = self.target.xpos, self.target.ypos
             self.arrive()
-            self.distance_travelled[int(self.load)] += np.linalg.norm(direction_vector) * 10  # convert to meters
+            self.distance_travelled[int(self.load)] += np.linalg.norm(direction_vector) * 6000 / constants.reso  # convert to meters
         else:
             self.xpos += step_vector[0]
             self.ypos += step_vector[1]
-            self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 10  # convert to meters
-            self.battery -= self.energy_per_meter * np.linalg.norm(step_vector) * 10  # energy consumption in kWh
-
-    def move_to_target_along_path(self, dt):
-        if self.target is None or not self.movement_path or len(self.movement_path) == 0 or len(self.movement_path) == 1:
-            self.move_to_target(dt)
-            return
-
-        # Move along the movement_path, but do not modify self.path (for plotting)
-        while len(self.movement_path) > 1:
-            next_x, next_y = self.movement_path[1]
-            direction_vector = np.array([next_x - self.xpos, next_y - self.ypos])
-            norm = np.linalg.norm(direction_vector)
-            if norm < self.speed * dt:
-                # Move directly to the waypoint and remove it from the movement_path
-                self.xpos, self.ypos = next_x, next_y
-                self.movement_path.pop(0)
-            else:
-                # Move towards the next waypoint
-                step_vector = direction_vector / norm * self.speed * dt
-                self.xpos += step_vector[0]
-                self.ypos += step_vector[1]
-                self.distance_travelled += np.linalg.norm(step_vector)
-                return  # Only move once per call
-
-        # If only one point left, move towards it (the final target)
-        if len(self.movement_path) == 1:
-            final_x, final_y = self.movement_path[0]
-            direction_vector = np.array([final_x - self.xpos, final_y - self.ypos])
-            norm = np.linalg.norm(direction_vector)
-            if norm < self.speed * dt:
-                self.xpos, self.ypos = final_x, final_y
-                self.arrive()
-                self.movement_path = []
-            else:
-                step_vector = direction_vector / norm * self.speed * dt
-                self.xpos += step_vector[0]
-                self.ypos += step_vector[1]
-                self.distance_travelled += np.linalg.norm(step_vector)
+            self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 6000 / constants.reso  # convert to meters
+            self.battery -= self.energy_per_meter * np.linalg.norm(step_vector) * 6000 / constants.reso  # energy consumption in kWh
 
     def arrive(self):
         self.battery -= constants.TO_land_energy
@@ -236,32 +194,6 @@ class Drone(Point):
             self.restaurant_order_nodes.pop(0) 
         #self.target = self.get_target()
         self.state = 'waiting'
-
-    def calculate_path(self):
-        
-        if self.target is None:
-            return
-        
-        minimum_turn_radius = 70 # [m]
-        map_resolution = 10 # [m]
-        conversion_factor = minimum_turn_radius / map_resolution
-        
-        idx_start = (int(self.xpos // conversion_factor), int(self.ypos // conversion_factor))
-        idx_target = (int(self.target.xpos // conversion_factor), int(self.target.ypos // conversion_factor))
-        
-        if idx_start == idx_target:
-            self.path = [(self.xpos, self.ypos), (self.target.xpos, self.target.ypos)]
-            self.movement_path = list(self.path)  # Store a copy for movement
-            return
-        
-        self.path, _, _ = calculate_smooth_path(idx_start, idx_target, walkable, density_map=grid['weight_grid'], 
-                                          MIN_TURN_RADIUS_GRID=70, alpha=0.7) # path, step_cost, weight_cost
-        self.movement_path = list(self.path) 
-        
-        if self.path is not None and len(self.path) > 0:
-            # Multiply each coordinate in self.path by conversion_factor
-            self.path = [(x * conversion_factor, y * conversion_factor) for x, y in self.path]
-            self.movement_path = list(self.path)  # Store a copy for movement
 
 
 class Depot(Point):
@@ -290,37 +222,33 @@ class City:
         self.silent_zones = city_dict['silent_zones']
         self.population = city_dict['population']
 
-        # Use bounds from population data to set the resolution
-        max_x = max([cell['xpos'] for cell in self.population]) + 1
-        max_y = max([cell['ypos'] for cell in self.population]) + 1
-        
-        self.map = np.zeros((max_x, max_y, 4))
-        # 3 pieces of info at each coordinate - restaurant, depot, silent zone
+        self.reso = constants.reso
+        self.map = np.zeros((self.reso, self.reso, 5))
+        # 100 x 100 2d map, 4 pieces of info at each coordinate - restaurant, depot, tall building, silent zone
         # each coordinate corresponds to a 1x1 square in the city
-        for population_cell in self.population:
-            self.map[population_cell['xpos'], population_cell['ypos'], 0] = population_cell['value']
-        # self.map[:, :, 0] = self.population
+        self.map[:, :, 0] = self.population / (self.reso * self.reso)
         for restaurant in self.restaurants: 
             self.map[restaurant.xpos, restaurant.ypos, 1] = 1
         for depot in self.depots:
             self.map[depot.xpos, depot.ypos, 2] = 1
+        for tall_building in self.tall_buildings:
+            self.map[tall_building.xpos, tall_building.ypos, 3] = tall_building.height
         for silent_zone in self.silent_zones:
-            self.map[silent_zone.xpos, silent_zone.ypos, 3] = 1
+            self.map[silent_zone.xpos, silent_zone.ypos, 4] = 1
         
         self.population_density = self.map[:, :, 0]
-        
     
     def generate_order_location(self):
         weights = self.population_density.flatten()
         weights /= np.sum(weights)
-        index = np.random.choice(np.arange(self.map.shape[0] * self.map.shape[1]), p=weights)
-        x = index // self.map.shape[1]
-        y = index % self.map.shape[1]
+        index = np.random.choice(np.arange(self.reso * self.reso), p=weights)
+        x = index % self.reso
+        y = index // self.reso
         return x, y
     
     def reset(self):
         self.depots = [Depot(i) for i in depot_dict]
-        self.restaurants = [Restaurant(i) for i in restaurant_dict]       
+        self.restaurants = [Restaurant(i) for i in restaurant_dict]     
 
 class Logger:
     def __init__(self):
@@ -387,7 +315,7 @@ class Simulation:
 
         if self.timestamp % self.mp_interval == 0:
             # run mission planning
-            self.mp.solve_mission_planning()
+            self.mp.solve_mission_planning(conversion_meters=6000 / constants.reso)
             #self.mp.basic_heuristic()
 
         for drone in self.drones:
@@ -411,61 +339,68 @@ class Simulation:
         order_time = int(np.round(order_time / 300) * 300)
         return order_time
 
-# Helper functions
-def load_city_data_from_json(filename):
-    """
-    Loads city_name, population, restaurants, and silent_zones from a JSON city grid file.
-    Returns: city_name, population (as np.array), restaurants (list), silent_zones (list)
-    """
-    with open(filename, 'r') as f:
-        city_dict = json.load(f)
-    city_name = city_dict['city_name']
-    population = np.array(city_dict['population'])
-    restaurants = city_dict['restaurants']
-    silent_zones = city_dict['silent_zones']
-    return city_name, population, restaurants, silent_zones
-
-
- 
-# -------- SIMULATION SETUP --------
-
-city_name, population_dict, restaurant_dict, silent_zones_dict = \
-load_city_data_from_json("temporary_files/operations/delft_city_grid_10_test.json")
-    
-restaurants = [Restaurant(r) for r in restaurant_dict]
-
-# make each silent zone a point object:
-silent_zones = [Point(s['xpos'], s['ypos']) for s in silent_zones_dict if s.get('value')]
-
-# Create depot objects
-depot_dict = [{
-'depot_id': 0,
-'xpos': 100,
-'ypos': 200,
-'capacity': 10,
-}, {
-'depot_id': 1,
-'xpos': 350,
-'ypos': 350,
-'capacity': 10,
+restaurant_dict = [{
+    'xpos': 50,
+    'ypos': 20,
+    'restaurant_id': 0,
+    'name': 'Pizza Place10',
+    'mean_nr_orders': 400,
+    'mean_order_size': {'small': 0, 'medium': 2, 'large': 0}
+},
+{
+    'xpos': 50,
+    'ypos': 50,
+    'restaurant_id': 1,
+    'name': 'Pizza Place1',
+    'mean_nr_orders': 400,
+    'mean_order_size': {'small': 0, 'medium': 2, 'large': 0}
+},
+{
+    'xpos': 20,
+    'ypos': 80,
+    'restaurant_id': 2,
+    'name': 'Pizza Place2',
+    'mean_nr_orders': 400,
+    'mean_order_size': {'small': 0, 'medium': 2, 'large': 0}
 }]
+
+Restaurant0 = Restaurant(restaurant_dict[0])
+Restaurant1 = Restaurant(restaurant_dict[1])
+Restaurant2 = Restaurant(restaurant_dict[2])
+restaurants = [Restaurant0, Restaurant1, Restaurant2]
+
+depot_dict = [{
+    'depot_id': 0,
+    'xpos': 10,
+    'ypos': 20,
+    'capacity': 10,
+    #'drones': [drone for drone in drone_list if drone['depot'] == 1]
+    }, {
+    'depot_id': 1,
+    'xpos': 90,
+    'ypos': 80,
+    'capacity': 10,
+    }]
 
 Depot0 = Depot(depot_dict[0])
 Depot1 = Depot(depot_dict[1])
 depots = [Depot0, Depot1]
 
-# Create drone objects
-drone_dict = [{'drone_id': i, 'depot': 0 if i%2 == 0 else 1} for i in range(n_drones)]
-drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))] 
+# Example: 8 drones at depot 0, 7 drones at depot 1
+drone_dict = [
+    {'drone_id': i, 'depot': 0 if i%2 == 0 else 1}
+    for i in range(n_drones)
+]
 
-# Create the city object
+drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))]
+
 city_dict = {
-    'city_name': city_name,
+    'city_name': 'Delft',
     'restaurants': restaurants,
     'depots': depots,
-    'tall_buildings': [],  # Placeholder, can be populated later
-    'silent_zones': silent_zones,
-    'population': population_dict
+    'tall_buildings': [],
+    'silent_zones': [],
+    'population': 10000
 }
 
 my_sim = Simulation(
@@ -473,56 +408,32 @@ my_sim = Simulation(
     logger=Logger()
 )
 
-
-# Setup Path Planning Grid
-def load_delft_grid(path="pathplanning/data/delft_grid_data_70_border.npz"):
-    data = np.load(path, allow_pickle=True)
-    return {
-        'weight_grid': data["weight_grid"],
-        'obstacle_grid': data["obstacle_grid"],
-    }
-    
-grid = load_delft_grid()
-walkable = ~grid['obstacle_grid']
-
-    
-    
-        
-
-# -------- SIMULATION ANIMATION --------
+#print(my_sim.financial_model.calculate_ROI())
+#for i in range(200):
+#    my_sim.take_step()
+#    print(my_sim.timestamp)
+#    if i % 20 == 0:
+#        print(len(my_sim.order_book))
 
 def animate_simulation(sim, steps=100, interval=200):
     city = sim.city
     fig, ax = plt.subplots(figsize=(6, 6))
-    im = ax.imshow(city.map[:, :, 0].T, cmap='YlOrRd', alpha=1, origin='lower')
-
-    # Show silent zones as dark gray where silent zone is true
-    silent_zone_mask = city.map[:, :, 3].T > 0
-    silent_zone_overlay = np.zeros((city.map.shape[1], city.map.shape[0], 4))
-    silent_zone_overlay[silent_zone_mask] = [0.2, 0.2, 0.2, 1]
-    ax.imshow(silent_zone_overlay, origin='lower')
-
-    scat_orders = ax.scatter([], [], c='cyan', label='Orders', s=20)
+    im = ax.imshow(city.map[:, :, 0], cmap='Greys', alpha=0.3, origin='lower')
+    scat_orders = ax.scatter([], [], c='salmon', label='Orders', s=30)
+    scat_being_delivered = ax.scatter([], [], c='darkred', label='Being Delivered', s=30)
     scat_restaurants = ax.scatter(
         [r.xpos for r in city.restaurants],
         [r.ypos for r in city.restaurants],
-        c='blue', marker='s', label='Restaurants', s=20, edgecolors=''
+        c='blue', marker='s', label='Restaurants', s=60
     )
     scat_depots = ax.scatter(
         [d.xpos for d in city.depots],
         [d.ypos for d in city.depots],
-        c='green', marker='^', label='Depots', s=30
+        c='green', marker='^', label='Depots', s=60
     )
-    scat_drones = ax.scatter([], [], c='orange', label='Drones', s=20, marker='o')
-
-    # Create a Line2D object for each drone's path
-    path_lines = []
-    for _ in sim.drones:
-        line, = ax.plot([], [], c='magenta', lw=2, alpha=0.8, label='_nolegend_')
-        path_lines.append(line)
-
-    ax.set_xlim(0, city.map.shape[0])
-    ax.set_ylim(0, city.map.shape[1])
+    scat_drones = ax.scatter([], [], c='orange', label='Drones', s=40, marker='o')
+    ax.set_xlim(0, city.reso)
+    ax.set_ylim(0, city.reso)
     ax.legend(loc='upper right')
     title_text = ax.text(0.5, 1.01, '', transform=ax.transAxes, ha='center', va='bottom', fontsize=12)
 
@@ -543,11 +454,20 @@ def animate_simulation(sim, steps=100, interval=200):
         order_ys.clear()
         order_ids = []
         for order in sim.order_book.values():
-            if not order.status and order.arrival_time <= sim.timestamp + constants.time_to_consider_order:
+            if not order.status and order.arrival_time <= sim.timestamp + constants.time_to_consider_order and order.arrival_time >= sim.timestamp - 3 * 60 and not order.being_delivered:
                 order_xs.append(order.xpos)
                 order_ys.append(order.ypos)
                 order_ids.append(order.arrival_time)
         scat_orders.set_offsets(np.c_[order_xs, order_ys])
+
+        being_delivered_xs, being_delivered_ys, being_delivered_ids = [], [], []
+        for order in sim.order_book.values():
+            if order.being_delivered and not order.status:
+                being_delivered_xs.append(order.xpos)
+                being_delivered_ys.append(order.ypos)
+                being_delivered_ids.append(order.arrival_time)
+        # --- Add this line: ---
+        scat_being_delivered.set_offsets(np.c_[being_delivered_xs, being_delivered_ys])
 
         # Update order ID texts
         for i, txt in enumerate(order_id_texts):
@@ -566,17 +486,8 @@ def animate_simulation(sim, steps=100, interval=200):
             drone_ys.append(drone.ypos)
         scat_drones.set_offsets(np.c_[drone_xs, drone_ys])
 
-        # Update each drone's path line
-        for i, drone in enumerate(sim.drones):
-            if hasattr(drone, 'path') and drone.path and len(drone.path) > 1:
-                path_x, path_y = zip(*drone.path)
-                path_lines[i].set_data(path_x, path_y)
-            else:
-                path_lines[i].set_data([], [])
-
         title_text.set_text(f'Simulation Map Animation\nTime: {sim.timestamp}s, Orders: {len(order_xs)}')
-        return (scat_orders, scat_drones, scat_restaurants, scat_depots, *path_lines, title_text, *order_id_texts)
-
+        return (scat_orders, scat_being_delivered, scat_drones, scat_restaurants, scat_depots, title_text, *order_id_texts)
     ani = animation.FuncAnimation(
         fig, update, frames=steps, interval=interval, blit=True, repeat=False
     )
@@ -588,7 +499,7 @@ for i in range(n_steps):
     my_sim.take_step()
 print(my_sim.financial_model.calculate_daily_profit())
 print(my_sim.financial_model.calculate_revenue())
-for i in range (my_sim.drones[0].max_capacity):
+for i in range (my_sim.drones[0].max_capacity + 1):
     print(f"average distance travelled at capacity {i}: {sum(drone.distance_travelled[i] for drone in my_sim.drones) / sum(len(drone.mission_log) for drone in my_sim.drones)} m")
 average_num_TO_landings = sum(
     sum(len(drone.mission_log[i]) - 1 for i in range(len(drone.mission_log))) / len(drone.mission_log) for drone in my_sim.drones) / len(my_sim.drones)
