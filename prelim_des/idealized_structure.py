@@ -2787,3 +2787,6 @@ def run_structure_analysis(
             )
 
     return wing_critical_mass, fuselage_critical_mass, tail_critical_mass
+
+
+# TODO: add the horizontal propeller to tail and add weight of all propellers to the fuselage
