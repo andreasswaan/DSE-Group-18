@@ -273,24 +273,25 @@ class Simulation:
     def take_orders(self, dt=None):
         if dt is None:
             dt = self.dt
-        for restaurant in self.city.restaurants:
-            orders = restaurant.generate_orders(dt, self.inv_total_time)
-            if orders:
-                for order in orders:
-                    order['restaurant_id'] = restaurant.restaurant_id
-                    order['arrival_time'] = self.calculate_arrival_time()
-                    order['restaurant'] = restaurant
-                    order['time'] = self.timestamp
-                    order['x_delivery_loc'], order['y_delivery_loc'] = self.city.generate_order_location()
-                    order['status'] = False # not delivered
-                    order_id = len(self.logger.order_log)
-                    order['order_id'] = order_id
-                    self.order_book[order_id] = Order(order)
+        if self.timestamp < constants.time_window - constants.min_order_delay:
+            for restaurant in self.city.restaurants:
+                orders = restaurant.generate_orders(dt, self.inv_total_time)
+                if orders:
+                    for order in orders:
+                        order['restaurant_id'] = restaurant.restaurant_id
+                        order['arrival_time'] = self.calculate_arrival_time()
+                        order['restaurant'] = restaurant
+                        order['time'] = self.timestamp
+                        order['x_delivery_loc'], order['y_delivery_loc'] = self.city.generate_order_location()
+                        order['status'] = False # not delivered
+                        order_id = len(self.logger.order_log)
+                        order['order_id'] = order_id
+                        self.order_book[order_id] = Order(order)
 
-                    logorder = copy.deepcopy(order)
-                    logorder['order_id'] = order_id
-                    del logorder['time']
-                    self.logger.order_log[order['time']] = logorder
+                        logorder = copy.deepcopy(order)
+                        logorder['order_id'] = order_id
+                        del logorder['time']
+                        self.logger.order_log[order['time']] = logorder
 
     def take_step(self):        
         self.take_orders()
@@ -401,7 +402,8 @@ def animate_simulation(sim, steps=100, interval=200):
     city = sim.city
     fig, ax = plt.subplots(figsize=(6, 6))
     im = ax.imshow(city.map[:, :, 0], cmap='Greys', alpha=0.3, origin='lower')
-    scat_orders = ax.scatter([], [], c='red', label='Orders', s=30)
+    scat_orders = ax.scatter([], [], c='salmon', label='Orders', s=30)
+    scat_being_delivered = ax.scatter([], [], c='darkred', label='Being Delivered', s=30)
     scat_restaurants = ax.scatter(
         [r.xpos for r in city.restaurants],
         [r.ypos for r in city.restaurants],
@@ -435,11 +437,20 @@ def animate_simulation(sim, steps=100, interval=200):
         order_ys.clear()
         order_ids = []
         for order in sim.order_book.values():
-            if not order.status and order.arrival_time <= sim.timestamp + constants.time_to_consider_order:
+            if not order.status and order.arrival_time <= sim.timestamp + constants.time_to_consider_order and order.arrival_time >= sim.timestamp - 3 * 60 and not order.being_delivered:
                 order_xs.append(order.xpos)
                 order_ys.append(order.ypos)
                 order_ids.append(order.arrival_time)
         scat_orders.set_offsets(np.c_[order_xs, order_ys])
+
+        being_delivered_xs, being_delivered_ys, being_delivered_ids = [], [], []
+        for order in sim.order_book.values():
+            if order.being_delivered and not order.status:
+                being_delivered_xs.append(order.xpos)
+                being_delivered_ys.append(order.ypos)
+                being_delivered_ids.append(order.arrival_time)
+        # --- Add this line: ---
+        scat_being_delivered.set_offsets(np.c_[being_delivered_xs, being_delivered_ys])
 
         # Update order ID texts
         for i, txt in enumerate(order_id_texts):
@@ -459,8 +470,7 @@ def animate_simulation(sim, steps=100, interval=200):
         scat_drones.set_offsets(np.c_[drone_xs, drone_ys])
 
         title_text.set_text(f'Simulation Map Animation\nTime: {sim.timestamp}s, Orders: {len(order_xs)}')
-        return (scat_orders, scat_drones, scat_restaurants, scat_depots, title_text, *order_id_texts)
-
+        return (scat_orders, scat_being_delivered, scat_drones, scat_restaurants, scat_depots, title_text, *order_id_texts)
     ani = animation.FuncAnimation(
         fig, update, frames=steps, interval=interval, blit=True, repeat=False
     )
@@ -468,6 +478,6 @@ def animate_simulation(sim, steps=100, interval=200):
 n_steps = int(constants.time_window / my_sim.dt)
 my_sim.change_order_volume(3)
 animate_simulation(my_sim, n_steps, interval=10)
-#for i in range(n_steps):
-#    my_sim.take_step()
+for i in range(n_steps):
+    my_sim.take_step()
 print(my_sim.financial_model.calculate_revenue())
