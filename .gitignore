@@ -9,6 +9,10 @@ prelim_des/utils/NACA_airfoil_database/**/*.csv
 prelim_des/utils/NACA_airfoil_database/*.dat
 prelim_des/utils/NACA_airfoil_database/**/*.dat
 
+#exclude plots
+*.svg
+*.png
+
 # C extensions
 *.so
 

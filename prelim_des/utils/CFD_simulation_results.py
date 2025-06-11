@@ -49,8 +49,8 @@ def average_cl_alpha():
 
 def root_chord_cl_alpha(root_chord):
     output_cl_alpha = []
-    if root_chord > 640 or root_chord < 440:
-        raise ValueError("root chord out of bounds", root_chord)
+    # if root_chord > 640 or root_chord < 440:
+    #     raise ValueError("root chord out of bounds", root_chord)
     for i in range(len(AOA)):
         ratio = (root_chord - 0.440) / 0.200
         output = abs(rc640_lift[i] - rc440_lift[i]) * ratio + min(
@@ -62,8 +62,8 @@ def root_chord_cl_alpha(root_chord):
 
 def tip_chord_cl_alpha(tip_chord):
     output_cl_alpha = []
-    if tip_chord > 320 or tip_chord < 120:
-        raise ValueError("tip chord out of bounds", tip_chord)
+    # if tip_chord > 320 or tip_chord < 120:
+    #     raise ValueError("tip chord out of bounds", tip_chord)
     for i in range(len(AOA)):
         ratio = (tip_chord - 0.120) / 0.200
         output = abs(tc320_lift[i] - tc120_lift[i]) * ratio + min(
