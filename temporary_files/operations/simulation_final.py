@@ -6,7 +6,9 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 from temporary_files.operations.mission_planning_2 import MissionPlanning
-from temporary_files.operations.dutch_city import create_city_data, get_city_border_polygon_ring
+
+from pathplanning.path_planning_final import calculate_smooth_path
+
 import financial_model
 import constants
 
@@ -124,7 +126,8 @@ class Drone(Point):
             #    self.restaurant_order_nodes.pop(0)
             if isinstance(self.target, Order):
                 self.target.status = True
-            self.target = self.targets[0] if self.targets else None 
+            self.target = self.targets[0] if self.targets else None
+            self.calculate_path()
             self.state = 'moving'  
             
     def calculate_payload_weight(self):
@@ -163,7 +166,8 @@ class Drone(Point):
         self.battery_level -= 0.1 * (self.xvel**2 + self.yvel**2) * dt"""
         if self.departure_times and self.departure_times[0] <= self.simulation.timestamp and self.targets and self.state == 'waiting':
             self.get_target()
-        self.move_to_target(dt)
+        # self.move_to_target(dt)
+        self.move_to_target_along_path(dt)
     
     def move_to_target(self, dt):
         if self.target is None:
@@ -182,6 +186,43 @@ class Drone(Point):
             self.xpos += step_vector[0]
             self.ypos += step_vector[1]
             self.distance_travelled += np.linalg.norm(step_vector)
+            
+    def move_to_target_along_path(self, dt):
+        if self.target is None or not self.movement_path or len(self.movement_path) == 0 or len(self.movement_path) == 1:
+            self.move_to_target(dt)
+            return
+
+        # Move along the movement_path, but do not modify self.path (for plotting)
+        while len(self.movement_path) > 1:
+            next_x, next_y = self.movement_path[1]
+            direction_vector = np.array([next_x - self.xpos, next_y - self.ypos])
+            norm = np.linalg.norm(direction_vector)
+            if norm < self.speed * dt:
+                # Move directly to the waypoint and remove it from the movement_path
+                self.xpos, self.ypos = next_x, next_y
+                self.movement_path.pop(0)
+            else:
+                # Move towards the next waypoint
+                step_vector = direction_vector / norm * self.speed * dt
+                self.xpos += step_vector[0]
+                self.ypos += step_vector[1]
+                self.distance_travelled += np.linalg.norm(step_vector)
+                return  # Only move once per call
+
+        # If only one point left, move towards it (the final target)
+        if len(self.movement_path) == 1:
+            final_x, final_y = self.movement_path[0]
+            direction_vector = np.array([final_x - self.xpos, final_y - self.ypos])
+            norm = np.linalg.norm(direction_vector)
+            if norm < self.speed * dt:
+                self.xpos, self.ypos = final_x, final_y
+                self.arrive()
+                self.movement_path = []
+            else:
+                step_vector = direction_vector / norm * self.speed * dt
+                self.xpos += step_vector[0]
+                self.ypos += step_vector[1]
+                self.distance_travelled += np.linalg.norm(step_vector)
 
     def arrive(self):
         if isinstance(self.target, Depot):
@@ -193,15 +234,30 @@ class Drone(Point):
         
     def calculate_path(self):
         
+        if self.target is None:
+            return
+        
         minimum_turn_radius = 70 # [m]
         map_resolution = 10 # [m]
         conversion_factor = minimum_turn_radius / map_resolution
         
-        idx_start = [self.xpos // conversion_factor, self.ypos // conversion_factor]
-        idx_target = [self.target.xpos // conversion_factor, self.target.ypos // conversion_factor]
+        idx_start = (int(self.xpos // conversion_factor), int(self.ypos // conversion_factor))
+        idx_target = (int(self.target.xpos // conversion_factor), int(self.target.ypos // conversion_factor))
         
-        # path = MP.get_path(idx_start, idx_target)
+        if idx_start == idx_target:
+            self.path = [(self.xpos, self.ypos), (self.target.xpos, self.target.ypos)]
+            self.movement_path = list(self.path)  # Store a copy for movement
+            return
         
+        self.path, _, _ = calculate_smooth_path(idx_start, idx_target, walkable, density_map=grid['weight_grid'], 
+                                          MIN_TURN_RADIUS_GRID=70, alpha=0.7) # path, step_cost, weight_cost
+        self.movement_path = list(self.path) 
+        
+        if self.path is not None and len(self.path) > 0:
+            # Multiply each coordinate in self.path by conversion_factor
+            self.path = [(x * conversion_factor, y * conversion_factor) for x, y in self.path]
+            self.movement_path = list(self.path)  # Store a copy for movement
+
         
 
 
@@ -282,7 +338,7 @@ class Simulation:
         for drone in self.drones:
             drone.simulation = self
         self.financial_model = financial_model.FinancialModel(self)
-        self.dt = 100
+        self.dt = 10
         self.mp_interval = constants.mp_interval
         self.mp = MissionPlanning(self)
         self.timestamp = 0
@@ -373,13 +429,13 @@ silent_zones = [Point(s['xpos'], s['ypos']) for s in silent_zones_dict if s.get(
 # Create depot objects
 depot_dict = [{
 'depot_id': 0,
-'xpos': 10,
-'ypos': 20,
+'xpos': 100,
+'ypos': 200,
 'capacity': 10,
 }, {
 'depot_id': 1,
-'xpos': 35,
-'ypos': 35,
+'xpos': 350,
+'ypos': 350,
 'capacity': 10,
 }]
 
@@ -405,6 +461,21 @@ my_sim = Simulation(
     city=City(city_dict),
     logger=Logger()
 )
+
+
+# Setup Path Planning Grid
+def load_delft_grid(path="pathplanning/data/delft_grid_data_70_border.npz"):
+    data = np.load(path, allow_pickle=True)
+    return {
+        'weight_grid': data["weight_grid"],
+        'obstacle_grid': data["obstacle_grid"],
+    }
+    
+grid = load_delft_grid()
+walkable = ~grid['obstacle_grid']
+
+    
+    
         
 
 # -------- SIMULATION ANIMATION --------
@@ -415,10 +486,9 @@ def animate_simulation(sim, steps=100, interval=200):
     im = ax.imshow(city.map[:, :, 0].T, cmap='YlOrRd', alpha=1, origin='lower')
 
     # Show silent zones as dark gray where silent zone is true
-    silent_zone_mask = city.map[:, :, 3].T > 0  # Transpose to match imshow orientation
-    # Create an RGBA mask: dark gray with alpha where silent zone is present, transparent elsewhere
-    silent_zone_overlay = np.zeros((city.map.shape[1], city.map.shape[0], 4))  # (y, x, 4)
-    silent_zone_overlay[silent_zone_mask] = [0.2, 0.2, 0.2, 1]  # RGBA for dark gray
+    silent_zone_mask = city.map[:, :, 3].T > 0
+    silent_zone_overlay = np.zeros((city.map.shape[1], city.map.shape[0], 4))
+    silent_zone_overlay[silent_zone_mask] = [0.2, 0.2, 0.2, 1]
     ax.imshow(silent_zone_overlay, origin='lower')
 
     scat_orders = ax.scatter([], [], c='cyan', label='Orders', s=30)
@@ -433,6 +503,13 @@ def animate_simulation(sim, steps=100, interval=200):
         c='green', marker='^', label='Depots', s=30
     )
     scat_drones = ax.scatter([], [], c='orange', label='Drones', s=20, marker='o')
+
+    # Create a Line2D object for each drone's path
+    path_lines = []
+    for _ in sim.drones:
+        line, = ax.plot([], [], c='magenta', lw=2, alpha=0.8, label='_nolegend_')
+        path_lines.append(line)
+
     ax.set_xlim(0, city.map.shape[0])
     ax.set_ylim(0, city.map.shape[1])
     ax.legend(loc='upper right')
@@ -478,15 +555,23 @@ def animate_simulation(sim, steps=100, interval=200):
             drone_ys.append(drone.ypos)
         scat_drones.set_offsets(np.c_[drone_xs, drone_ys])
 
+        # Update each drone's path line
+        for i, drone in enumerate(sim.drones):
+            if hasattr(drone, 'path') and drone.path and len(drone.path) > 1:
+                path_x, path_y = zip(*drone.path)
+                path_lines[i].set_data(path_x, path_y)
+            else:
+                path_lines[i].set_data([], [])
+
         title_text.set_text(f'Simulation Map Animation\nTime: {sim.timestamp}s, Orders: {len(order_xs)}')
-        return (scat_orders, scat_drones, scat_restaurants, scat_depots, title_text, *order_id_texts)
+        return (scat_orders, scat_drones, scat_restaurants, scat_depots, *path_lines, title_text, *order_id_texts)
 
     ani = animation.FuncAnimation(
         fig, update, frames=steps, interval=interval, blit=True, repeat=False
     )
     plt.show()
 n_steps = int(constants.time_window / my_sim.dt)
-my_sim.change_order_volume(0.1)
+my_sim.change_order_volume(0.01)
 animate_simulation(my_sim, n_steps, interval=10)
 for i in range(n_steps):
    my_sim.take_step()
