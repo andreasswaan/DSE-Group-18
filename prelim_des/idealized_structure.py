@@ -1853,6 +1853,9 @@ class StructuralAnalysis:
         self.SAFETY_FACTOR = toml["config"]["structures"]["SAFETY_FACTOR"]
         self.shear_thickness = toml["config"]["structures"]["shear_thickness"]
         self.min_boom_area = toml["config"]["structures"]["min_boom_area"]
+        self.ratio_width_box_to_root_chord = toml["config"]["structures"][
+            "ratio_width_box_to_root_chord"
+        ]
         self.fuselage_case = fuselage_case
         self.prop_connection = prop_connection
         (
@@ -1891,7 +1894,8 @@ class StructuralAnalysis:
     @property
     def fuselage_root_section(self):
         return create_rectangular_section(
-            width=float(self.drone.wing.c_root),  # Assumption
+            width=float(self.drone.wing.c_root)
+            * self.ratio_width_box_to_root_chord,  # Assumption
             height=float(
                 self.drone.wing.thick_over_chord * self.drone.wing.chord(y=0.0)
             ),
@@ -2036,8 +2040,8 @@ class StructuralAnalysis:
             wing_point_loads=self.wing_point_loads_cruise,
         )
 
-        wing_weight = np.max([min_wing_mass_cruise, min_wing_mass_vtol])
-        self.wing_weight = wing_weight * 2
+        wing_weight = np.max([min_wing_mass_cruise, min_wing_mass_vtol]) * 2
+        self.wing_weight = wing_weight
         return wing_weight
 
 
