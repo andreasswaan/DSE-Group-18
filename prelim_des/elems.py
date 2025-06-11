@@ -351,7 +351,7 @@ class LandingGear:
         
     def weight(self):
         
-        weight_per_leg = 0.0827
+        weight_per_leg = 0.017
         
         return self.n_legs * weight_per_leg
 
