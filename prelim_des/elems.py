@@ -167,9 +167,10 @@ class Wing:
         # Placeholder estimate for the wing weight based
         # return 0.4 * self.S + 0.06 * self.drone.MTOW + weight_folding
 
-        wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
-            self.drone, "fuselage", fuselage_case=2
-        )
+        # wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
+        #     self.drone, "fuselage", fuselage_case=2
+        # )
+        wing_mass = self.drone.structural_analysis.run_wing_analysis()
         self.weight = wing_mass
         return wing_mass + mass_folding
 
@@ -314,7 +315,7 @@ class Fuselage:
         wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
             self.drone, "fuselage", fuselage_case=2
         )
-        self.weight = fuselage_mass
+        self.weight = fuselage_mass + self.drone.structure.delivery_mechanism_weight()
         return fuselage_mass + self.drone.structure.delivery_mechanism_weight()
 
 
