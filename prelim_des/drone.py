@@ -72,10 +72,10 @@ class Drone:
 
         mission_energy = self.perf.mission_energy(transition)
         self.OEW = (
-            self.wing.weight
-            + self.fuselage.weight()
-            + self.tail.weight()
-            + self.landing_gear.weight()
+            self.wing.calc_weight
+            + self.fuselage.calc_weight
+            + self.tail.calc_weight
+            + self.landing_gear.calc_weight
             + self.propulsion.weight(mission_energy)
         )
         if print:
@@ -100,9 +100,9 @@ class Drone:
                 else "Propeller Weight: Not available"
             )
             print(
-                f"Component Weights: Wing = {self.wing.roskam_weight():.2f} kg, "
-                f"Fuselage = {self.fuselage.weight():.2f} kg, "
-                f"Landing Gear = {float(self.landing_gear.weight()):.2f} kg, "
+                f"Component Weights: Wing = {self.wing.weight:.2f} kg, "
+                f"Fuselage = {self.fuselage.weight:.2f} kg, "
+                f"Landing Gear = {float(self.landing_gear.weight):.2f} kg, "
                 f"Propulsion = {self.propulsion.weight(mission_energy)[0]:.2f} kg"
             )
 

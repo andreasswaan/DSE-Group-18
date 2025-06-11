@@ -21,6 +21,7 @@ class Wing:
 
     S: float
     mac: float
+    weight: float
 
     def __init__(self, drone: Drone):
         logging.debug("Initializing Wing class...")
@@ -160,7 +161,7 @@ class Wing:
         return roskam_w
 
     @property
-    def weight(self):
+    def calc_weight(self):
         mass_folding = toml["config"]["wing"]["wing_folding_weight"]
 
         # Placeholder estimate for the wing weight based
@@ -170,6 +171,7 @@ class Wing:
         #     self.drone, "fuselage", fuselage_case=2
         # )
         wing_mass = self.drone.structural_analysis.run_wing_analysis()
+        self.weight = wing_mass
         return wing_mass + mass_folding
 
     def plot_planform(self, save_plot=True, filename="wing_planform.png"):
@@ -261,6 +263,8 @@ class Wing:
 
 
 class Fuselage:
+    weight: float
+    
     def __init__(self, drone: Drone):
         """Fuselage class."""
         logging.debug("Initializing Fuselage class...")
@@ -282,7 +286,8 @@ class Fuselage:
         """Fuselage perimeter [m]"""
         return self.drone.structure.fuselage_max_perimeter()
 
-    def weight(self):
+    @property
+    def calc_weight(self):
         """Estimate the fuselage weight using Cessna method from Roskam V:
         https://research.tudelft.nl/files/144857482/6.2022_1485.pdf.
 
@@ -310,10 +315,12 @@ class Fuselage:
         wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
             self.drone, "fuselage", fuselage_case=2
         )
+        self.weight = fuselage_mass + self.drone.structure.delivery_mechanism_weight()
         return fuselage_mass + self.drone.structure.delivery_mechanism_weight()
 
 
 class LandingGear:
+    weight: float
     def __init__(self, drone: Drone):
         """Landing gear class."""
         logging.debug("Initializing LandingGear class...")
@@ -349,23 +356,29 @@ class LandingGear:
             0.013 * ImperialConverter.mass_kg_lbs(self.drone.MTOW)
             + +ImperialConverter.mass_kg_lbs(wheel_tire_assembly_weight)
         )
+    
+    @property
+    def calc_weight(self):
         
-    def weight(self):
+        weight_per_leg = 0.017
+        total_weight = self.n_legs * weight_per_leg
+        self.weight = total_weight
         
-        weight_per_leg = 0.0827
-        
-        return self.n_legs * weight_per_leg
+        return total_weight
 
 class Tail_Hori_Veri:
+    weight: float
     def __init__(self, drone: Drone):
         """Landing gear class."""
         logging.debug("Initializing LandingGear class...")
 
         self.drone = drone
-    
-    def weight(self):
+        
+    @property
+    def calc_weight(self):
         wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
             self.drone, "fuselage", fuselage_case=2)
+        self.weight = tail_mass
     
         return tail_mass
 
