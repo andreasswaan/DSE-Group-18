@@ -143,3 +143,20 @@ class Aerodynamics:
             )  # Drag force in N
         else:
             return 0.5 * ρ * V**2 * self.drone.wing.S * self.CD  # Drag force in N
+
+    def elliptical_lift_distribution(self, y: float) -> float:
+        """
+        Computes lift per unit span (N/m) at spanwise position y from centerline.
+        Assumes elliptical distribution. small change hello
+
+        Parameters:
+            y (float): Position along span (from root, 0 ≤ y ≤ b/2)
+
+        Returns:
+            float: Lift per unit span at y (N/m)
+        """
+        b = float(self.drone.wing.span)  # Use the drone's wing span
+        CL_cruise = self.drone.aero.CL_cruise
+        V_max = toml["config"]["mission"]["max_velocity"]
+        L_total = float(self.drone.aero.lift(V_max, CL_cruise))  # Total lift at max velocity
+        return (4 * L_total / (np.pi * b)) * np.sqrt(1 - (2 * y / b) ** 2)

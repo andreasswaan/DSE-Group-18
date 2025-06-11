@@ -29,22 +29,7 @@ materials = load_materials(toml)
 # === LOAD DISTRIBUTIONS ===
 
 
-def elliptical_lift_distribution(y: float, drone: Drone) -> float:
-    """
-    Computes lift per unit span (N/m) at spanwise position y from centerline.
-    Assumes elliptical distribution. small change hello
 
-    Parameters:
-        y (float): Position along span (from root, 0 ≤ y ≤ b/2)
-
-    Returns:
-        float: Lift per unit span at y (N/m)
-    """
-    b = float(drone.wing.span)  # Use the drone's wing span
-    CL_cruise = drone.aero.CL_cruise
-    V_max = toml["config"]["mission"]["max_velocity"]
-    L_total = float(drone.aero.lift(V_max, CL_cruise))  # Total lift at max velocity
-    return (4 * L_total / (np.pi * b)) * np.sqrt(1 - (2 * y / b) ** 2)
 
 
 # def constant_weight_distribution(
@@ -2359,7 +2344,7 @@ def run_structure_analysis(
         point_loads = []
 
         lift_per_section = [
-            elliptical_lift_distribution(y, drone) * dy for y, _ in wing.sections
+           drone.aero.elliptical_lift_distribution(y) * dy for y, _ in wing.sections
         ]
         weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
         drag_per_section = [
@@ -2536,7 +2521,7 @@ def run_structure_analysis(
         if flight_mode == "cruise":
             # All lift from wings, no propeller loads
             lift_per_section = [
-                elliptical_lift_distribution(y, drone) * dy * n_max
+                drone.aero.elliptical_lift_distribution(y) * dy * n_max
                 for y, _ in wing.sections
             ]
             if prop_connection == "wing":
@@ -2797,7 +2782,7 @@ def run_structure_analysis(
     if wing_critical_mode == "cruise":
         # All lift from wings, no propeller loads
         lift_per_section_plot = [
-            elliptical_lift_distribution(y, drone) * dy for y, _ in wing.sections
+           drone.aero.elliptical_lift_distribution(y) * dy for y, _ in wing.sections
         ]
         wing_point_loads_plot = []
     elif wing_critical_mode == "vtol":
