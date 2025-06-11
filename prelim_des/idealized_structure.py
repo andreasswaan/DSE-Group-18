@@ -1871,6 +1871,7 @@ class StructuralAnalysis:
 
     @property
     def wing_root_section(self):
+        print(self.ratio_width_box_to_root_chord)
         return create_rectangular_section(
             width=float(self.drone.wing.c_root)*self.ratio_width_box_to_root_chord,
             height=float(
@@ -1894,8 +1895,7 @@ class StructuralAnalysis:
     @property
     def fuselage_root_section(self):
         return create_rectangular_section(
-            width=float(self.drone.wing.c_root)
-            * self.ratio_width_box_to_root_chord,  # Assumption
+            width=float(self.drone.wing.c_root),  # Assumption
             height=float(
                 self.drone.wing.thick_over_chord * self.drone.wing.chord(y=0.0)
             ),
@@ -2014,7 +2014,7 @@ class StructuralAnalysis:
             [boom.area for boom in section.booms]
             for _, section in wing_structure.sections
         ]
-        dy = self.wing_structure.dy
+        dy = wing_structure.dy
 
         lift_per_section_cruise = [
             self.drone.aero.elliptical_lift_distribution(y) * dy * self.n_max
@@ -2464,9 +2464,9 @@ def run_structure_analysis(
     # wing.plot_deformed_wing(vertical_deflections)
 
     # Tail Creation - CHANGE VALUES !!!!!!!!!! --- !!!!!!!!!!! FIX FIX FIX
-
+    '''
     _, _, _, b_h, c_h_small, c_h_big, b_v, c_v_small, c_v_big = (
-        main_horizontal_stability(Drone)
+        main_horizontal_stability(drone)
     )
 
     horiz_span = b_h
@@ -2475,7 +2475,13 @@ def run_structure_analysis(
     vert_chord = c_v_big
     horiz_taper = c_h_small / c_h_big
     vert_taper = c_v_small / c_v_big
-
+    '''
+    horiz_span = 0.6
+    horiz_chord = 0.15
+    vert_span = 0.25
+    vert_chord = 0.12
+    horiz_taper =1
+    vert_taper  =1
     horiz_section = create_rectangular_section(
         width=horiz_chord,
         height=0.02,
