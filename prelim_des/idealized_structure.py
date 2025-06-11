@@ -54,7 +54,7 @@ materials = load_materials(toml)
 
 
 class IdealizedSection:
-    def __init__(self, booms: list[Boom], width= None):
+    def __init__(self, booms: list[Boom], width=None):
         self.booms = booms
         self.centroid_x, self.centroid_y = self.calc_centroid()
         self.Ixx, self.Iyy, self.Ixy = self.calc_moments()
@@ -237,8 +237,8 @@ def create_rectangular_section(
                 )
             )
 
-    section = IdealizedSection(booms,width)
-    #section.width = width  # <-- Add this line
+    section = IdealizedSection(booms, width)
+    # section.width = width  # <-- Add this line
     section.height = height  # <-- (optional, for symmetry)
 
     return section
@@ -714,7 +714,7 @@ class WingStructure:
         self.dy = self.span / 2 / (n_sections - 1)
         self.sections = self.generate_sections()
         self.total_weight = None
-        self.width= root_section.width
+        self.width = root_section.width
 
     def generate_sections(self) -> list[tuple[float, IdealizedSection]]:
         """
@@ -1133,6 +1133,8 @@ class TailStructure:
         n_sections: int,
         horiz_section: IdealizedSection,
         vert_section: IdealizedSection,
+        horiz_taper_ratio: float = 1.0,
+        vert_taper_ratio: float = 1.0,
         x0: float = 0.0,  # x-location of tail root (relative to fuselage)
         z0: float = 0.0,  # z-location of tail root (relative to fuselage)
     ):
@@ -1143,6 +1145,8 @@ class TailStructure:
         self.n_sections = n_sections
         self.horiz_section = horiz_section
         self.vert_section = vert_section
+        self.horiz_taper_ratio = horiz_taper_ratio
+        self.vert_taper_ratio = vert_taper_ratio
         self.x0 = x0
         self.z0 = z0
         self.horiz_sections = self.generate_horizontal_sections()
@@ -1153,7 +1157,20 @@ class TailStructure:
         sections = []
         for i in range(self.n_sections):
             y = -self.horiz_span / 2 + i * self.horiz_span / (self.n_sections - 1)
+            frac = (y + self.horiz_span / 2) / self.horiz_span
+            scale = 1 - (1 - self.horiz_taper_ratio) * frac
+            scaled_booms = [
+                Boom(
+                    x=boom.x * scale,
+                    y=boom.y * scale,
+                    area=boom.area * (scale**2),
+                    boom_type=boom.type,
+                    material=boom.material,
+                )
+                for boom in self.horiz_section.booms
+            ]
             pos = np.array([self.x0, y, self.z0])
+            section = IdealizedSection(scaled_booms)
             sections.append((pos, self.horiz_section))
         return sections
 
@@ -1162,7 +1179,20 @@ class TailStructure:
         sections = []
         for i in range(self.n_sections):
             z = self.z0 + i * self.vert_span / (self.n_sections - 1)
+            frac = i / (self.n_sections - 1)  # 0 at root, 1 at tip
+            scale = 1 - (1 - self.vert_taper_ratio) * frac
+            scaled_booms = [
+                Boom(
+                    x=boom.x * scale,
+                    y=boom.y * scale,
+                    area=boom.area * (scale**2),
+                    boom_type=boom.type,
+                    material=boom.material,
+                )
+                for boom in self.vert_section.booms
+            ]
             pos = np.array([self.x0, 0.0, z])
+            section = IdealizedSection(scaled_booms)
             sections.append((pos, self.vert_section))
         return sections
 
@@ -1810,12 +1840,14 @@ def size_tail_for_min_mass(
 # === MAIN EXECUTION ===
 
 
-
-
 class StructuralAnalysis:
     wing_weight: float
+
     def __init__(
-        self, drone: Drone, fuselage_case: Literal[1, 2], prop_connection: Literal["wing", "fuselage"]
+        self,
+        drone: Drone,
+        fuselage_case: Literal[1, 2],
+        prop_connection: Literal["wing", "fuselage"],
     ):
         self.drone = drone
         self.SAFETY_FACTOR = toml["config"]["structures"]["SAFETY_FACTOR"]
@@ -1859,7 +1891,7 @@ class StructuralAnalysis:
     @property
     def fuselage_root_section(self):
         return create_rectangular_section(
-            width=float(self.drone.wing.c_root), #Assumption
+            width=float(self.drone.wing.c_root),  # Assumption
             height=float(
                 self.drone.wing.thick_over_chord * self.drone.wing.chord(y=0.0)
             ),
@@ -1895,10 +1927,10 @@ class StructuralAnalysis:
     def fuselage_prop_loads(self):
         wing = self.wing_structure
         return [
-            {"x": 2.5 * wing.width, "y":  wing.span / 2 / 3, "z": 0.0, "Pz": 450 / 4},
-            {"x": -1.5 * wing.width, "y":  wing.span / 2 / 3, "z": 0.0, "Pz": 450 / 4},
-            {"x": 2.5 * wing.width, "y": - wing.span/ 2 / 3, "z": 0.0, "Pz": 450 / 4},
-            {"x": -1.5 * wing.width, "y": - wing.span/ 2 / 3, "z": 0.0, "Pz": 450 / 4},
+            {"x": 2.5 * wing.width, "y": wing.span / 2 / 3, "z": 0.0, "Pz": 450 / 4},
+            {"x": -1.5 * wing.width, "y": wing.span / 2 / 3, "z": 0.0, "Pz": 450 / 4},
+            {"x": 2.5 * wing.width, "y": -wing.span / 2 / 3, "z": 0.0, "Pz": 450 / 4},
+            {"x": -1.5 * wing.width, "y": -wing.span / 2 / 3, "z": 0.0, "Pz": 450 / 4},
         ]
 
     @property
@@ -1935,14 +1967,16 @@ class StructuralAnalysis:
         """all forces on the wing with their coordinates in cruise"""
         if self.prop_connection == "wing":
             wing_point_loads = []  # forces of propellers thrust
-            wing_point_loads.extend(self.motor_weight_loads_wing)  # forces of motor weight
+            wing_point_loads.extend(
+                self.motor_weight_loads_wing
+            )  # forces of motor weight
 
         if self.prop_connection == "fuselage":
             wing_point_loads = []
 
         wing_point_loads.extend(
-                self.wing_folding_load
-            )  # forces due to wing folding mechanism
+            self.wing_folding_load
+        )  # forces due to wing folding mechanism
         return wing_point_loads
 
     @property
@@ -1961,7 +1995,7 @@ class StructuralAnalysis:
             wing_point_loads.extend(
                 self.motor_weight_loads_wing
             )  # forces of motor weight
-       
+
         if self.prop_connection == "fuselage":
             wing_point_loads = []
 
@@ -1992,8 +2026,7 @@ class StructuralAnalysis:
             safety_factor=self.SAFETY_FACTOR,
             wing_point_loads=self.wing_point_loads_vtol,
         )
-        
-        
+
         min_wing_mass_cruise, wing_scale_cruise = size_wing_for_min_mass(
             wing_structure,
             lift_per_section_cruise,
@@ -2002,10 +2035,11 @@ class StructuralAnalysis:
             safety_factor=self.SAFETY_FACTOR,
             wing_point_loads=self.wing_point_loads_cruise,
         )
-        
-        wing_weight = np.max([min_wing_mass_cruise,min_wing_mass_vtol])
-        self.wing_weight = wing_weight *2
+
+        wing_weight = np.max([min_wing_mass_cruise, min_wing_mass_vtol])
+        self.wing_weight = wing_weight * 2
         return wing_weight
+
 
 def run_structure_analysis(
     drone: Drone,
@@ -2426,13 +2460,17 @@ def run_structure_analysis(
     # wing.plot_deformed_wing(vertical_deflections)
 
     # Tail Creation - CHANGE VALUES !!!!!!!!!! --- !!!!!!!!!!! FIX FIX FIX
-    
-    _, _, _, b_h, c_h_small, c_h_big, b_v, c_v_small, c_v_big = 
 
-    horiz_span = 0.6
-    horiz_chord = 0.15
-    vert_span = 0.25
-    vert_chord = 0.12
+    _, _, _, b_h, c_h_small, c_h_big, b_v, c_v_small, c_v_big = (
+        main_horizontal_stability(Drone)
+    )
+
+    horiz_span = b_h
+    horiz_chord = c_h_big
+    vert_span = b_v
+    vert_chord = c_v_big
+    horiz_taper = c_h_small / c_h_big
+    vert_taper = c_v_small / c_v_big
 
     horiz_section = create_rectangular_section(
         width=horiz_chord,
@@ -2462,6 +2500,8 @@ def run_structure_analysis(
         n_sections=10,
         horiz_section=horiz_section,
         vert_section=vert_section,
+        horiz_taper_ratio=horiz_taper,
+        vert_taper_ratio=vert_taper,
         x0=1.1 * fuselage_length,  # example: place at rear of fuselage
         z0=0.0,
     )
