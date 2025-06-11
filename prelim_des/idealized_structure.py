@@ -10,17 +10,17 @@ import matplotlib.ticker as ticker
 from matplotlib import cm
 import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D
-from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
-<<<<<<< HEAD
 from structure import Material
-=======
 from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
->>>>>>> 448452b11f2b8fb2fef647ef952075d8a9c76810
+from prelim_des.utils.load_materials import load_materials
+from prelim_des.utils.import_toml import load_toml
+
 
 # === CONFIG & MATERIALS ===
 
 toml = load_toml()
+materials = load_materials(toml)
 
 
 def load_materials(toml: dict) -> dict[str, Material]:
@@ -61,7 +61,6 @@ def load_materials(toml: dict) -> dict[str, Material]:
     return material_dict
 
 
-materials = load_materials(toml)
 
 # === LOAD DISTRIBUTIONS ===
 
