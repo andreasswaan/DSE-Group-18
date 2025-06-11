@@ -11,6 +11,7 @@ from prelim_des.utils.import_toml import load_toml
 from prelim_des.utils.unit_converter import ImperialConverter
 import utils.define_logging  # do not remove this line, it sets up logging configuration
 import logging
+from idealized_structure import run_structure_analysis
 
 toml = load_toml()
 
@@ -72,7 +73,7 @@ class Wing:
         return (
             (2 / 3) * self.c_root * (1 + self.taper + self.taper**2) / (1 + self.taper)
         )
-    
+
     @property
     def x_ac_lemac(self):
         """X-coordinate of the aerodynamic center (AC) of the wing [m]"""
@@ -149,9 +150,14 @@ class Wing:
         )
 
         weight_folding = toml["config"]["wing"]["wing_folding_weight"]
-        
+
         # Placeholder estimate for the wing weight based
-        return 0.4 * self.S + 0.06 * self.drone.MTOW + weight_folding
+        # return 0.4 * self.S + 0.06 * self.drone.MTOW + weight_folding
+
+        wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
+            self.drone, "fuselage", fuselage_case=2
+        )
+        return wing_mass + weight_folding
 
     def plot_planform(self, save_plot=False, filename="wing_planform.png"):
         """
@@ -274,18 +280,23 @@ class Fuselage:
         n_box = toml["config"]["payload"]["n_box"]
         N_pax = max(N_pax, n_box)
 
-        return (
-            ImperialConverter.mass_lbs_kg(
-                14.86
-                * ImperialConverter.mass_kg_lbs(self.drone.MTOW**0.144)
-                * (self.length / self.perimeter) ** 0.778
-                * ImperialConverter.len_m_ft(self.length) ** 0.383
-                * (N_pax**0.455)
-            )
-            * (0.5 / 100)
-            + self.drone.structure.delivery_mechanism_weight()
-        )
+        # return (
+        #     ImperialConverter.mass_lbs_kg(
+        #         14.86
+        #         * ImperialConverter.mass_kg_lbs(self.drone.MTOW**0.144)
+        #         * (self.length / self.perimeter) ** 0.778
+        #         * ImperialConverter.len_m_ft(self.length) ** 0.383
+        #         * (N_pax**0.455)
+        #     )
+        #     * (0.5 / 100)
+        #     + self.drone.structure.delivery_mechanism_weight()
+        # )
         # Assuming that a pax weighs 100kg and that a pizza weighs 300 g.
+
+        wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
+            self.drone, "fuselage", fuselage_case=2
+        )
+        return fuselage_mass + self.drone.structure.delivery_mechanism_weight()
 
 
 class LandingGear:
