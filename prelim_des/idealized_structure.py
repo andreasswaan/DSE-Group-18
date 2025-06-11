@@ -1645,13 +1645,15 @@ def size_fuselage_for_min_mass(
             section.Ixx, section.Iyy, section.Ixy = section.calc_moments()
 
         dz = fuselage.dz
-        distributed_loads = [section.mass(dz) * g for _, section in fuselage.sections]
+        # distributed_loads = [section.mass(dz) * g for _, section in fuselage.sections]
+        self_weight_per_section = [section.mass(dz) * g for _, section in fuselage.sections]
+        # Add self-weight to the external distributed loads
+        total_distributed_loads = [ext + selfw for ext, selfw in zip(distributed_loads, self_weight_per_section)]
 
         # --- Bending moments and stresses ---
-        # Use only distributed loads for moments, pass point loads separately
         Mz_per_section, My_per_section = (
             fuselage.compute_bending_moments_with_distributed_and_point_loads(
-                distributed_loads, fuselage_point_loads or []
+                total_distributed_loads, fuselage_point_loads or []
             )
         )
         stresses_per_section = fuselage.compute_bending_stresses(
@@ -1906,16 +1908,15 @@ def run_structure_analysis(
     banked=True,  # Set to False for normal cruise, True for banked case
 ):
     # FIX FIX FIX
-    SAFETY_FACTOR = 2.0
-
+    SAFETY_FACTOR = 1.5 * 7.33
     # Create root cross-section
     # FIX THIS -> call correct values
     root_section = create_rectangular_section(
         width=0.6,
         height=0.072,
         n_regular_booms=12,
-        spar_cap_area=2e-5,
-        regular_boom_area=1e-5,
+        spar_cap_area=1e-4,
+        regular_boom_area=5e-5,
         material_name="al_6061_t4",
         materials=materials,
     )
@@ -1943,8 +1944,8 @@ def run_structure_analysis(
         width=fuselage_width,
         height=fuselage_height,
         n_regular_booms=12,
-        spar_cap_area=2e-5,
-        regular_boom_area=1e-5,
+        spar_cap_area=1e-4,
+        regular_boom_area=5e-5,
         material_name="al_6061_t4",
         materials=materials,
     )
@@ -2172,18 +2173,18 @@ def run_structure_analysis(
 
     # Call the sizing function
     # FIX FIX FIX IMPLEMENT SHEAR THICKNESS SOMEWHERE
-    min_fuselage_mass, fuselage_area_scale = size_fuselage_for_min_mass(
-        fuselage,
-        distributed_loads=fuselage_weight_per_section,
-        shear_thickness=0.002,
-        safety_factor=SAFETY_FACTOR,
-        area_scale_start=10.0,
-        area_scale_step=0.02,
-        min_scale=0.01,
-        max_iter=200,
-        fuselage_point_loads=all_fuselage_point_loads,
-        min_boom_area=1e-5,
-    )
+    # min_fuselage_mass, fuselage_area_scale = size_fuselage_for_min_mass(
+    #     fuselage,
+    #     distributed_loads=fuselage_weight_per_section,
+    #     shear_thickness=0.002,
+    #     safety_factor=SAFETY_FACTOR,
+    #     area_scale_start=10.0,
+    #     area_scale_step=0.02,
+    #     min_scale=0.01,
+    #     max_iter=200,
+    #     fuselage_point_loads=all_fuselage_point_loads,
+    #     min_boom_area=1e-5,
+    # )
 
     # print(f"Minimal safe fuselage mass: {min_fuselage_mass:.2f} kg (area scale factor: {fuselage_area_scale:.2f})")
 
@@ -2347,8 +2348,8 @@ def run_structure_analysis(
         width=horiz_chord,
         height=0.02,
         n_regular_booms=8,
-        spar_cap_area=1e-5,
-        regular_boom_area=5e-6,
+        spar_cap_area=5e-5,
+        regular_boom_area=1e-5,
         material_name="al_6061_t4",
         materials=materials,
     )
@@ -2357,8 +2358,8 @@ def run_structure_analysis(
         width=0.02,
         height=vert_chord,
         n_regular_booms=8,
-        spar_cap_area=1e-5,
-        regular_boom_area=5e-6,
+        spar_cap_area=5e-5,
+        regular_boom_area=1e-5,
         material_name="al_6061_t4",
         materials=materials,
     )
@@ -2552,10 +2553,23 @@ def run_structure_analysis(
         # print(f"[INFO] Fuselage dimensions (case {fuselage_case}): width={fuselage_width:.3f} m, height={fuselage_height:.3f} m, length={fuselage_length:.3f} m")
         # print(f"[INFO] Fuselage initial structural mass: {fuselage.mass():.3f} kg")
 
+        
+        payload_weight = (
+            battery_weight
+            + sensors_weight
+            + computing_module_weight
+            + miscellaneous_weight
+            + pizza_weight_1
+            + pizza_weight_2
+            + mechanisms_weight
+            + payload_insulator_weight
+        )
+        
         # FIX FIX FIX SHEAR THICKNESS
+        payload_per_section = [payload_weight / fuselage.n_sections for _ in range(fuselage.n_sections)]
         min_fuselage_mass, fuselage_scale = size_fuselage_for_min_mass(
             fuselage,
-            distributed_loads=fuselage_weight_per_section,
+            distributed_loads=payload_per_section,
             shear_thickness=0.002,
             safety_factor=SAFETY_FACTOR,
             area_scale_start=3.0,
