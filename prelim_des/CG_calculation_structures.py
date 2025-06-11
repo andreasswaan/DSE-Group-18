@@ -241,6 +241,68 @@ def plot_tail_structure_3d(tail):
     plt.show()
 
 # Example usage:
-plot_fuselage_structure_3d(fuselage)
-plot_wing_structure_3d(wing)
-plot_tail_structure_3d(tail)
+# plot_fuselage_structure_3d(fuselage)
+# plot_wing_structure_3d(wing)
+# plot_tail_structure_3d(tail)
+
+
+
+import numpy as np
+
+# Dummy material for booms
+class DummyMaterial:
+    def __init__(self, density=2700):
+        self.density = density
+
+dummy_material = DummyMaterial()
+
+# Dummy Section and Boom classes if not already defined
+class DummyBoom:
+    def __init__(self, x, y, area, material):
+        self.x = x  # chordwise
+        self.y = y  # vertical
+        self.z = 0  # for 3D plotting, lateral (spanwise) is handled by section position
+        self.area = area
+        self.material = material
+
+class DummySection:
+    def __init__(self, booms):
+        self.booms = booms
+
+# Create a simple rectangular wing: 5 spanwise sections, each with 4 corner booms
+n_sections = 5
+span = 1.0  # meters
+chord = 0.2  # meters
+thickness = 0.03  # meters
+area = 1e-4  # m^2 per boom
+
+sections = []
+for i in range(n_sections):
+    y = i * span / (n_sections - 1)  # spanwise position
+    booms = [
+        DummyBoom(0, -thickness/2, area, dummy_material),         # leading edge, bottom
+        DummyBoom(0, thickness/2, area, dummy_material),          # leading edge, top
+        DummyBoom(chord, -thickness/2, area, dummy_material),     # trailing edge, bottom
+        DummyBoom(chord, thickness/2, area, dummy_material),      # trailing edge, top
+        DummyBoom(chord, thickness/3, area, dummy_material),
+        DummyBoom(chord, thickness/7, area, dummy_material),     
+        DummyBoom(chord, thickness/4, area, dummy_material),       
+        DummyBoom(chord, thickness/6, area, dummy_material),
+        DummyBoom(chord, thickness/5, area, dummy_material),             
+        DummyBoom(chord, thickness/8, area, dummy_material),
+        DummyBoom(chord, thickness/9, area, dummy_material),
+        ]
+    sections.append((y, DummySection(booms)))
+
+# Dummy WingStructure class for compatibility with your plotting/CG code
+class DummyWing:
+    def __init__(self, sections, dy):
+        self.sections = sections
+        self.dy = dy
+
+dummy_wing = DummyWing(sections, span / (n_sections - 1))
+
+# Now you can use:
+# plot_wing_structure_3d(dummy_wing)
+# wing_cg_x, wing_cg_z = compute_wing_cg_xz(dummy_wing)
+# print(f"Dummy Wing CG: x={wing_cg_x:.3f} m, z={wing_cg_z:.3f} m")
