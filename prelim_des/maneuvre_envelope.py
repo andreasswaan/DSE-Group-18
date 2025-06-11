@@ -1,11 +1,11 @@
 from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-from prelim_des.drone import Drone
 from prelim_des.mission import Mission
 from prelim_des.performance import Performance
 from constants import ρ, g
