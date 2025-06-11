@@ -79,4 +79,4 @@ if print:
 #         )
 
 
-run_structure_analysis(drone, "fuselage", fuselage_case=2, plot=False, print_bool=True)
+run_structure_analysis(drone, "fuselage", fuselage_case=2, plot=False, PRINT=True)

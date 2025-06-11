@@ -1838,7 +1838,7 @@ class StructuralAnalysis:
     @property
     def wing_root_section(self):
         return create_rectangular_section(
-            width=float(self.drone.wing.c_root),
+            width=float(self.drone.wing.c_root)*self.ratio_width_box_to_root_chord,
             height=float(
                 self.drone.wing.thick_over_chord * self.drone.wing.chord(y=0.0)
             ),
