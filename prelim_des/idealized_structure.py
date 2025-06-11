@@ -1922,7 +1922,7 @@ def run_structure_analysis(
     prop_connection: str = "wing",
     # prop_connection: "wing" or "fuselage"
     fuselage_case=2,  # or 2, (1 for chubby, 2 for elongated fuselage)
-    banked=False,  # Set to False for normal cruise, True for banked case
+    # banked=False,  # Set to False for normal cruise, True for banked case
     plot=False,
 ):
     from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
@@ -1932,14 +1932,14 @@ def run_structure_analysis(
     
     # FIX FIX FIX, those values are educated guesses, but what values should they have? These might be correct
     SAFETY_FACTOR = 1.5 * n_max
-    shear_thickness = 0.002  # meters, skin thickness for shear stress calculations
+    shear_thickness = 0.002  # meters, skin thickness for shear stress calculations, WE DECIDE
     min_boom_area = 1e-5  # m^2, minimum area for a boom
 
     # Create root cross-section
     # FIX THIS -> call correct values
     root_section = create_rectangular_section(
-        width=0.6,
-        height=0.072,
+        width=0.6, # drone.wing.c_root,
+        height=0.072, # drone.wing.thick_over_chord * drone.wing.chord(y = 0.0),
         n_regular_booms=12,
         spar_cap_area=1e-4,
         regular_boom_area=5e-5,
@@ -2286,14 +2286,14 @@ def run_structure_analysis(
 
     # --- Banked flight option ---
     # FIX FIX FIX PULL THEM PROPERLY - FIXED I think? It doesn't seem like we even use this load factor anywhere
-    phi_deg = 30  # Bank angle in degrees
-    phi_rad = np.radians(phi_deg)
-    n_load = 1 / np.cos(phi_rad) if banked else 1.0
+    # phi_deg = 30  # Bank angle in degrees
+    # phi_rad = np.radians(phi_deg)
+    # n_load = 1 / np.cos(phi_rad) if banked else 1.0
 
-    CL_max = drone.aero.CL_max
-    V_max = toml["config"]["mission"]["max_velocity"]
-    L_total = drone.aero.lift(V_max, CL_max)  # Total lift at max velocity
-    L_total_banked = L_total * n_load
+    # CL_max = drone.aero.CL_max
+    # V_max = toml["config"]["mission"]["max_velocity"]
+    # L_total = drone.aero.lift(V_max, CL_max)  # Total lift at max velocity
+    # L_total_banked = L_total * n_load
 
     # Use correct total lift for the selected case
     lift_per_section = []
