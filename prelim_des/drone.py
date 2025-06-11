@@ -2,7 +2,7 @@ import os
 import matplotlib.pyplot as plt
 from globals import main_dir
 from prelim_des.power import PropulsionSystem
-from prelim_des.elems import Wing, Fuselage, LandingGear
+from prelim_des.elems import Wing, Fuselage, LandingGear, Tail_Hori_Veri
 from prelim_des.structure import Structure
 from prelim_des.aerodynamics import Aerodynamics
 from prelim_des.constants import *
@@ -32,6 +32,7 @@ class Drone:
         self.wing = Wing(self)
         self.fuselage = Fuselage(self)
         self.landing_gear = LandingGear(self)
+        self.tail = Tail_Hori_Veri(self)
         self.structure = Structure(self)
         self.propulsion = PropulsionSystem(self)
 
@@ -71,6 +72,7 @@ class Drone:
         self.OEW = (
             self.wing.weight
             + self.fuselage.weight()
+            + self.tail.weight()
             + self.landing_gear.weight()
             + self.propulsion.weight(mission_energy)
         )

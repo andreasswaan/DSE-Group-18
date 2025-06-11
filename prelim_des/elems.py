@@ -349,6 +349,19 @@ class LandingGear:
             + +ImperialConverter.mass_kg_lbs(wheel_tire_assembly_weight)
         )
 
+class Tail_Hori_Veri:
+    def __init__(self, drone: Drone):
+        """Landing gear class."""
+        logging.debug("Initializing LandingGear class...")
+
+        self.drone = drone
+    
+    def weight(self):
+        wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
+            self.drone, "fuselage", fuselage_case=2)
+    
+        return tail_mass
+
 
 # class HorizontalTail(Wing):
 #     def __init__(self,
