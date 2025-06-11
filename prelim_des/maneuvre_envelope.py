@@ -105,6 +105,6 @@ if __name__ == "__main__":
     drone.wing.S = perf.wing_area(drone.OEW)
     drone.class_2_weight_estimate()
 
-    drone.iterative_weight_estimate(plot=True, tolerance=0.01)
+    # drone.iterative_weight_estimate(plot=True, tolerance=0.01)
     n_max = plot_maneuver_and_gust_envelope(drone)
     print(f"Maximum load factor (n_max): {n_max:.2f}")
