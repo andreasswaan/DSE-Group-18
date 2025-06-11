@@ -12,7 +12,11 @@ import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
+<<<<<<< HEAD
 from structure import Material
+=======
+from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
+>>>>>>> 448452b11f2b8fb2fef647ef952075d8a9c76810
 
 # === CONFIG & MATERIALS ===
 
@@ -1909,14 +1913,15 @@ def run_structure_analysis(
     fuselage_case=2,  # or 2, (1 for chubby, 2 for elongated fuselage)
     # banked=False,  # Set to False for normal cruise, True for banked case
     plot=False,
+    print_bool=False,
 ):
-    from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
 
     n_max = plot_maneuver_and_gust_envelope(drone, plot=False)
-    print(f"{n_max} g's maximum load factor from maneuver envelope.")
+    if print_bool:
+        print(f"{n_max} g's maximum load factor from maneuver envelope.")
 
     # FIX FIX FIX, those values are educated guesses, but what values should they have? These might be correct
-    SAFETY_FACTOR = 1.5 * n_max
+    SAFETY_FACTOR = 1.5
     shear_thickness = (
         0.002  # meters, skin thickness for shear stress calculations, WE DECIDE
     )
@@ -2111,6 +2116,7 @@ def run_structure_analysis(
     else:
         raise ValueError("Invalid fuselage case. Choose 1 or 2.")
     """
+    # FIX FIX FIX
     fuselage_prop_loads = [
         {"x": 2.5 * root_section.width, "y": b / 2 / 3, "z": 0.0, "Pz": 450 / 4},
         {"x": -1.5 * root_section.width, "y": b / 2 / 3, "z": 0.0, "Pz": 450 / 4},
@@ -2361,12 +2367,16 @@ def run_structure_analysis(
     vert_half_idx = tail.n_sections // 2
     z_half = tail.vert_sections[vert_half_idx][0][2]
 
+    # FIX FIX FIX
+
     vert_loads = [0.0 for _ in range(tail.n_sections)]
-    vert_loads[vert_half_idx] = 30.0  # 30 N at halfway up the vertical stabiliser
+    vert_loads[vert_half_idx] = (
+        30.0 * n_max
+    )  # 30 N at halfway up the vertical stabiliser
 
     horiz_loads = [0.0 for _ in range(tail.n_sections)]
-    horiz_loads[0] = 50.0  # 50 N at left tip
-    horiz_loads[-1] = 50.0  # 50 N at right tip
+    horiz_loads[0] = 50.0 * n_max**2  # 50 N at left tip
+    horiz_loads[-1] = 50.0 * n_max**2  # 50 N at right tip
 
     h_stress, v_stress = tail.compute_bending_stresses(horiz_loads, vert_loads)
     if plot:
@@ -2376,7 +2386,7 @@ def run_structure_analysis(
             arrow_scale=arrow_scale,
             horiz_loads=horiz_loads,
             vert_loads=vert_loads,
-        )
+        )  # FIX FIX FIX move inside the loop for tail
 
     # --- SIZING FOR BOTH FLIGHT MODES ---
 
@@ -2394,9 +2404,9 @@ def run_structure_analysis(
         ]
 
         # Calculate total forces on the wing
-        total_lift = sum(lift_per_section)
+        total_lift = sum(lift_per_section) * n_max
         total_weight = sum(weight_per_section)
-        total_drag = sum(drag_per_section)
+        total_drag = sum(drag_per_section) * n_max**2
 
         net_vertical_force = total_lift - total_weight  # Pz (upwards positive)
         net_drag_force = total_drag
@@ -2563,7 +2573,8 @@ def run_structure_analysis(
         if flight_mode == "cruise":
             # All lift from wings, no propeller loads
             lift_per_section = [
-                elliptical_lift_distribution(y, drone) * dy for y, _ in wing.sections
+                elliptical_lift_distribution(y, drone) * dy * n_max
+                for y, _ in wing.sections
             ]
             if prop_connection == "wing":
                 wing_point_loads_mode = wing_prop_loads.copy()
@@ -2762,9 +2773,10 @@ def run_structure_analysis(
         payload_per_section = [
             payload_weight / fuselage.n_sections for _ in range(fuselage.n_sections)
         ]
+
         min_fuselage_mass, fuselage_scale = size_fuselage_for_min_mass(
             fuselage,
-            distributed_loads=payload_per_section,
+            distributed_loads=payload_per_section,  # payload_per_section,
             shear_thickness=shear_thickness,
             safety_factor=SAFETY_FACTOR,
             area_scale_start=3.0,
@@ -2794,15 +2806,16 @@ def run_structure_analysis(
     fuselage_critical_mode = max(results, key=lambda m: results[m]["fuselage_mass"])
     tail_critical_mode = max(results, key=lambda m: results[m]["tail_mass"])
 
-    print("\n=== STRUCTURE SIZING SUMMARY ===")
-    print(
-        f"Wing: Critical mode is '{wing_critical_mode}' with mass {2* results[wing_critical_mode]['wing_mass']:.2f} kg"
-    )
-    print(
-        f"Fuselage: Critical mode is '{fuselage_critical_mode}' with mass {results[fuselage_critical_mode]['fuselage_mass']:.2f} kg"
-    )
-    print(f"Tail: Mass {results[tail_critical_mode]['tail_mass']:.2f} kg")
-    print("==============================\n")
+    if print_bool:
+        print("\n=== STRUCTURE SIZING SUMMARY ===")
+        print(
+            f"Wing: Critical mode is '{wing_critical_mode}' with mass {2* results[wing_critical_mode]['wing_mass']:.2f} kg"
+        )
+        print(
+            f"Fuselage: Critical mode is '{fuselage_critical_mode}' with mass {results[fuselage_critical_mode]['fuselage_mass']:.2f} kg"
+        )
+        print(f"Tail: Mass {results[tail_critical_mode]['tail_mass']:.2f} kg")
+        print("==============================\n")
 
     # --- Store critical mode variables for further use ---
     wing_critical_mass = results[wing_critical_mode]["wing_mass"]
@@ -2813,7 +2826,7 @@ def run_structure_analysis(
     tail_critical_scale = results[tail_critical_mode]["tail_scale"]
 
     # Example: print or use these variables
-    if print == True:
+    if print_bool == True:
         print(f"Wing critical scale: {wing_critical_scale:.2f}")
         print(f"Fuselage critical scale: {fuselage_critical_scale:.2f}")
 

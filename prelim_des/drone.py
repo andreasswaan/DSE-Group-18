@@ -55,7 +55,7 @@ class Drone:
             )
         return self.MTOW, self.OEW
 
-    def class_2_weight_estimate(self, transition=False):
+    def class_2_weight_estimate(self, transition=False, print=False):
         """
         Estimate the weight of the drone using a class 2 weight estimate.
         """
@@ -74,7 +74,7 @@ class Drone:
             + self.landing_gear.weight()
             + self.propulsion.weight(mission_energy)
         )
-        if print == True:
+        if print:
             print(
                 f"Mission Energy: {mission_energy[0]:.2f} J"
                 if mission_energy is not None
@@ -135,6 +135,9 @@ class Drone:
             self.wing.S = self.perf.wing_area(self.MTOW)
             S_history.append(self.wing.S)
             if abs(self.MTOW - MTOW_prev) < tolerance * MTOW_prev:
+                print(
+                    f"Converged after {i + 1} iterations: MTOW = {self.MTOW[0]:.2f} kg, OEW = {self.OEW[0]:.2f} kg"
+                )
                 break
         else:
             logging.error(
