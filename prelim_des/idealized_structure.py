@@ -1935,13 +1935,15 @@ def run_structure_analysis(
     plot=False,
 ):
     from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
-    
+
     n_max = plot_maneuver_and_gust_envelope(drone, plot=False)
     print(f"{n_max} g's maximum load factor from maneuver envelope.")
-    
+
     # FIX FIX FIX, those values are educated guesses, but what values should they have? These might be correct
     SAFETY_FACTOR = 1.5 * n_max
-    shear_thickness = 0.002  # meters, skin thickness for shear stress calculations, WE DECIDE
+    shear_thickness = (
+        0.002  # meters, skin thickness for shear stress calculations, WE DECIDE
+    )
     min_boom_area = 1e-5  # m^2, minimum area for a boom
     motor_weight_kg = 0.2  # 200g per motor, waiting for proper weght from Ishaan
     motor_weight = motor_weight_kg * g  # [N]
@@ -1949,11 +1951,11 @@ def run_structure_analysis(
     # Create root cross-section
     # FIX THIS -> call correct values
     root_section = create_rectangular_section(
-        width=0.6, # drone.wing.c_root,
-        height=0.072, # drone.wing.thick_over_chord * drone.wing.chord(y = 0.0),
+        width=float(drone.wing.c_root),
+        height=float(drone.wing.thick_over_chord * drone.wing.chord(y=0.0)),
         n_regular_booms=12,
-        spar_cap_area=1e-4,
-        regular_boom_area=5e-5,
+        spar_cap_area=5e-4,
+        regular_boom_area=1e-4,
         material_name="al_6061_t4",
         materials=materials,
     )
@@ -1981,8 +1983,8 @@ def run_structure_analysis(
         width=fuselage_width,
         height=fuselage_height,
         n_regular_booms=12,
-        spar_cap_area=1e-4,
-        regular_boom_area=5e-5,
+        spar_cap_area=4e-4,
+        regular_boom_area=1e-4,
         material_name="al_6061_t4",
         materials=materials,
     )
@@ -2350,8 +2352,8 @@ def run_structure_analysis(
         width=horiz_chord,
         height=0.02,
         n_regular_booms=8,
-        spar_cap_area=5e-5,
-        regular_boom_area=1e-5,
+        spar_cap_area=1e-4,
+        regular_boom_area=5e-5,
         material_name="al_6061_t4",
         materials=materials,
     )
@@ -2360,8 +2362,8 @@ def run_structure_analysis(
         width=0.02,
         height=vert_chord,
         n_regular_booms=8,
-        spar_cap_area=5e-5,
-        regular_boom_area=1e-5,
+        spar_cap_area=1e-4,
+        regular_boom_area=5e-5,
         material_name="al_6061_t4",
         materials=materials,
     )
@@ -2835,8 +2837,9 @@ def run_structure_analysis(
     tail_critical_scale = results[tail_critical_mode]["tail_scale"]
 
     # Example: print or use these variables
-    print(f"Wing critical scale: {wing_critical_scale:.2f}")
-    print(f"Fuselage critical scale: {fuselage_critical_scale:.2f}")
+    if print == True:
+        print(f"Wing critical scale: {wing_critical_scale:.2f}")
+        print(f"Fuselage critical scale: {fuselage_critical_scale:.2f}")
 
     # --- Prepare and plot the critical case for the WING ---
     if wing_critical_mode == "cruise":

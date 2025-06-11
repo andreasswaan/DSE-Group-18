@@ -69,7 +69,7 @@ class Drone:
 
         mission_energy = self.perf.mission_energy(transition)
         self.OEW = (
-            self.wing.roskam_weight()
+            self.wing.weight
             + self.fuselage.weight()
             + self.landing_gear.weight()
             + self.propulsion.weight(mission_energy)
