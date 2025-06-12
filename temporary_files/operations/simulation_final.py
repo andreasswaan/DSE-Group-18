@@ -575,7 +575,10 @@ def animate_simulation(sim, steps=100, interval=200):
 
         # Update each drone's path line
         for i, drone in enumerate(sim.drones):
-            if hasattr(drone, 'path') and drone.path and len(drone.path) > 1:
+            # Remove path line if drone has arrived (state is 'waiting' or movement_path is empty)
+            if (hasattr(drone, 'path') and drone.path and len(drone.path) > 1
+                and getattr(drone, 'state', None) != 'waiting'
+                and getattr(drone, 'movement_path', None)):
                 path_x, path_y = zip(*drone.path)
                 path_lines[i].set_data(path_x, path_y)
             else:
