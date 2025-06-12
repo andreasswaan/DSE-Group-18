@@ -168,3 +168,6 @@ taper_ratio_tail = 0.5
 Aspect_ratio_tail = 3
 d_e_d_alpha = 0.5
 V_g = 7 
+Cl_alpha_h = 4
+Cm_ac = -0.1
+Cl_h = -0.2
