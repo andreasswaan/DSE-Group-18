@@ -126,11 +126,3 @@ layout_const = {
     # TODO: payload sensors
     # POWER TODO add motors
 }
-
-print(
-    get_cg_constant(
-        CG_calculation_structures.fuselage,
-        CG_calculation_structures.wing,
-        CG_calculation_structures.tail,
-    )
-)
