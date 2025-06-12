@@ -71,7 +71,7 @@ def fix_corner_jumps(path, walkable):
 
 
     
-def calculate_smooth_path(start, end, walkable, density_map, MIN_TURN_RADIUS_GRID, alpha=0.7):
+def calculate_smooth_path(start, end, walkable, density_map, MIN_TURN_RADIUS_GRID=1, alpha=0.7):
     
     if not walkable[start[1], start[0]] or not walkable[end[1], end[0]]:
         return [], 0, 0
