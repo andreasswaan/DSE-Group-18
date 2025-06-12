@@ -5,6 +5,7 @@ from CG_calculation_structures import (
     compute_tail_cg_xz,
 )
 import CG_calculation_structures
+from prelim_des.idealized_structure import 
 
 if TYPE_CHECKING:
     from idealized_structure import FuselageStructure, WingStructure, TailStructure
