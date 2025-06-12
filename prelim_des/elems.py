@@ -171,6 +171,7 @@ class Wing:
         # )
         wing_mass = self.drone.structural_analysis.run_wing_analysis()
         self.weight = wing_mass
+        print(f"Wing mass: {wing_mass:.2f} kg")
         return wing_mass + mass_folding
 
     def plot_planform(self, save_plot=True, filename="wing_planform.png"):

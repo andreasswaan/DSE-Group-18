@@ -6,7 +6,7 @@ from prelim_des.drone import Drone
 from prelim_des.performance import Performance
 import logging
 import utils.define_logging  # do not remove this line, it sets up logging configuration
-from prelim_des.idealized_structure import run_structure_analysis
+
 
 logging.info("Starting drone performance estimation...")
 
@@ -19,9 +19,9 @@ mission = Mission("DRCCRCD")
 drone = Drone()
 perf = Performance(drone, mission)
 drone.perf = perf
+
 drone.class_1_weight_estimate()
-if print == True:
-    print("Drone MTOW:", drone.MTOW)
+print("Drone MTOW:", drone.MTOW)
 # print("Drone OEW:", drone.OEW)
 
 drone.wing.S = perf.wing_area(drone.OEW)
@@ -34,9 +34,9 @@ drone.class_2_weight_estimate(transition=True)
 drone.iterative_weight_estimate(
     transition=True, plot=False, max_iterations=100, tolerance=0.01
 )
-if print:
-    print("Drone MTOW after iterative estimate:", drone.MTOW)
-    print(
+
+print("Drone MTOW after iterative estimate:", drone.MTOW)
+print(
         "Drone mass breakdown:",
         "Battery weight:",
         drone.propulsion.battery.weight,
@@ -52,7 +52,7 @@ if print:
         drone.propulsion.weight(drone.perf.mission_energy(transition=True)[0]),
         "Mission energy (J):",
         drone.perf.mission_energy(transition=True)[0], 
-    )
+)
 # print(f"Wing surface area: {drone.wing.S}")
 
 # drone.wing.plot_planform(save_plot=True)
@@ -68,18 +68,4 @@ if print:
 
 # drone.perf.cruise_noise(plot=True)
 
-
 # drone.perf.payload_range_diagram()
-
-# for prop_connection in ["fuselage", "wing"]:
-#     for fuselage_case in [1, 2]:
-#         print(
-#             f"\n=== Running structure analysis for prop_connection='{prop_connection}', fuselage_case={fuselage_case} ==="
-#         )
-#         run_structure_analysis(
-#             drone, prop_connection=prop_connection, fuselage_case=fuselage_case
-#         )
-
-
-
-run_structure_analysis(drone, "fuselage", fuselage_case=2, plot=False, PRINT=True)
