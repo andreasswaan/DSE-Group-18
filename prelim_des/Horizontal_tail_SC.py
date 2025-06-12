@@ -22,10 +22,8 @@ X_fuselage = 0.5  # m, distance from nose to fuselage CG
 
 # Aerodynamics Values
 Cl_alpha_h = 4  # tail Cl alpha
-Cl_alpha_tailless = 5  # no tail Cl alpha
 Cm_ac = -0.1  # ac moment constant
 Cl_h = -0.2  # tail cl
-Cl_tailless = 0.3  # tailess aircraft cl
 
 
 def item_input_sort():
@@ -50,12 +48,13 @@ def main_horizontal_stability(
     drone: Drone,
     X_fuselage,  # Talk to Andy
     Cl_alpha_h,  # Constant, talk to Andreas
-    Cl_alpha_tailless,  # Constant, talk to Andreas
     Cm_ac,  # Constant, talk to Andreas
     Cl_h,  # Constant, talk to Andreas
-    Cl_tailless,  # Constant, talk to Andreas,
     graph=False,
 ):
+    Cl_alpha_tailless =   drone.aero.cl_alpha_slope()
+    Cl_tailless = drone.aero.cl_alpha(drone.aero.AOA_cruise)
+    
     Dxw = drone.wing.c_root / 2  # m , from LEMAC to wing CG
     drone_thickness = get_fuselage_dimensions(case=2)[1]
     W_fuselage = drone.fuselage.weight  # kg, fuselage weight
@@ -545,18 +544,16 @@ if __name__ == "__main__":
     perf = Performance(drone, mission)
     drone.perf = perf
     drone.class_1_weight_estimate()
+    drone.wing.S = perf.wing_area(drone.OEW)
     drone.class_2_weight_estimate(transition=True)
     
-    drone.aero.cl_alpha_slope()
+  
 
     main_horizontal_stability(
         drone,
         X_fuselage,
-        Dxw,
         Cl_alpha_h,
-        Cl_alpha_tailless,
         Cm_ac,
         Cl_h,
-        Cl_tailless,
         graph=True,
     )

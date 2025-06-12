@@ -10,6 +10,7 @@ from constants import ρ
 from prelim_des.utils.import_toml import load_toml
 import utils.define_logging  # do not remove this line, it sets up logging configuration
 import logging
+from sklearn import datasets, linear_model, metrics
 from utils.CFD_simulation_results import (
     average_cl_alpha,
     AOA,
@@ -42,6 +43,8 @@ class Aerodynamics:
         self.oswald_efficiency = toml["config"]["aero"]["oswald_efficiency"]
         self.drone = drone
         self.CL_slope_aircraft = toml["config"]["aero"]["CL_slope_aircraft"]
+        self.AOA_cruise = toml["config"]["performance"]["AOA_cruise"]
+        
 
     @property
     def CD(self) -> float:
@@ -105,9 +108,54 @@ class Aerodynamics:
             folder = os.path.join("prelim_des", "plots", "Aerodynamics")
             os.makedirs(folder, exist_ok=True)
             plt.savefig(os.path.join(folder, "AOA vs Cl"), dpi=300, bbox_inches="tight")
+            plt.show()
             plt.close()
 
         return cl_at_req_alpha
+
+    def cl_alpha_slope(self, save_plot=True):
+        """
+        Estimate the cl of the drone based on alpha (deg).
+        If the root chord and tip chord are defined it will
+        return an estimation otherwise it will use the base cl/alpha curve
+
+        Parameters:
+        alpha (float): The angle of attack (deg).
+
+        Returns:
+        float: The cl.
+        """
+        if self.drone.wing.c_root == None or self.drone.wing.c_tip == None:
+            return self.__base_cl_cruise(self.AOA_cruise)
+
+        root_chord = self.drone.wing.c_root
+        tip_chord = self.drone.wing.c_tip
+
+        cl_alpha_tip = tip_chord_cl_alpha(tip_chord)
+        cl_alpha_root = root_chord_cl_alpha(root_chord)
+        cl_alpha = []
+        for i in range(len(AOA)):
+            cl_alpha.append(np.average([cl_alpha_tip[i], cl_alpha_root[i]]))
+        if save_plot:
+            plt.figure()
+            plt.plot(AOA, cl_alpha, label="cl_alpha vs AOA")
+            plt.xlabel("Angle of Attack (deg)")
+            plt.ylabel("cl_alpha")
+            plt.title("AOA vs cl_alpha")
+            plt.grid(True)
+            plt.ylim(bottom=0)  # Ensure y-axis starts at 0
+            folder = os.path.join("prelim_des", "plots", "Aerodynamics")
+            os.makedirs(folder, exist_ok=True)
+            plt.savefig(os.path.join(folder, "AOA vs Cl"), dpi=300, bbox_inches="tight")
+            plt.close()
+    
+        reg = linear_model.LinearRegression()
+        X = np.array(AOA[:-1]).reshape(-1, 1)
+        y = np.array(cl_alpha[:-1])
+        reg.fit(X, y)
+        print(reg.coef_[0])
+        return reg.coef_[0]
+
 
     def lift(self, V: float, CL) -> float:
         """
