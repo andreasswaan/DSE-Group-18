@@ -85,9 +85,9 @@ class Drone(Point):
         self.target = None
         self.max_battery_level = 100
         self.energy_per_meter = constants.energy_per_metre  # kWh per meter, this is a placeholder value
-        self.speed = 10*100/6000*5  # m/s, horizontal speed
-        self.distance_travelled = 0
-        self.max_capacity = 10 # max number of pizzas it can carry
+        self.speed = 15 / 10  # m/s, horizontal speed
+        self.max_capacity = 6 # max number of pizzas it can carry
+        self.distance_travelled = np.zeros(self.max_capacity)
         self.battery = 100  # battery level in percentage
         self.departure_times = []  # list of departure times for each mission
         self.arrival_times = []  # list of arrival times for each mission
@@ -357,23 +357,24 @@ class Simulation:
         if dt is None:
             dt = self.dt
         for restaurant in self.city.restaurants:
-            orders = restaurant.generate_orders(dt, self.inv_total_time)
-            if orders:
-                for order in orders:
-                    order['restaurant_id'] = restaurant.restaurant_id
-                    order['arrival_time'] = self.calculate_arrival_time()
-                    order['restaurant'] = restaurant
-                    order['time'] = self.timestamp
-                    order['x_delivery_loc'], order['y_delivery_loc'] = self.city.generate_order_location()
-                    order['status'] = False # not delivered
-                    order_id = len(self.logger.order_log)
-                    order['order_id'] = order_id
-                    self.order_book[order_id] = Order(order)
+            if self.timestamp < constants.time_window - constants.min_order_delay:
+                orders = restaurant.generate_orders(dt, self.inv_total_time)
+                if orders:
+                    for order in orders:
+                        order['restaurant_id'] = restaurant.restaurant_id
+                        order['arrival_time'] = self.calculate_arrival_time()
+                        order['restaurant'] = restaurant
+                        order['time'] = self.timestamp
+                        order['x_delivery_loc'], order['y_delivery_loc'] = self.city.generate_order_location()
+                        order['status'] = False # not delivered
+                        order_id = len(self.logger.order_log)
+                        order['order_id'] = order_id
+                        self.order_book[order_id] = Order(order)
 
-                    logorder = copy.deepcopy(order)
-                    logorder['order_id'] = order_id
-                    del logorder['time']
-                    self.logger.order_log[order['time']] = logorder
+                        logorder = copy.deepcopy(order)
+                        logorder['order_id'] = order_id
+                        del logorder['time']
+                        self.logger.order_log[order['time']] = logorder
 
     def take_step(self):        
         self.take_orders()

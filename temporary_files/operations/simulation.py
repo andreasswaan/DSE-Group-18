@@ -86,8 +86,8 @@ class Drone(Point):
         self.max_battery_level = 100
         self.energy_per_meter = constants.energy_per_metre  # kWh per meter, this is a placeholder value
         self.speed = 15 / 10  # m/s, horizontal speed
-        self.distance_travelled = [0, 0, 0, 0, 0, 0]
-        self.max_capacity = 5 # max number of pizzas it can carry
+        self.max_capacity = 6 # max number of pizzas it can carry
+        self.distance_travelled = np.zeros(self.max_capacity)
         self.battery = 100  # battery level in percentage
         self.departure_times = []  # list of departure times for each mission
         self.arrival_times = []  # list of arrival times for each mission
