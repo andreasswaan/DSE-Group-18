@@ -210,22 +210,35 @@ class Drone(Point):
                 self.distance_travelled += np.linalg.norm(step_vector)
             return
 
-        # Otherwise, move towards the next waypoint in the path
-        next_x, next_y = self.movement_path[1]
-        direction_vector = np.array([next_x - self.xpos, next_y - self.ypos])
-        norm = np.linalg.norm(direction_vector)
-        if norm == 0:
-            step_vector = np.array([0.0, 0.0])
+        distance_per_frame = self.speed * dt
+        temp = 0
+        dist = 0
+
+        # Find how many full segments the drone can traverse this frame
+        while temp + 1 < len(self.movement_path) and dist + np.linalg.norm(np.array(self.movement_path[temp + 1]) - np.array(self.movement_path[temp])) < distance_per_frame:
+            dist += np.linalg.norm(np.array(self.movement_path[temp + 1]) - np.array(self.movement_path[temp]))
+            temp += 1
+
+        # Remaining distance to move after last full segment
+        remaining = distance_per_frame - dist
+
+        if temp + 1 < len(self.movement_path):
+            # Move partially toward the next waypoint
+            start = np.array(self.movement_path[temp])
+            end = np.array(self.movement_path[temp + 1])
+            direction = end - start
+            segment_length = np.linalg.norm(direction)
+            if segment_length > 0:
+                step = direction / segment_length * remaining
+                self.xpos, self.ypos = (start + step)
+            else:
+                self.xpos, self.ypos = end
+            # Remove all waypoints up to temp
+            self.movement_path = self.movement_path[temp:]
         else:
-            step_vector = direction_vector / norm * self.speed * dt
-        if np.linalg.norm(direction_vector) <= np.linalg.norm(step_vector):
-            self.xpos, self.ypos = next_x, next_y
-            self.distance_travelled += np.linalg.norm(direction_vector)
-            self.movement_path.pop(0)
-        else:
-            self.xpos += step_vector[0]
-            self.ypos += step_vector[1]
-            self.distance_travelled += np.linalg.norm(step_vector)
+            # If at or past the last waypoint, just set position to the last point
+            self.xpos, self.ypos = self.movement_path[-1]
+            self.movement_path = [self.movement_path[-1]]
     
     def arrive(self):
         if isinstance(self.target, Depot):
