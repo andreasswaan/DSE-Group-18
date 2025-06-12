@@ -1,16 +1,10 @@
 \ Model DARP_copy
 \ LP format - for model browsing. Use MPS format to capture full model detail.
-\ Signature: 0x6e6bbe1c0f4b5854
+\ Signature: 0x5af67735cdbd1410
 Maximize
  
 Subject To
- arr_after_order_0_0: - 10000 x[0,7,0] - 10000 x[1,7,0] - 10000 x[2,7,0]
-   - 10000 x[3,7,0] - 10000 x[4,7,0] - 10000 x[5,7,0] - 10000 x[6,7,0]
-   - 10000 x[8,7,0] - 10000 x[9,7,0] - 10000 x[10,7,0] - 10000 x[11,7,0]
-   - 10000 x[12,7,0] - 10000 x[13,7,0] + t_arr[7,0] >= 4400
+ start_battery_0: battery[0,0] = 2.2894
 Bounds
- -infinity <= t_arr[7,0] <= 3000
-Binaries
- x[0,7,0] x[1,7,0] x[2,7,0] x[3,7,0] x[4,7,0] x[5,7,0] x[6,7,0] x[8,7,0]
- x[9,7,0] x[10,7,0] x[11,7,0] x[12,7,0] x[13,7,0]
+ battery[0,0] >= 20
 End
