@@ -1,3 +1,5 @@
+import sys
+import argparse
 import os
 import json
 import numpy as np
@@ -14,7 +16,7 @@ import financial_model
 import constants
 
 # pizza size to weight guide in kg
-np.random.seed(4)  # for reproducibility
+np.random.seed(40)  # for reproducibility
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
 n_drones = 10
 
@@ -87,7 +89,7 @@ class Drone(Point):
         self.target = None
         self.max_battery_level = 100
         self.energy_per_meter = constants.energy_per_metre  # kWh per meter, this is a placeholder value
-        self.speed = 15 * 10  # m/s, horizontal speed
+        self.speed = 15 / 10  # m/s, horizontal speed
         self.max_capacity = 6 # max number of pizzas it can carry
         self.distance_travelled = np.zeros(self.max_capacity + 1)
         self.battery = 100  # battery level in percentage
@@ -183,15 +185,17 @@ class Drone(Point):
         if np.linalg.norm(direction_vector) <= np.linalg.norm(step_vector):
             self.xpos, self.ypos = self.target.xpos, self.target.ypos
             self.arrive()
-            self.distance_travelled[int(self.load)] += np.linalg.norm(direction_vector)
+            self.distance_travelled[int(self.load)] += np.linalg.norm(direction_vector) * 10
         else:
             self.xpos += step_vector[0]
             self.ypos += step_vector[1]
-            self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector)
+            self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 10
             
     def move_to_target_along_path(self, dt):
         if self.target is None or not self.movement_path or len(self.movement_path) == 0:
             return
+
+        distance_per_frame = self.speed * dt
 
         # If only one point left, move towards it (the final target)
         if len(self.movement_path) == 1:
@@ -201,32 +205,35 @@ class Drone(Point):
             if norm == 0:
                 step_vector = np.array([0.0, 0.0])
             else:
-                step_vector = direction_vector / norm * self.speed * dt
-            if np.linalg.norm(direction_vector) <= np.linalg.norm(step_vector):
+                step_vector = direction_vector / norm * distance_per_frame
+            if norm <= np.linalg.norm(step_vector):
                 self.xpos, self.ypos = target_x, target_y
                 self.arrive()
-                self.distance_travelled[int(self.load)] += np.linalg.norm(direction_vector)
+                self.distance_travelled[int(self.load)] += norm * 10
                 self.movement_path = []
             else:
                 self.xpos += step_vector[0]
                 self.ypos += step_vector[1]
-                self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector)
+                self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 10
             return
 
-        distance_per_frame = self.speed * dt
+        # Move along as many segments as possible
         temp = 0
         dist = 0
+        start = np.array(self.movement_path[0])
+        while temp + 1 < len(self.movement_path):
+            seg = np.array(self.movement_path[temp + 1]) - np.array(self.movement_path[temp])
+            seg_len = np.linalg.norm(seg)
+            if dist + seg_len < distance_per_frame:
+                dist += seg_len
+                temp += 1
+            else:
+                break
 
-        # Find how many full segments the drone can traverse this frame
-        while temp + 1 < len(self.movement_path) and dist + np.linalg.norm(np.array(self.movement_path[temp + 1]) - np.array(self.movement_path[temp])) < distance_per_frame:
-            dist += np.linalg.norm(np.array(self.movement_path[temp + 1]) - np.array(self.movement_path[temp]))
-            temp += 1
-
-        # Remaining distance to move after last full segment
         remaining = distance_per_frame - dist
 
         if temp + 1 < len(self.movement_path):
-            # Move partially toward the next waypoint
+            # Interpolate within the next segment
             start = np.array(self.movement_path[temp])
             end = np.array(self.movement_path[temp + 1])
             direction = end - start
@@ -238,25 +245,13 @@ class Drone(Point):
                 self.xpos, self.ypos = end
             # Remove all waypoints up to temp
             self.movement_path = self.movement_path[temp:]
-        # Otherwise, move towards the next waypoint in the path
-        next_x, next_y = self.movement_path[1]
-        direction_vector = np.array([next_x - self.xpos, next_y - self.ypos])
-        norm = np.linalg.norm(direction_vector)
-        if norm == 0:
-            step_vector = np.array([0.0, 0.0])
-        else:
-            step_vector = direction_vector / norm * self.speed * dt
-        if np.linalg.norm(direction_vector) <= np.linalg.norm(step_vector):
-            self.xpos, self.ypos = next_x, next_y
-            self.distance_travelled[int(self.load)] += np.linalg.norm(direction_vector)
-            self.movement_path.pop(0)
-        else:
-            # If at or past the last waypoint, just set position to the last point
-            self.xpos, self.ypos = self.movement_path[-1]
-            self.movement_path = [self.movement_path[-1]]
-            self.xpos += step_vector[0]
-            self.ypos += step_vector[1]
-            self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector)
+            self.distance_travelled[int(self.load)] += distance_per_frame * 10
+            return
+
+        # If at or past the last waypoint, just set position to the last point
+        self.xpos, self.ypos = self.movement_path[-1]
+        self.movement_path = [self.movement_path[-1]]
+        self.distance_travelled[int(self.load)] += (dist + np.linalg.norm(np.array([self.xpos, self.ypos]) - start)) * 10
     
     def arrive(self):
         self.battery -= constants.TO_land_energy
@@ -267,9 +262,11 @@ class Drone(Point):
             self.depot.charge_drone(self)
         elif isinstance(self.target, Order):
             self.load -= self.target.demand
+            self.departure_times[0] = self.simulation.timestamp + self.target.waiting_time
         elif isinstance(self.target, Restaurant):
             self.load += self.restaurant_order_nodes[0].demand
-            self.restaurant_order_nodes.pop(0) 
+            self.restaurant_order_nodes.pop(0)
+            self.departure_times[0] = self.simulation.timestamp + self.target.waiting_time 
         #self.target = self.get_target()
         self.state = 'waiting'
         
@@ -291,15 +288,13 @@ class Drone(Point):
             return
         
         self.path, _, _ = calculate_smooth_path(idx_start, idx_target, walkable, 
-                                                density_map=grid['weight_grid'], alpha=0.7) # path, step_cost, weight_cost
+                                                density_map=grid['weight_grid'], alpha=0.3) # path, step_cost, weight_cost
         self.movement_path = list(self.path) 
         
         if self.path is not None and len(self.path) > 0:
             # Multiply each coordinate in self.path by conversion_factor
             self.path = [(x * conversion_factor, y * conversion_factor) for x, y in self.path]
             self.movement_path = list(self.path)  # Store a copy for movement
-
-        
 
 
 class Depot(Point):
@@ -312,6 +307,11 @@ class Depot(Point):
         self.energy_spent: float = 0.0 #kWh
         self.name = f'Depot {self.depot_id}'
         self.waiting_time = constants.battery_swap_time
+
+    def charge_drone(self, drone:Drone):
+        energy_needed = drone.max_battery_level - drone.battery
+        self.energy_spent += energy_needed * 0.00444
+        drone.battery = drone.max_battery_level
 
 class City:
     def __init__(self,
@@ -435,9 +435,14 @@ class Simulation:
         self.city.reset()
         global drone_list
         drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))]
-        self.drones = [drone for depot in self.city.depots for drone in depot.current_drones]
+        #for drone in drone_list:
+        #    drone.depot.current_drones.append(drone)
+        self.drones = [drone for drone in drone_list if drone.depot is not None]
+        print(f"Resetting simulation with {len(self.drones)} drones.")
         for drone in self.drones:
             drone.simulation = self
+        self.mp = MissionPlanning(self)
+        self.financial_model = financial_model.FinancialModel(self)
 
     def calculate_arrival_time(self):
         min_order_time: int = self.timestamp + constants.min_order_delay
@@ -631,10 +636,10 @@ def animate_simulation(sim, steps=100, interval=200):
     )
     plt.show()
 n_steps = int(constants.time_window / my_sim.dt)
-my_sim.change_order_volume(1/9)
+my_sim.change_order_volume(1/10)
 #animate_simulation(my_sim, n_steps, interval=10)
-for i in range(n_steps):
-   my_sim.take_step()
+#for i in range(n_steps):
+#   my_sim.take_step()
 #print(my_sim.financial_model.calculate_revenue())
 
 def variable_weights_test():
@@ -650,23 +655,6 @@ def variable_weights_test():
 
     with open(txt_path, "w") as f:
         for j in np.arange(0, -1.1, -0.1):  # Use np.arange for float steps, include -1
-            #Depot0 = Depot(depot_dict[0])
-            #depots = [Depot0]
-            #drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))] 
-            #print(f"Running simulation with weight: {j}")
-            #print(depot.current_drones for depot in depots)
-            #city_dict = {
-            #    'city_name': city_name,
-            #    'restaurants': restaurants,
-            #    'depots': depots,
-            #    'tall_buildings': [],  # Placeholder, can be populated later
-            #    'silent_zones': silent_zones,
-            #    'population': population_dict
-            #}
-            #my_sim = Simulation(
-            #    city=City(city_dict),
-            #    logger=Logger()
-            #)
             my_sim.reset()
             my_sim.weight = j
             f.write(f"---------------------Weight: {j}----------------------\n")
@@ -694,4 +682,138 @@ def variable_weights_test():
     plt.savefig(fig_path)
     plt.close()
 
-variable_weights_test()
+#variable_weights_test()
+
+def run_variable_simulation(param_values, param_name, output_dir, txt_filename, fig_filename, setup_sim_func):
+    """
+    Runs the simulation for each value in param_values, varying param_name.
+    setup_sim_func(param_value) should return a fresh Simulation instance.
+    """
+    weights_or_drones = []
+    profits = []
+
+    os.makedirs(output_dir, exist_ok=True)
+    txt_path = os.path.join(output_dir, txt_filename)
+    fig_path = os.path.join(output_dir, fig_filename)
+
+    with open(txt_path, "w") as f:
+        for val in param_values:
+            my_sim = setup_sim_func(val)
+            f.write(f"---------------------{param_name}: {val}----------------------\n")
+            for i in range(n_steps):
+                my_sim.take_step()
+            profit, costs, revenue = my_sim.financial_model.calculate_daily_profit()
+            f.write(f"Profit: {profit:.2f} EUR, Costs: {costs:.2f} EUR, Revenue: {revenue:.2f} EUR\n")
+            weights_or_drones.append(val)
+            profits.append(profit)
+            if my_sim.drones:
+                for i in range(my_sim.drones[0].max_capacity):
+                    avg_dist = sum(drone.distance_travelled[i] for drone in my_sim.drones) / max(1, sum(len(drone.mission_log) for drone in my_sim.drones))
+                    f.write(f"average distance travelled at capacity {i}: {avg_dist:.2f} m\n")
+                average_num_TO_landings = sum(
+                    sum(len(drone.mission_log[i]) - 1 for i in range(len(drone.mission_log))) / len(drone.mission_log) for drone in my_sim.drones
+                ) / len(my_sim.drones)
+                f.write(f"Average number of TO landings per drone: {average_num_TO_landings:.2f}\n")
+
+    # Plot profit vs parameter
+    plt.figure()
+    plt.plot(weights_or_drones, profits, marker='o')
+    plt.xlabel(param_name.capitalize())
+    plt.ylabel("Profit (EUR)")
+    plt.title(f"Profit vs {param_name.capitalize()}")
+    plt.grid(True)
+    plt.savefig(fig_path)
+    plt.close()
+
+def setup_sim_with_weight(weight):
+    # Re-create city, logger, and simulation for each run
+    restaurants = [Restaurant(r) for r in restaurant_dict]
+
+    # make each silent zone a point object:
+    silent_zones = [Point(s['xpos'], s['ypos']) for s in silent_zones_dict if s.get('value')]
+
+    # Create depot objects
+    depot_dict = [{
+    'depot_id': 0,
+    'xpos': 264,
+    'ypos': 472,
+    'capacity': 10,
+    }]
+
+    Depot0 = Depot(depot_dict[0])
+    #Depot1 = Depot(depot_dict[1])
+    depots = [Depot0]
+
+    # Create drone objects
+    #drone_dict = [{'drone_id': i, 'depot': 0 if i%2 == 0 else 1} for i in range(n_drones)]
+    drone_dict = [{'drone_id': i, 'depot': 0} for i in range(n_drones)] 
+    drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))] 
+
+    # Create the city object
+    city_dict = {
+        'city_name': city_name,
+        'restaurants': restaurants,
+        'depots': depots,
+        'tall_buildings': [],  # Placeholder, can be populated later
+        'silent_zones': silent_zones,
+        'population': population_dict
+    }
+
+    my_sim = Simulation(
+        city=City(city_dict),
+        logger=Logger()
+    )
+    my_sim.weight = weight
+    return my_sim
+
+def setup_sim_with_n_drones(n_drones_val):
+    # Update global n_drones and re-create city, depots, drones, logger, simulation
+    global n_drones, drone_dict, drone_list, depots, city_dict
+    n_drones = int(n_drones_val)
+    # Re-create depots and drones
+    for depot in depots:
+        depot.current_drones = []
+    drone_dict = [{'drone_id': i, 'depot': 0} for i in range(n_drones)]
+    drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))]
+    city = City(city_dict)
+    logger = Logger()
+    sim = Simulation(city=city, logger=logger)
+    return sim
+
+def variable_weights_test():
+    param_values = np.arange(0, -1.1, -0.1)
+    run_variable_simulation(
+        param_values=param_values,
+        param_name="weight",
+        output_dir="operations",
+        txt_filename="variable_objective_weights.txt",
+        fig_filename="profit_vs_weight.png",
+        setup_sim_func=setup_sim_with_weight
+    )
+
+def variable_drones_test():
+    param_values = np.arange(5, 25, 5)
+    run_variable_simulation(
+        param_values=param_values,
+        param_name="n_drones",
+        output_dir="operations",
+        txt_filename="variable_objective_drones.txt",
+        fig_filename="profit_vs_drones.png",
+        setup_sim_func=setup_sim_with_n_drones
+    )
+
+# Usage:
+#variable_weights_test()
+#variable_drones_test()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--weight", type=float, default=-0.1)
+    parser.add_argument("--output", type=str, default="result_weight.txt")
+    args = parser.parse_args()
+
+    my_sim.weight = args.weight
+    for i in range(n_steps):
+        my_sim.take_step()
+    profit, costs, revenue = my_sim.financial_model.calculate_daily_profit()
+    with open(args.output, "w") as f:
+        f.write(f"{args.weight},{profit},{costs},{revenue}\n")

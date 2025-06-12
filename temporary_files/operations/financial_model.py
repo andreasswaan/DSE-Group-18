@@ -95,7 +95,7 @@ class FinancialModel:
             self.calculate_energy_costs()  # Energy costs
         )
         daily_profit = daily_revenue - daily_costs   
-        return daily_profit
+        return daily_profit, daily_costs, daily_revenue
     
     def calculate_weekly_profit(self):
         # Calculate weekly profit

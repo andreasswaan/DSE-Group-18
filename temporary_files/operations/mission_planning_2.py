@@ -30,7 +30,7 @@ class MissionPlanning:
                 nearest_depot.current_drones[0].set_targets([order.restaurant, order, order.nearest(self.depots)])
                 order.being_delivered = True
 
-    def solve_mission_planning(self, conversion_meters=10):
+    def solve_mission_planning(self, conversion_meters=10, weight = -0.1):
         drones, depots, orders, order_clusters = self.setup_problem()
         #print(len(orders), "orders to deliver")
         for cluster in order_clusters:
@@ -50,7 +50,7 @@ class MissionPlanning:
                                 if k != j:
                                     distance_matrix[j, k] = node1.distance(node2)
                         #self.solve([drones[0]], drone_start_nodes, depots, restaurants, subcluster, nodes, distance_matrix)
-                        self.solve(drones, drone_start_nodes, depots, restaurants, subcluster, nodes, distance_matrix, conversion_meters=conversion_meters)
+                        self.solve(drones, drone_start_nodes, depots, restaurants, subcluster, nodes, distance_matrix, conversion_meters=conversion_meters, weight = weight)
         
     def setup_problem(self):
         #print("-------------------------time:", self.simulation.timestamp, "-------------------------")
@@ -77,7 +77,7 @@ class MissionPlanning:
         #            distance_matrix[i, j] = node1.distance(node2)        
         return drones, depots, orders, order_clusters
 
-    def solve(self, drones, drone_start_nodes, depots, restaurants, orders, nodes, distance_matrix, conversion_meters = 10):
+    def solve(self, drones, drone_start_nodes, depots, restaurants, orders, nodes, distance_matrix, conversion_meters = 10, weight = -0.1):
         #drones, drone_start_nodes, depots, restaurants, orders, nodes, distance_matrix = self.setup_problem()
         M = 1e4  # big-M
         n_nodes = len(nodes)
@@ -279,7 +279,7 @@ class MissionPlanning:
             for i in range(n_nodes):
                 for j in range(n_nodes):
                     if i != j:
-                        travel_time = distance_matrix[i, j] / drones[k].speed
+                        travel_time = distance_matrix[i, j] / (drones[k].speed * 0.8)
                         travel = 0 if travel_time == 0 else 1
                         model.addConstr(
                             t_arr[j, k] >= t_dep[i, k] + travel_time - M * (1 - x[i, j, k]),
@@ -301,7 +301,7 @@ class MissionPlanning:
                                     + M * (1 - gp.quicksum(x[j, i, k] for j in range(n_nodes) if j != i)), name=f"dep_before_max_wait_{i}_{k}")
         # Objective: Minimize weighted sum of total distance and total delay
         weight_dist = -0.5
-        weight_finish_time = -0.1
+        weight_finish_time = weight
         weight_orders_delivered = 500
 
         total_orders_delivered = gp.quicksum(x[i, n_depots + n_restaurants + o, k] for o in range(n_orders) for i in range(n_nodes) if i != n_depots + n_restaurants + o for k in range(n_drones))
