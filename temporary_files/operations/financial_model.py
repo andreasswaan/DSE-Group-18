@@ -95,7 +95,7 @@ class FinancialModel:
             self.calculate_energy_costs()  # Energy costs
         )
         daily_profit = daily_revenue - daily_costs   
-        return daily_profit
+        return daily_profit, daily_costs, daily_revenue
     
     def calculate_weekly_profit(self):
         # Calculate weekly profit
@@ -105,27 +105,40 @@ class FinancialModel:
             self.simulation.change_order_volume(constants.order_volume_ratios[day])
             for t in range(constants.time_window // self.simulation.dt):
                 self.simulation.take_step()
-            daily_revenue = self.calculate_revenue()
-            daily_costs = (
-                self.calculate_costs_per_delivery() * len([order for order in self.orders if order.status]) +  # Costs per delivery
-                self.calculate_energy_costs()  # Energy costs
-            )
+            daily_profit, daily_costs, daily_revenue = self.calculate_daily_profit()
             weekly_revenue += daily_revenue
             weekly_costs += daily_costs
             self.simulation.reset()
         weekly_profit = weekly_revenue - weekly_costs
         
-        return weekly_profit
+        return weekly_profit, weekly_costs, weekly_revenue
     
     def calculate_monthly_profit(self):
-        monthly_profit = self.calculate_weekly_profit() * 365 / 12 / 7
+        monthly_profit, monthly_costs, monthly_revenue = self.calculate_weekly_profit() * 365 / 12 / 7
         monthly_profit -= self.calculate_costs_per_month()  # Subtract monthly costs
-        return monthly_profit
+        monthly_costs += self.calculate_costs_per_month()
+        return monthly_profit, monthly_costs, monthly_revenue
     
     def calculate_ROI(self, time_period=5): #in years
         # Calculate Return on Investment (ROI)
         initial_costs = self.calculate_initial_costs()
-        monthly_profit = self.calculate_monthly_profit()
+        monthly_profit, monthly_costs, monthly_revenue = self.calculate_monthly_profit()
         roi = (monthly_profit * 12 * time_period / initial_costs) * 100
         profit = monthly_profit * 12 * time_period - initial_costs
-        return roi, profit
+        cost = monthly_costs * 12 * time_period
+        revenue = monthly_revenue * 12 * time_period
+        return roi, profit, initial_costs, cost, revenue
+    
+    def fixed_volume_ROI(self, time_period=5):
+        for t in range(constants.time_window // self.simulation.dt):
+            self.simulation.take_step()
+        daily_profit, daily_costs, daily_revenue = self.calculate_daily_profit()
+        initial_costs = self.calculate_initial_costs()
+        monthly_costs = self.calculate_costs_per_month()
+        monthly_costs += daily_costs * 365 / 12  
+        monthly_profit = daily_profit * 365 / 12 - monthly_costs
+        roi = (monthly_profit * 12 * time_period / initial_costs) * 100
+        profit = monthly_profit * 12 * time_period - initial_costs
+        cost = monthly_costs * 12 * time_period
+        revenue = daily_revenue * 365 / 12 * 12 * time_period
+        return roi, profit, initial_costs, cost, revenue
