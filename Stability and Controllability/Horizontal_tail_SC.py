@@ -4,7 +4,8 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import tomllib
-from internals import layout_var
+from prelim_des.internals import layout_var
+from prelim_des.idealized_structure import get_fuselage_dimensions
 
 if TYPE_CHECKING:
     from prelim_des.drone import Drone
@@ -17,10 +18,7 @@ with open("prelim_des/config.toml", "rb") as f:
     data = tomllib.load(f)
 
 # Structures Values
-Dxw = 0.2  # m , from LEMAC to wing CG
 X_fuselage = 0.5  # m, distance from nose to fuselage CG
-drone_thickness = 0.4
-X_battery_pizza_list = []
 
 # Aerodynamics Values
 Cl_alpha_h = 4  # tail Cl alpha
@@ -30,20 +28,36 @@ Cl_h = -0.2  # tail cl
 Cl_tailless = 0.3  # tailess aircraft cl
 
 
+def item_input_sort():
+    N = 1
+    W_list = []
+    X_list = []
+    while N == 1:
+        W = float(input("Weight input kg:"))
+        X = float(input("Distance from nose m:"))
+        W_list.append(W)
+        X_list.append(X)
+        choice = int(input("1. continue / 2. end :"))
+        if choice == 2:
+            N = 0
+    X_reverse = X_list[::-1]
+    W_reverse = W_list[::-1]
+    return X_list, W_list, X_reverse, W_reverse
+
+
 # MAIN
 def main_horizontal_stability(
     drone: Drone,
     X_fuselage,  # Talk to Andy
-    Dxw,  # Talk to Andy
     Cl_alpha_h,  # Constant, talk to Andreas
     Cl_alpha_tailless,  # Constant, talk to Andreas
     Cm_ac,  # Constant, talk to Andreas
     Cl_h,  # Constant, talk to Andreas
     Cl_tailless,  # Constant, talk to Andreas,
-    drone_thickness,
     graph=False,
 ):
-
+    Dxw = drone.wing.c_root / 2  # m , from LEMAC to wing CG
+    drone_thickness = get_fuselage_dimensions(case=2)[1]
     W_fuselage = drone.fuselage.weight  # kg, fuselage weight
     W_wing = drone.wing.weight  # kg, wing weight
     S_M = data["config"]["horizontal_sc"]["S_M"]  # safety margin
@@ -212,23 +226,6 @@ def horizontal_tail_area_sizing(area_ratio, S_wing, t, A):
     c_small = 2 * t / (1 + t) * math.sqrt(S / A)
     c_big = 2 / (1 + t) * math.sqrt(S / A)
     return b, c_small, c_big
-
-
-def item_input_sort():
-    N = 1
-    W_list = []
-    X_list = []
-    while N == 1:
-        W = float(input("Weight input kg:"))
-        X = float(input("Distance from nose m:"))
-        W_list.append(W)
-        X_list.append(X)
-        choice = int(input("1. continue / 2. end :"))
-        if choice == 2:
-            N = 0
-    X_reverse = X_list[::-1]
-    W_reverse = W_list[::-1]
-    return X_list, W_list, X_reverse, W_reverse
 
 
 def cg_diagram(W_EOM, X_EOM, W_list_0, X_list_0):

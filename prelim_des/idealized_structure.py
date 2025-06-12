@@ -11,15 +11,13 @@ from matplotlib import cm
 import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D
 from prelim_des.constants import g
-from structure import Material
+from prelim_des.structure import Boom, Material
 from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
 from prelim_des.utils.load_materials import load_materials
 from prelim_des.utils.import_toml import load_toml
 
 from prelim_des.utils.load_materials import load_materials
 from prelim_des.utils.import_toml import load_toml
-from structure import Boom
-
 
 # === CONFIG & MATERIALS ===
 
@@ -28,9 +26,6 @@ materials = load_materials(toml)
 
 
 # === LOAD DISTRIBUTIONS ===
-
-
-
 
 
 # def constant_weight_distribution(
@@ -52,12 +47,7 @@ materials = load_materials(toml)
 #     return W_total / (b / 2)  # Divide by half-span (modelling half wing)
 
 
-
-
-
 # === STRUCTURAL CLASSES ===
-
-
 
 
 class IdealizedSection:
@@ -2306,7 +2296,7 @@ def run_structure_analysis(
         point_loads = []
 
         lift_per_section = [
-           drone.aero.elliptical_lift_distribution(y) * dy for y, _ in wing.sections
+            drone.aero.elliptical_lift_distribution(y) * dy for y, _ in wing.sections
         ]
         weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
         drag_per_section = [
@@ -2744,7 +2734,7 @@ def run_structure_analysis(
     if wing_critical_mode == "cruise":
         # All lift from wings, no propeller loads
         lift_per_section_plot = [
-           drone.aero.elliptical_lift_distribution(y) * dy for y, _ in wing.sections
+            drone.aero.elliptical_lift_distribution(y) * dy for y, _ in wing.sections
         ]
         wing_point_loads_plot = []
     elif wing_critical_mode == "vtol":
