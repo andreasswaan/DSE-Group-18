@@ -49,7 +49,7 @@ class Performance:
         """Calculate required wing surface area for given weight and cruise speed."""
 
         AOA = self.AOA_cruise
-        cl_cruise = self.drone.aero.cl_alpha(AOA)
+        cl_cruise = self.drone.aero.cl_from_alpha(AOA)
         S = (
             mass * g / (0.5 * ρ * self.V_cruise**2 * cl_cruise)
         )  # Using lift equation with horizontal equilibrium
@@ -63,7 +63,7 @@ class Performance:
         while abs(difference_S) > 0.001:
             if n > 1000:
                 raise RuntimeError("the wing did not converge")
-            cl_cruise = self.drone.aero.cl_alpha(AOA)
+            cl_cruise = self.drone.aero.cl_from_alpha(AOA)
             self.drone.wing.S = (
                 mass * g / (0.5 * ρ * self.V_cruise**2 * cl_cruise)
             )  # Using lift equation with horizontal equilibrium
