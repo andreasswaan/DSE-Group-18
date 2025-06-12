@@ -160,17 +160,18 @@ class Wing:
         )
         return roskam_w
 
-    @property
     def calc_weight(self):
         mass_folding = toml["config"]["wing"]["wing_folding_weight"]
 
         # Placeholder estimate for the wing weight based
         # return 0.4 * self.S + 0.06 * self.drone.MTOW + weight_folding
 
-        wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
-            self.drone, "fuselage", fuselage_case=2
-        )
+        # wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
+        #     self.drone, "fuselage", fuselage_case=2
+        # )
+        wing_mass = self.drone.structural_analysis.run_wing_analysis()
         self.weight = wing_mass
+        print(f"Wing mass: {wing_mass:.2f} kg")
         return wing_mass + mass_folding
 
     def plot_planform(self, save_plot=True, filename="wing_planform.png"):
@@ -314,7 +315,7 @@ class Fuselage:
         wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
             self.drone, "fuselage", fuselage_case=2
         )
-        self.weight = fuselage_mass
+        self.weight = fuselage_mass + self.drone.structure.delivery_mechanism_weight()
         return fuselage_mass + self.drone.structure.delivery_mechanism_weight()
 
 

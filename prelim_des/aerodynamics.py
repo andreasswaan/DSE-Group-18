@@ -72,7 +72,7 @@ class Aerodynamics:
         cl_at_req_alpha = np.interp(alpha, AOA, avg_cl_alpha)
         return cl_at_req_alpha
 
-    def cl_alpha(self, alpha, save_plot=True):
+    def cl_from_alpha(self, alpha, save_plot=True):
         """
         Estimate the cl of the drone based on alpha (deg).
         If the root chord and tip chord are defined it will

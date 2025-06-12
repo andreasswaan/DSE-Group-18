@@ -156,6 +156,7 @@ mat_delta_y_2 = 180                         # MPa (Flexural)
 SAFETY_FACTOR = 1.5
 shear_thickness = 0.002
 min_boom_area=1e-5
+ratio_width_box_to_root_chord = 1
 #-----------------------------------------------------------------------------------------------------------------------
 
 [config.horizontal_sc]
@@ -168,6 +169,12 @@ taper_ratio_tail = 0.5
 Aspect_ratio_tail = 3
 d_e_d_alpha = 0.5
 V_g = 7 
+
+
+#-----------------------------------------------------------------------------------------------------------------------
+[config.sensors]
+
+mass = 0.26         # kg
 Cl_alpha_h = 6.28
 Cm_ac = -0.15
 Cl_h = -0.33

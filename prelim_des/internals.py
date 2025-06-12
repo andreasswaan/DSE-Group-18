@@ -1,9 +1,10 @@
 from typing import TYPE_CHECKING
-from prelim_des.CG_calculation_structures import (
+from CG_calculation_structures import (
     compute_fuselage_cg_xz,
     compute_wing_cg_xz,
     compute_tail_cg_xz,
 )
+import CG_calculation_structures
 
 if TYPE_CHECKING:
     from idealized_structure import FuselageStructure, WingStructure, TailStructure
