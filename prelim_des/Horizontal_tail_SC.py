@@ -542,9 +542,5 @@ if __name__ == "__main__":
 
     main_horizontal_stability(
         drone,
-        X_fuselage,
-        Cl_alpha_h,
-        Cm_ac,
-        Cl_h,
         graph=True,
     )
