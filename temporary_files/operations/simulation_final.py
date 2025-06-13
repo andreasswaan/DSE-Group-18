@@ -645,9 +645,9 @@ if __name__ == "__main__":
     my_sim.change_order_volume(1/9)
     my_sim.weight = args.weight
     np.random.seed(args.seed)
-    #for i in range(n_steps):
-    #    my_sim.take_step()
-    animate_simulation(my_sim, n_steps, interval=10)
+    for i in range(n_steps):
+        my_sim.take_step()
+    #animate_simulation(my_sim, n_steps, interval=10)
     plt.plot(np.linspace(0, constants.time_window, len(my_sim.orders_per_time)), my_sim.orders_per_time, label='Orders per time step')
     plt.xlabel('Time step')
     plt.ylabel('Number of orders')
