@@ -15,10 +15,9 @@ from pathplanning.path_planning_final import calculate_smooth_path
 import financial_model
 import constants
 
-# pizza size to weight guide in kg
-np.random.seed(40)  # for reproducibility
+np.random.seed(42)
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
-n_drones = 10
+n_drones = constants.n_drones
 
 class Point():
     def __init__(self, xpos: float, ypos: float) -> None:
@@ -480,39 +479,6 @@ restaurants = [Restaurant(r) for r in restaurant_dict]
 # make each silent zone a point object:
 silent_zones = [Point(s['xpos'], s['ypos']) for s in silent_zones_dict if s.get('value')]
 
-# Create depot objects
-depot_dict = [{
-'depot_id': 0,
-'xpos': 264,
-'ypos': 472,
-'capacity': 10,
-}]
-
-Depot0 = Depot(depot_dict[0])
-#Depot1 = Depot(depot_dict[1])
-depots = [Depot0]
-
-# Create drone objects
-#drone_dict = [{'drone_id': i, 'depot': 0 if i%2 == 0 else 1} for i in range(n_drones)]
-drone_dict = [{'drone_id': i, 'depot': 0} for i in range(n_drones)] 
-drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))] 
-
-# Create the city object
-city_dict = {
-    'city_name': city_name,
-    'restaurants': restaurants,
-    'depots': depots,
-    'tall_buildings': [],  # Placeholder, can be populated later
-    'silent_zones': silent_zones,
-    'population': population_dict
-}
-
-my_sim = Simulation(
-    city=City(city_dict),
-    logger=Logger()
-)
-
-
 # Setup Path Planning Grid
 def load_delft_grid(path="pathplanning/data/delft_grid_data_70_border.npz"):
     data = np.load(path, allow_pickle=True)
@@ -635,8 +601,6 @@ def animate_simulation(sim, steps=100, interval=200):
         fig, update, frames=steps, interval=interval, blit=True, repeat=False
     )
     plt.show()
-n_steps = int(constants.time_window / my_sim.dt)
-my_sim.change_order_volume(1/10)
 #animate_simulation(my_sim, n_steps, interval=10)
 #for i in range(n_steps):
 #   my_sim.take_step()
@@ -809,11 +773,47 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--weight", type=float, default=-0.1)
     parser.add_argument("--output", type=str, default="result_weight.txt")
+    parser.add_argument('--seed', type=int, required=False, default=0)
+    parser.add_argument("--n_drones", type=int, default=n_drones)
     args = parser.parse_args()
 
+    # Create depot objects
+    depot_dict = [{
+    'depot_id': 0,
+    'xpos': 264,
+    'ypos': 472,
+    'capacity': 10,
+    }]
+
+    Depot0 = Depot(depot_dict[0])
+    #Depot1 = Depot(depot_dict[1])
+    depots = [Depot0]
+
+    # Create drone objects
+    #drone_dict = [{'drone_id': i, 'depot': 0 if i%2 == 0 else 1} for i in range(n_drones)]
+    drone_dict = [{'drone_id': i, 'depot': 0} for i in range(n_drones)] 
+    drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))] 
+
+    # Create the city object
+    city_dict = {
+        'city_name': city_name,
+        'restaurants': restaurants,
+        'depots': depots,
+        'tall_buildings': [],  # Placeholder, can be populated later
+        'silent_zones': silent_zones,
+        'population': population_dict
+    }
+
+    my_sim = Simulation(
+    city=City(city_dict),
+    logger=Logger()
+)
+    n_steps = int(constants.time_window / my_sim.dt)
+    my_sim.change_order_volume(1/9)
     my_sim.weight = args.weight
+    np.random.seed(args.seed)
     for i in range(n_steps):
         my_sim.take_step()
     profit, costs, revenue = my_sim.financial_model.calculate_daily_profit()
     with open(args.output, "w") as f:
-        f.write(f"{args.weight},{profit},{costs},{revenue}\n")
+        f.write(f"{args.weight},{args.n_drone},{profit},{costs},{revenue}\n")

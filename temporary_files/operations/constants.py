@@ -11,7 +11,7 @@ unloading_time_customer=60
 buffer_time=60
 battery_swap_time=300
 peak_order_volume=350
-time_window= 3600 * 1 # time window to place orders
+time_window= 3600 * 4 # time window to place orders
 min_order_delay=0*60
 scale=30*60 # scale for order time distribution
 pizza_cooling_time=30*60
@@ -26,6 +26,7 @@ max_orders_per_mission=10
 mp_interval=60*2
 deliver_time_window=60*10
 reso = 100
+n_drones = 10
 
 # financial constants
 #initial costs

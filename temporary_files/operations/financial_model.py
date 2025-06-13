@@ -129,3 +129,14 @@ class FinancialModel:
         roi = (monthly_profit * 12 * time_period / initial_costs) * 100
         profit = monthly_profit * 12 * time_period - initial_costs
         return roi, profit
+    
+    def calculate_ROI_single_day(self,time_period=5):
+        # Calculate Return on Investment (ROI) for a single day
+        initial_costs = self.calculate_initial_costs()
+        daily_profit, daily_cost, daily_revenue = self.calculate_daily_profit()
+        monthly_costs = self.calculate_costs_per_month()
+        total_costs = initial_costs + monthly_costs * time_period * 12 + daily_cost * time_period * 365
+        total_revenue = daily_revenue * 365 * time_period
+        total_profit = total_revenue - total_costs
+        roi = (total_profit / initial_costs) * 100
+        return roi, total_profit, total_costs, total_revenue, initial_costs
