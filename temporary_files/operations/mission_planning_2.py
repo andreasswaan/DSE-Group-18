@@ -32,7 +32,8 @@ class MissionPlanning:
 
     def solve_mission_planning(self, conversion_meters=10, weight = -0.1):
         drones, depots, orders, order_clusters = self.setup_problem()
-        #print(len(orders), "orders to deliver")
+        print(len(orders), "orders to deliver")
+        print(f"Number of drones: {len(drones)}")
         for cluster in order_clusters:
             if len(cluster) > 0:
                 # Split cluster into chunks of size max_orders_per_mission
@@ -64,17 +65,8 @@ class MissionPlanning:
         orders = [order for order in orders_to_deliver if not order.being_delivered]
         #print(f"Order {order.order_id} at restaurant {order.restaurant.name} with arrival time {order.arrival_time}")
         order_clusters = self.cluster_orders(orders, int(np.ceil(len(orders)/constants.max_orders_per_mission)))
-        #orders.sort(key=lambda order: order.arrival_time)
-        #restaurants = [order.restaurant for order in orders]
-        #drone_start_nodes = [drone.depot.depot_id for drone in drones if drone.depot is not None]
-        #nodes = [*depots, *restaurants, *orders, *depots]
         #print(f"Orders: {[order.name for order in orders]}")
-        #print(f"Orders being delivered: {[order.name for order in orders_being_delivered]}")
-        #distance_matrix = np.zeros((len(nodes), len(nodes)))
-        #for i, node1 in enumerate(nodes):
-        #    for j, node2 in enumerate(nodes):
-        #        if i != j:
-        #            distance_matrix[i, j] = node1.distance(node2)        
+        #print(f"Orders being delivered: {[order.name for order in orders_being_delivered]}")        
         return drones, depots, orders, order_clusters
 
     def solve(self, drones, drone_start_nodes, depots, restaurants, orders, nodes, distance_matrix, conversion_meters = 10, weight = -0.1):
