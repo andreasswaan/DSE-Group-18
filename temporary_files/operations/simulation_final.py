@@ -75,6 +75,7 @@ class Order(Point):
         self.demand = self.s + self.m + self.l
         self.arrival_time = order_dict['arrival_time']
         self.waiting_time = constants.waiting_time_customer  # seconds
+        self.delivered_at = None
 
 class Drone(Point):
     def __init__(self,
@@ -169,7 +170,7 @@ class Drone(Point):
         self.battery_level -= 0.1 * (self.xvel**2 + self.yvel**2) * dt"""
         if self.departure_times and self.departure_times[0] <= self.simulation.timestamp and self.targets and self.state == 'waiting':
             self.get_target()
-        # self.move_to_target(dt)
+        #self.move_to_target(dt)
         self.move_to_target_along_path(dt)
     
     def move_to_target(self, dt):
@@ -179,41 +180,37 @@ class Drone(Point):
         norm = np.linalg.norm(direction_vector)
         if norm == 0:
             step_vector = np.array([0.0, 0.0])
+            return
         else:
             step_vector = direction_vector / norm * self.speed * dt
         if np.linalg.norm(direction_vector) <= np.linalg.norm(step_vector):
             self.xpos, self.ypos = self.target.xpos, self.target.ypos
             self.arrive()
             self.distance_travelled[int(self.load)] += np.linalg.norm(direction_vector) * 10
+            return
         else:
             self.xpos += step_vector[0]
             self.ypos += step_vector[1]
             self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 10
             
     def move_to_target_along_path(self, dt):
-        if self.target is None or not self.movement_path or len(self.movement_path) == 0:
+        if self.target is None:
             return
-
+        if not self.movement_path or len(self.movement_path) == 0:
+            #print(f"Warning: No path found for drone {self.drone_id}, moving directly toward target!")
+            self.move_to_target(dt)
+            return
+            
         distance_per_frame = self.speed * dt
 
-        # If only one point left, move towards it (the final target)
+        # If only one point left, move directly to the target (the final target)
         if len(self.movement_path) == 1:
-            target_x, target_y = self.movement_path[0]
-            direction_vector = np.array([target_x - self.xpos, target_y - self.ypos])
-            norm = np.linalg.norm(direction_vector)
-            if norm == 0:
-                step_vector = np.array([0.0, 0.0])
-            else:
-                step_vector = direction_vector / norm * distance_per_frame
-            if norm <= np.linalg.norm(step_vector):
-                self.xpos, self.ypos = target_x, target_y
-                self.arrive()
-                self.distance_travelled[int(self.load)] += norm * 10
-                self.movement_path = []
-            else:
-                self.xpos += step_vector[0]
-                self.ypos += step_vector[1]
-                self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 10
+            self.xpos, self.ypos = self.target.xpos, self.target.ypos
+            self.arrive()
+            self.distance_travelled[int(self.load)] += np.linalg.norm(
+                np.array([self.target.xpos, self.target.ypos]) - np.array([self.xpos, self.ypos])
+            ) * 10
+            self.movement_path = []
             return
 
         # Move along as many segments as possible
@@ -231,27 +228,21 @@ class Drone(Point):
 
         remaining = distance_per_frame - dist
 
-        if temp + 1 < len(self.movement_path):
-            # Interpolate within the next segment
-            start = np.array(self.movement_path[temp])
-            end = np.array(self.movement_path[temp + 1])
-            direction = end - start
-            segment_length = np.linalg.norm(direction)
-            if segment_length > 0:
-                step = direction / segment_length * remaining
-                self.xpos, self.ypos = (start + step)
-            else:
-                self.xpos, self.ypos = end
-            # Remove all waypoints up to temp
-            self.movement_path = self.movement_path[temp:]
-            self.distance_travelled[int(self.load)] += distance_per_frame * 10
-            return
+        # Interpolate within the next segment
+        start = np.array(self.movement_path[temp-1])
+        end = np.array(self.movement_path[temp])
+        direction = end - start
+        segment_length = np.linalg.norm(direction)
+        if segment_length > 0:
+            step = direction / segment_length * remaining
+            self.xpos, self.ypos = (start + step)
+        else:
+            self.xpos, self.ypos = end
+        # Remove all waypoints up to temp
+        self.movement_path = self.movement_path[temp:]
+        self.distance_travelled[int(self.load)] += distance_per_frame * 10
+        return
 
-        # If at or past the last waypoint, just set position to the last point
-        self.xpos, self.ypos = self.movement_path[-1]
-        self.movement_path = [self.movement_path[-1]]
-        self.distance_travelled[int(self.load)] += (dist + np.linalg.norm(np.array([self.xpos, self.ypos]) - start)) * 10
-    
     def arrive(self):
         self.battery -= constants.TO_land_energy
         if isinstance(self.target, Depot):
@@ -262,6 +253,7 @@ class Drone(Point):
         elif isinstance(self.target, Order):
             self.load -= self.target.demand
             self.departure_times[0] = self.simulation.timestamp + self.target.waiting_time
+            self.target.delivered_at = self.simulation.timestamp
         elif isinstance(self.target, Restaurant):
             self.load += self.restaurant_order_nodes[0].demand
             self.restaurant_order_nodes.pop(0)
@@ -386,6 +378,8 @@ class Simulation:
         self.timestamp = 0
         self.take_orders(dt=constants.initial_orders_time)  
         self.weight = -0.1
+        self.orders_per_time = []
+        self.orders_interval = 300
 
     def change_order_volume(self, order_volume_ratio: float):
         for restaurant in self.city.restaurants:
@@ -421,6 +415,10 @@ class Simulation:
             # run mission planning
             self.mp.solve_mission_planning(weight=self.weight)
             #self.mp.basic_heuristic()
+        if self.timestamp % self.orders_interval == 0:
+            orders = [self.order_book[order_id] for order_id in self.order_book if self.order_book[order_id].status]
+            orders = [order for order in orders if order.delivered_at - order.arrival_time <= constants.deliver_time_window]
+            self.orders_per_time.append(len(orders))
 
         for drone in self.drones:
             drone.update_drone(self.dt)
@@ -496,9 +494,6 @@ obstacle_grid = grid['obstacle_grid']
 obstacle_grid_7x = np.kron(obstacle_grid, np.ones((scale_factor, scale_factor)))
 # weight_grid_7x now has the same values as weight_grid, but each cell is expanded to a 7x7 block
 
-    
-    
-        
 
 # -------- SIMULATION ANIMATION --------
 
@@ -528,9 +523,9 @@ def animate_simulation(sim, steps=100, interval=200):
     scat_depots = ax.scatter(
         [d.xpos for d in city.depots],
         [d.ypos for d in city.depots],
-        c='green', marker='^', label='Depots', s=30
+        c='green', marker='^', label='Depots', s=50, edgecolors='black'
     )
-    scat_drones = ax.scatter([], [], c='orange', label='Drones', s=20, marker='o', zorder=20)
+    scat_drones = ax.scatter([], [], c='lime', label='Drones', s=20, marker='o', zorder=20)
 
     # Create a Line2D object for each drone's path
     path_lines = []
@@ -606,169 +601,7 @@ def animate_simulation(sim, steps=100, interval=200):
 #   my_sim.take_step()
 #print(my_sim.financial_model.calculate_revenue())
 
-def variable_weights_test():
-    weights = []
-    profits = []
 
-    # Ensure the operations directory exists
-    output_dir = "operations"
-    os.makedirs(output_dir, exist_ok=True)
-
-    txt_path = os.path.join(output_dir, "variable_objective_weights.txt")
-    fig_path = os.path.join(output_dir, "profit_vs_weight.png")
-
-    with open(txt_path, "w") as f:
-        for j in np.arange(0, -1.1, -0.1):  # Use np.arange for float steps, include -1
-            my_sim.reset()
-            my_sim.weight = j
-            f.write(f"---------------------Weight: {j}----------------------\n")
-            for i in range(n_steps):
-                my_sim.take_step()
-            profit, costs, revenue = my_sim.financial_model.calculate_daily_profit()
-            f.write(f"Profit: {profit:.2f} EUR, Costs: {costs:.2f} EUR, Revenue: {revenue:.2f} EUR\n")
-            weights.append(j)
-            profits.append(profit)
-            for i in range(my_sim.drones[0].max_capacity):
-                avg_dist = sum(drone.distance_travelled[i] for drone in my_sim.drones) / max(1, sum(len(drone.mission_log) for drone in my_sim.drones))
-                f.write(f"average distance travelled at capacity {i}: {avg_dist:.2f} m\n")
-            average_num_TO_landings = sum(
-                sum(len(drone.mission_log[i]) - 1 for i in range(len(drone.mission_log))) / len(drone.mission_log) for drone in my_sim.drones
-            ) / len(my_sim.drones)
-            f.write(f"Average number of TO landings per drone: {average_num_TO_landings:.2f}\n")
-
-    # Plot profit vs weight
-    plt.figure()
-    plt.plot(weights, profits, marker='o')
-    plt.xlabel("Weight")
-    plt.ylabel("Profit (EUR)")
-    plt.title("Profit vs Weight")
-    plt.grid(True)
-    plt.savefig(fig_path)
-    plt.close()
-
-#variable_weights_test()
-
-def run_variable_simulation(param_values, param_name, output_dir, txt_filename, fig_filename, setup_sim_func):
-    """
-    Runs the simulation for each value in param_values, varying param_name.
-    setup_sim_func(param_value) should return a fresh Simulation instance.
-    """
-    weights_or_drones = []
-    profits = []
-
-    os.makedirs(output_dir, exist_ok=True)
-    txt_path = os.path.join(output_dir, txt_filename)
-    fig_path = os.path.join(output_dir, fig_filename)
-
-    with open(txt_path, "w") as f:
-        for val in param_values:
-            my_sim = setup_sim_func(val)
-            f.write(f"---------------------{param_name}: {val}----------------------\n")
-            for i in range(n_steps):
-                my_sim.take_step()
-            profit, costs, revenue = my_sim.financial_model.calculate_daily_profit()
-            f.write(f"Profit: {profit:.2f} EUR, Costs: {costs:.2f} EUR, Revenue: {revenue:.2f} EUR\n")
-            weights_or_drones.append(val)
-            profits.append(profit)
-            if my_sim.drones:
-                for i in range(my_sim.drones[0].max_capacity):
-                    avg_dist = sum(drone.distance_travelled[i] for drone in my_sim.drones) / max(1, sum(len(drone.mission_log) for drone in my_sim.drones))
-                    f.write(f"average distance travelled at capacity {i}: {avg_dist:.2f} m\n")
-                average_num_TO_landings = sum(
-                    sum(len(drone.mission_log[i]) - 1 for i in range(len(drone.mission_log))) / len(drone.mission_log) for drone in my_sim.drones
-                ) / len(my_sim.drones)
-                f.write(f"Average number of TO landings per drone: {average_num_TO_landings:.2f}\n")
-
-    # Plot profit vs parameter
-    plt.figure()
-    plt.plot(weights_or_drones, profits, marker='o')
-    plt.xlabel(param_name.capitalize())
-    plt.ylabel("Profit (EUR)")
-    plt.title(f"Profit vs {param_name.capitalize()}")
-    plt.grid(True)
-    plt.savefig(fig_path)
-    plt.close()
-
-def setup_sim_with_weight(weight):
-    # Re-create city, logger, and simulation for each run
-    restaurants = [Restaurant(r) for r in restaurant_dict]
-
-    # make each silent zone a point object:
-    silent_zones = [Point(s['xpos'], s['ypos']) for s in silent_zones_dict if s.get('value')]
-
-    # Create depot objects
-    depot_dict = [{
-    'depot_id': 0,
-    'xpos': 264,
-    'ypos': 472,
-    'capacity': 10,
-    }]
-
-    Depot0 = Depot(depot_dict[0])
-    #Depot1 = Depot(depot_dict[1])
-    depots = [Depot0]
-
-    # Create drone objects
-    #drone_dict = [{'drone_id': i, 'depot': 0 if i%2 == 0 else 1} for i in range(n_drones)]
-    drone_dict = [{'drone_id': i, 'depot': 0} for i in range(n_drones)] 
-    drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))] 
-
-    # Create the city object
-    city_dict = {
-        'city_name': city_name,
-        'restaurants': restaurants,
-        'depots': depots,
-        'tall_buildings': [],  # Placeholder, can be populated later
-        'silent_zones': silent_zones,
-        'population': population_dict
-    }
-
-    my_sim = Simulation(
-        city=City(city_dict),
-        logger=Logger()
-    )
-    my_sim.weight = weight
-    return my_sim
-
-def setup_sim_with_n_drones(n_drones_val):
-    # Update global n_drones and re-create city, depots, drones, logger, simulation
-    global n_drones, drone_dict, drone_list, depots, city_dict
-    n_drones = int(n_drones_val)
-    # Re-create depots and drones
-    for depot in depots:
-        depot.current_drones = []
-    drone_dict = [{'drone_id': i, 'depot': 0} for i in range(n_drones)]
-    drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))]
-    city = City(city_dict)
-    logger = Logger()
-    sim = Simulation(city=city, logger=logger)
-    return sim
-
-def variable_weights_test():
-    param_values = np.arange(0, -1.1, -0.1)
-    run_variable_simulation(
-        param_values=param_values,
-        param_name="weight",
-        output_dir="operations",
-        txt_filename="variable_objective_weights.txt",
-        fig_filename="profit_vs_weight.png",
-        setup_sim_func=setup_sim_with_weight
-    )
-
-def variable_drones_test():
-    param_values = np.arange(5, 25, 5)
-    run_variable_simulation(
-        param_values=param_values,
-        param_name="n_drones",
-        output_dir="operations",
-        txt_filename="variable_objective_drones.txt",
-        fig_filename="profit_vs_drones.png",
-        setup_sim_func=setup_sim_with_n_drones
-    )
-
-# Usage:
-#variable_weights_test()
-#variable_drones_test()
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--weight", type=float, default=-0.1)
@@ -814,6 +647,12 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     for i in range(n_steps):
         my_sim.take_step()
+    #animate_simulation(my_sim, n_steps, interval=10)
+    #plt.plot(np.linspace(0, constants.time_window, len(my_sim.orders_per_time)), my_sim.orders_per_time, label='Orders per time step')
+    #plt.xlabel('Time step')
+    #plt.ylabel('Number of orders')
+    #plt.title(f'Orders per time step with weight {args.weight}')
+    #plt.show()
     profit, costs, revenue = my_sim.financial_model.calculate_daily_profit()
     with open(args.output, "w") as f:
-        f.write(f"{args.weight},{args.n_drone},{profit},{costs},{revenue}\n")
+        f.write(f"{args.weight},{args.n_drones},{profit},{costs},{revenue}\n")
