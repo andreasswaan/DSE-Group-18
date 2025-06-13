@@ -118,18 +118,27 @@ def main_horizontal_stability(
     X_cg = final_X_cg(W_EOM, X_EOM, W_list, X_list)
 
     # print("most infront x_cg:",x_cg_start,"\n","most back x_cg:",x_cg_end,"\n","wing position:",wing_position,"\n","tail_area_ratio:",tail_area_ratio,)
-    b_h, c_h_small, c_h_big = horizontal_tail_area_sizing(
-        tail_area_ratio, S_wing, taper_ratio_tail, Aspect_ratio_tail
-    )
+    S_h = horizontal_tail_area_sizing(tail_area_ratio, S_wing)
 
     # Extra initial values
 
     X_LEMAC = wing_position
     X_wing = X_LEMAC + Dxw  # m
 
-    b_v, c_v_small, c_v_big = vertical_tail_sizing(
-        L_fuselage, V_g, X_cg, V, Aspect_ratio_tail, taper_ratio_tail, drone_thickness
+    S_v = vertical_tail_sizing(
+        L_fuselage, V_g, X_cg, V, Aspect_ratio_tail, drone_thickness
     )
+
+    S_o = math.sqrt(S_h**2 + S_v**2) / 2
+    tail_angle = math.atan(S_v / S_h)
+    b = math.sqrt(S_o * Aspect_ratio_tail)
+    c_small = (
+        2
+        * taper_ratio_tail
+        * math.sqrt(S_o / Aspect_ratio_tail)
+        / (1 + taper_ratio_tail)
+    )
+    c_big = 2 * math.sqrt(S_o / Aspect_ratio_tail) / (1 + taper_ratio_tail)
 
     if graph:
         main_cg_range_with_graph(
@@ -182,12 +191,10 @@ def main_horizontal_stability(
         x_cg_start,
         x_cg_end,
         wing_position,
-        b_h,
-        c_h_small,
-        c_h_big,
-        b_v,
-        c_v_small,
-        c_v_big,
+        tail_angle,
+        b,
+        c_small,
+        c_big,
     )
 
 
@@ -196,9 +203,7 @@ def cg_shift(W_old, X_old, W_item, X_item):
     return W_old + W_item, (W_old * X_old + W_item * X_item) / (W_old + W_item)
 
 
-def vertical_tail_sizing(
-    L_fuselage, V_g, X_cg, V, aspect_ratio, v_taper_ratio, drone_thickness
-):
+def vertical_tail_sizing(L_fuselage, V_g, X_cg, V, aspect_ratio, drone_thickness):
     S_lat = drone_thickness * L_fuselage
     S = (
         (2 * X_cg - L_fuselage)
@@ -206,23 +211,12 @@ def vertical_tail_sizing(
         * S_lat
         / (math.pi * V**2 * (L_fuselage - X_cg))
     ) / aspect_ratio
-    b = math.sqrt(S * aspect_ratio)
-    c_small = 2 * v_taper_ratio / (1 + v_taper_ratio) * math.sqrt(S / aspect_ratio)
-    c_big = 2 / (1 + v_taper_ratio) * math.sqrt(S / aspect_ratio)
-    if b <= 0 or c_small <= 0 or c_big <= 0:
-        b = 0
-        c_small = 0
-        c_big = 0
-        print("error: vertical tail model failure")
-    return c_small, c_big, b
+    return S
 
 
-def horizontal_tail_area_sizing(area_ratio, S_wing, t, A):
+def horizontal_tail_area_sizing(area_ratio, S_wing):
     S = S_wing * area_ratio
-    b = math.sqrt(S * A)
-    c_small = 2 * t / (1 + t) * math.sqrt(S / A)
-    c_big = 2 / (1 + t) * math.sqrt(S / A)
-    return b, c_small, c_big
+    return S
 
 
 def cg_diagram(W_EOM, X_EOM, W_list_0, X_list_0):
