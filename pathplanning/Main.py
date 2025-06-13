@@ -51,51 +51,63 @@ def fix_corner_jumps(path, walkable):
 grid = load_delft_grid()
 walkable = ~grid['obstacle_grid']  # True where traversal is allowed
 
-# ---------- 2. Select a start point (from restaurant locations) ----------
-restaurant_coords = np.argwhere(grid['restaurant_grid'])
-if len(restaurant_coords) == 0:
-    raise ValueError("❌ No restaurant locations found in the grid.")
-start = tuple(restaurant_coords[0][::-1])  # flip to (x, y)
+def select_random_point():
 
-# ---------- 3. Select an end point (somewhere near city center) ----------
-height, width = grid['weight_grid'].shape
-center_x, center_y = width // 2, height // 2
+    # ---------- 2. Select a start point (from restaurant locations) ----------
+    restaurant_coords = np.argwhere(grid['restaurant_grid'])
+    if len(restaurant_coords) == 0:
+        raise ValueError("❌ No restaurant locations found in the grid.")
 
-# Try up to 500 times to find a walkable coordinate near the center
-np.random.seed(3)
-for _ in range(500):
-    dx, dy = np.random.randint(-20, 20), np.random.randint(-20, 20)
-    x, y = center_x + dx, center_y + dy
-    if 0 <= x < width and 0 <= y < height and walkable[y, x]:
-        end = (x, y)
-        break
-else:
-    raise ValueError("❌ Could not find a valid endpoint near the center.")
+    # Only choose restaurant locations that are walkable
+    walkable_restaurants = [tuple(coord[::-1]) for coord in restaurant_coords if walkable[tuple(coord)]]
+    if not walkable_restaurants:
+        raise ValueError("❌ No walkable restaurant locations found in the grid.")
+    start = walkable_restaurants[np.random.choice(len(walkable_restaurants))]
 
-start = tuple([25,480])
-# end = tuple([180,585])
+    # ---------- 3. Select an end point using the weight grid as a probability density ----------
+    weight_grid = grid['weight_grid']
+    flat_weights = weight_grid.flatten()
+    flat_weights = np.nan_to_num(flat_weights, nan=0.0, posinf=0.0, neginf=0.0)
+    flat_weights[flat_weights < 0] = 0
+    if np.sum(flat_weights) == 0:
+        raise ValueError("❌ All weights are zero in the weight grid.")
 
-print(f"Start point (restaurant): {start}")
-print(f"End point (near center): {end}")
+    prob_weights = flat_weights / np.sum(flat_weights)
+
+    # Resample until a walkable end point is found
+    while True:
+        chosen_index = np.random.choice(np.arange(weight_grid.shape[0] * weight_grid.shape[1]), p=prob_weights)
+        end_x = chosen_index // weight_grid.shape[1]
+        end_y = chosen_index % weight_grid.shape[1]
+        end = (end_y, end_x)
+        if 0 <= end_y < walkable.shape[0] and 0 <= end_x < walkable.shape[1] and walkable[end]:
+            break
+    return start, end
+
+# print(f"Start point (restaurant): {start}")
+# print(f"End point (sampled from weight grid): {end}")
 
 # ---------- 4. Run A* algorithm ----------
-path = a_star_search_8dir(start, end, walkable, density_map=grid['weight_grid'])
-if not path:
-    raise RuntimeError("❌ A* could not find a path.")
+# path = a_star_search_8dir(start, end, walkable, density_map=grid['weight_grid'])
+# if not path:
+#     raise RuntimeError("❌ A* could not find a path.")
 # smoothed_path = smooth_path(path, walkable)
 
 paths_n = []
-alpha_step = 0.1
+alpha_step = 0.5
 alphas = np.arange(0.0, 1+alpha_step, alpha_step)
 num_runs = 1
 np.random.seed(3)
 
 for i in range(num_runs):
+    start, end = select_random_point()
     print(f"------ Run {i+1}/{num_runs} ------")
-    start = tuple(restaurant_coords[np.random.randint(len(restaurant_coords))][::-1])
-    end = tuple([np.random.randint(0, width), np.random.randint(0, height)])
-    # start = tuple([200,300])
-    # end = tuple([250,500])
+    # start = tuple(restaurant_coords[np.random.randint(len(restaurant_coords))][::-1])
+    # end = tuple([np.random.randint(0, width), np.random.randint(0, height)])
+    start = tuple([200,300])
+    end = tuple([250,500])
+    start = tuple([160,290])
+    end = tuple([275,330])
     # start = (30, 49)
     # end = (32, 76)
     print(f"Start point: {start}, End point: {end}")
@@ -189,22 +201,27 @@ fig2, ax2 = plt.subplots()
 for paths in paths_n: 
     distances = [p[1] for p in paths]
     noises = [p[2] for p in paths]
-    ax2.plot(distances, noises, marker='o', alpha=0.5)
+    ax2.plot(distances, noises, marker='o', alpha=0.4, color='orange')
     
 # Transpose paths_n so that each element is a list of results for a single alpha across runs
 paths_n_T = list(zip(*paths_n))  # shape: (num_alphas, num_runs)
 
 avg_distances = [np.mean([p[1] for p in alpha_group]) for alpha_group in paths_n_T]
 avg_noises = [np.mean([p[2] for p in alpha_group]) for alpha_group in paths_n_T]
-ax2.plot(avg_distances, avg_noises, color='black', label='Average varying alpha line', marker='x',)
-    
+ax2.plot(avg_distances, avg_noises, color='black', label='Mean Relation', marker='x',)
+
+# Label every second alpha value
+for i, (x, y) in enumerate(zip(avg_distances, avg_noises)):
+    if np.round(alphas[i],1) == 0.0 or np.round(alphas[i],1) == 0.2 or np.round(alphas[i],1) == 1.0:
+        ax2.text(x+0.5, y, f"{alphas[i]:.2f}", fontsize=10, ha='left', va='bottom', color='black')
 
 
-ax2.set_xlabel('Distance')
-ax2.set_ylabel('Public Disurbance (noise)')
-ax2.set_title('Path Distance vs Public Disturbance at varying Alpha')
+ax2.set_xlabel('Distance [m]')
+ax2.set_ylabel('Public disturbance due to noise')
+ax2.set_title('Path Distance vs Public Disturbance at Varying Alpha')
 ax2.legend()
-plt.tight_layout()
+# plt.tight_layout()
+plt.savefig("pathplanning/figures/pareto_curve_100_seed_3_refined.svg")
 plt.show()
 
 
