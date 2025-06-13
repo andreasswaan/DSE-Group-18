@@ -197,7 +197,7 @@ class Drone(Point):
         if self.target is None:
             return
         if not self.movement_path or len(self.movement_path) == 0:
-            print(f"Warning: No path found for drone {self.drone_id}, moving directly toward target!")
+            #print(f"Warning: No path found for drone {self.drone_id}, moving directly toward target!")
             self.move_to_target(dt)
             return
             
@@ -648,11 +648,11 @@ if __name__ == "__main__":
     for i in range(n_steps):
         my_sim.take_step()
     #animate_simulation(my_sim, n_steps, interval=10)
-    plt.plot(np.linspace(0, constants.time_window, len(my_sim.orders_per_time)), my_sim.orders_per_time, label='Orders per time step')
-    plt.xlabel('Time step')
-    plt.ylabel('Number of orders')
-    plt.title(f'Orders per time step with weight {args.weight}')
-    plt.show()
+    #plt.plot(np.linspace(0, constants.time_window, len(my_sim.orders_per_time)), my_sim.orders_per_time, label='Orders per time step')
+    #plt.xlabel('Time step')
+    #plt.ylabel('Number of orders')
+    #plt.title(f'Orders per time step with weight {args.weight}')
+    #plt.show()
     profit, costs, revenue = my_sim.financial_model.calculate_daily_profit()
     with open(args.output, "w") as f:
         f.write(f"{args.weight},{args.n_drones},{profit},{costs},{revenue}\n")
