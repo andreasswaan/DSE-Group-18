@@ -44,6 +44,37 @@ def point_line_distance(px, py, x0, y0, x1, y1):
     den = sqrt((y1 - y0)**2 + (x1 - x0)**2)
     return num / den if den != 0 else 0
 
+def ensure_walkable_start_end(start, end, walkable):
+    """
+    Ensure both start and end are on walkable cells.
+    If not, move them to the nearest walkable cell (using BFS).
+    Returns possibly updated (start, end).
+    """
+    from collections import deque
+
+    def nearest_walkable(point):
+        if walkable[point[1], point[0]]:
+            return point
+        visited = set()
+        queue = deque()
+        queue.append((point, 0))
+        visited.add(point)
+        while queue:
+            (x, y), dist = queue.popleft()
+            for dx, dy in [(-1,0), (1,0), (0,-1), (0,1), (-1,-1), (-1,1), (1,-1), (1,1)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < walkable.shape[1] and 0 <= ny < walkable.shape[0]:
+                    if (nx, ny) not in visited:
+                        if walkable[ny, nx]:
+                            return (nx, ny)
+                        visited.add((nx, ny))
+                        queue.append(((nx, ny), dist + 1))
+        raise ValueError("No walkable cell found near point {}".format(point))
+
+    start = nearest_walkable(start)
+    end = nearest_walkable(end)
+    return start, end
+
 # ---------- A* ALGORITHM ----------
 
 def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=None, alpha=0.3, beta=0.003):
@@ -53,6 +84,9 @@ def a_star_search_8dir(start, end, walkable, density_map=None, density_cost_map=
     density_map: optional 2D array of category letters (e.g. 'A', 'B', 'C')
     density_cost_map: dict mapping letter → cost, e.g. {'A': 0.0, 'B': 0.1, 'C': 0.3}
     """
+    
+    start, end = ensure_walkable_start_end(start, end, walkable)
+    
     height, width = walkable.shape
 
     open_set = []
