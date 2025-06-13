@@ -75,6 +75,7 @@ class Order(Point):
         self.demand = self.s + self.m + self.l
         self.arrival_time = order_dict['arrival_time']
         self.waiting_time = constants.waiting_time_customer  # seconds
+        self.delivered_at = None
 
 class Drone(Point):
     def __init__(self,
@@ -186,35 +187,30 @@ class Drone(Point):
             self.xpos, self.ypos = self.target.xpos, self.target.ypos
             self.arrive()
             self.distance_travelled[int(self.load)] += np.linalg.norm(direction_vector) * 10
+            return
         else:
             self.xpos += step_vector[0]
             self.ypos += step_vector[1]
             self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 10
             
     def move_to_target_along_path(self, dt):
-        if self.target is None or not self.movement_path or len(self.movement_path) == 0:
+        if self.target is None:
             return
-
+        if not self.movement_path or len(self.movement_path) == 0:
+            print(f"Warning: No path found for drone {self.drone_id}, moving directly toward target!")
+            self.move_to_target(dt)
+            return
+            
         distance_per_frame = self.speed * dt
 
-        # If only one point left, move towards it (the final target)
+        # If only one point left, move directly to the target (the final target)
         if len(self.movement_path) == 1:
-            target_x, target_y = self.target.xpos, self.target.ypos
-            direction_vector = np.array([target_x - self.xpos, target_y - self.ypos])
-            norm = np.linalg.norm(direction_vector)
-            if norm == 0:
-                step_vector = np.array([0.0, 0.0])
-            else:
-                step_vector = direction_vector / norm * distance_per_frame
-            if norm <= np.linalg.norm(step_vector):
-                self.xpos, self.ypos = target_x, target_y
-                self.arrive()
-                self.distance_travelled[int(self.load)] += norm * 10
-                self.movement_path = []
-            else:
-                self.xpos += step_vector[0]
-                self.ypos += step_vector[1]
-                self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 10
+            self.xpos, self.ypos = self.target.xpos, self.target.ypos
+            self.arrive()
+            self.distance_travelled[int(self.load)] += np.linalg.norm(
+                np.array([self.target.xpos, self.target.ypos]) - np.array([self.xpos, self.ypos])
+            ) * 10
+            self.movement_path = []
             return
 
         # Move along as many segments as possible
@@ -232,27 +228,21 @@ class Drone(Point):
 
         remaining = distance_per_frame - dist
 
-        if temp + 1 < len(self.movement_path):
-            # Interpolate within the next segment
-            start = np.array(self.movement_path[temp])
-            end = np.array(self.movement_path[temp + 1])
-            direction = end - start
-            segment_length = np.linalg.norm(direction)
-            if segment_length > 0:
-                step = direction / segment_length * remaining
-                self.xpos, self.ypos = (start + step)
-            else:
-                self.xpos, self.ypos = end
-            # Remove all waypoints up to temp
-            self.movement_path = self.movement_path[temp:]
-            self.distance_travelled[int(self.load)] += distance_per_frame * 10
-            return
+        # Interpolate within the next segment
+        start = np.array(self.movement_path[temp-1])
+        end = np.array(self.movement_path[temp])
+        direction = end - start
+        segment_length = np.linalg.norm(direction)
+        if segment_length > 0:
+            step = direction / segment_length * remaining
+            self.xpos, self.ypos = (start + step)
+        else:
+            self.xpos, self.ypos = end
+        # Remove all waypoints up to temp
+        self.movement_path = self.movement_path[temp:]
+        self.distance_travelled[int(self.load)] += distance_per_frame * 10
+        return
 
-        # If at or past the last waypoint, just set position to the last point
-        self.xpos, self.ypos = self.target.xpos, self.target.ypos
-        self.movement_path = [self.movement_path[-1]]
-        self.distance_travelled[int(self.load)] += (dist + np.linalg.norm(np.array([self.xpos, self.ypos]) - start)) * 10
-    
     def arrive(self):
         self.battery -= constants.TO_land_energy
         if isinstance(self.target, Depot):
@@ -263,6 +253,7 @@ class Drone(Point):
         elif isinstance(self.target, Order):
             self.load -= self.target.demand
             self.departure_times[0] = self.simulation.timestamp + self.target.waiting_time
+            self.target.delivered_at = self.simulation.timestamp
         elif isinstance(self.target, Restaurant):
             self.load += self.restaurant_order_nodes[0].demand
             self.restaurant_order_nodes.pop(0)
@@ -426,6 +417,7 @@ class Simulation:
             #self.mp.basic_heuristic()
         if self.timestamp % self.orders_interval == 0:
             orders = [self.order_book[order_id] for order_id in self.order_book if self.order_book[order_id].status]
+            orders = [order for order in orders if order.delivered_at - order.arrival_time <= constants.deliver_time_window]
             self.orders_per_time.append(len(orders))
 
         for drone in self.drones:
