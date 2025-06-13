@@ -1,0 +1,28 @@
+---------------------Weight: 0.0----------------------
+Profit: 353.46 EUR, Costs: 6.29 EUR, Revenue: 359.75 EUR
+---------------------Weight: -0.1----------------------
+Profit: 409.51 EUR, Costs: 8.99 EUR, Revenue: 418.50 EUR
+---------------------Weight: -0.2----------------------
+Profit: 406.13 EUR, Costs: 8.12 EUR, Revenue: 414.25 EUR
+---------------------Weight: -0.30000000000000004----------------------
+Profit: 458.97 EUR, Costs: 9.53 EUR, Revenue: 468.50 EUR
+---------------------Weight: -0.4----------------------
+Profit: 269.98 EUR, Costs: 5.27 EUR, Revenue: 275.25 EUR
+---------------------Weight: -0.5----------------------
+Profit: 372.92 EUR, Costs: 7.33 EUR, Revenue: 380.25 EUR
+---------------------Weight: -0.6000000000000001----------------------
+Profit: 228.14 EUR, Costs: 4.11 EUR, Revenue: 232.25 EUR
+---------------------Weight: -0.7000000000000001----------------------
+Profit: 357.75 EUR, Costs: 6.75 EUR, Revenue: 364.50 EUR
+---------------------Weight: -0.8----------------------
+Profit: 277.06 EUR, Costs: 5.44 EUR, Revenue: 282.50 EUR
+---------------------Weight: -0.9----------------------
+Profit: 263.36 EUR, Costs: 4.89 EUR, Revenue: 268.25 EUR
+---------------------Weight: -1.0----------------------
+Profit: 273.31 EUR, Costs: 5.19 EUR, Revenue: 278.50 EUR
+---------------------Weight: -1.1----------------------
+Profit: 106.92 EUR, Costs: 1.83 EUR, Revenue: 108.75 EUR
+---------------------Weight: -1.2000000000000002----------------------
+Profit: 139.65 EUR, Costs: 2.60 EUR, Revenue: 142.25 EUR
+---------------------Weight: -1.3----------------------
+Profit: 81.68 EUR, Costs: 1.82 EUR, Revenue: 83.50 EUR
