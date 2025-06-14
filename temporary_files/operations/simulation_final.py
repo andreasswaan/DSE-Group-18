@@ -302,6 +302,9 @@ class Depot(Point):
     def charge_drone(self, drone:Drone):
         energy_needed = drone.max_battery_level - drone.battery
         self.energy_spent += energy_needed * 0.00444
+        if drone.battery < 20:
+            print(f"WARNING: Drone {drone.drone_id} arrived at depot with battery too low:{drone.battery}% \n \
+                  ----------------------------------------------------------------------------------------------")
         drone.battery = drone.max_battery_level
 
 class City:
@@ -601,30 +604,32 @@ def animate_simulation(sim, steps=100, interval=200):
 #   my_sim.take_step()
 #print(my_sim.financial_model.calculate_revenue())
 
-
+depot_dict = [{
+    'depot_id': 0,
+    'xpos': 264,
+    'ypos': 472,
+    'capacity': 10,
+    }]
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--weight", type=float, default=-0.1)
     parser.add_argument("--output", type=str, default="result_weight.txt")
     parser.add_argument('--seed', type=int, required=False, default=0)
     parser.add_argument("--n_drones", type=int, default=n_drones)
+    parser.add_argument("--depot_dict", type=str, default=json.dumps(depot_dict))
     args = parser.parse_args()
 
-    # Create depot objects
-    depot_dict = [{
-    'depot_id': 0,
-    'xpos': 264,
-    'ypos': 472,
-    'capacity': 10,
-    }]
+    n_drones = args.n_drones
+    np.random.seed(args.seed)
+    depot_dict = json.loads(args.depot_dict)
 
-    Depot0 = Depot(depot_dict[0])
-    #Depot1 = Depot(depot_dict[1])
-    depots = [Depot0]
-
+    depots = [Depot(depot_dict[i]) for i in range(len(depot_dict))]
+    n_depots = len(depots)
     # Create drone objects
-    #drone_dict = [{'drone_id': i, 'depot': 0 if i%2 == 0 else 1} for i in range(n_drones)]
-    drone_dict = [{'drone_id': i, 'depot': 0} for i in range(n_drones)] 
+    if n_depots > 1:
+        drone_dict = [{'drone_id': i, 'depot': 0 if i%2 == 0 else 1} for i in range(n_drones)]
+    else:
+        drone_dict = [{'drone_id': i, 'depot': 0} for i in range(n_drones)] 
     drone_list = [Drone(drone_dict[i]) for i in range(len(drone_dict))] 
 
     # Create the city object
@@ -644,7 +649,6 @@ if __name__ == "__main__":
     n_steps = int(constants.time_window / my_sim.dt)
     my_sim.change_order_volume(1/9)
     my_sim.weight = args.weight
-    np.random.seed(args.seed)
     for i in range(n_steps):
         my_sim.take_step()
     #animate_simulation(my_sim, n_steps, interval=10)
@@ -653,6 +657,18 @@ if __name__ == "__main__":
     #plt.ylabel('Number of orders')
     #plt.title(f'Orders per time step with weight {args.weight}')
     #plt.show()
-    profit, costs, revenue = my_sim.financial_model.calculate_daily_profit()
+    #orders = [my_sim.order_book[order_id] for order_id in my_sim.order_book]
+    #arrival_times = [order.arrival_time for order in orders if order.status]
+    #unique_times, counts = np.unique(arrival_times, return_counts=True)
+    #plt.bar(unique_times, counts, width=constants.mp_interval, color='blue', alpha=0.7)
+    #plt.xlabel('Arrival Time')
+    #plt.ylabel('Number of Orders')
+    #plt.title(f'Number of Orders per Arrival Time with weight {args.weight}')
+    #plt.show()
+    orders_delivered = len([order for order in my_sim.order_book.values() if order.status])
+    roi, total_profit, total_costs, total_revenue, initial_costs = my_sim.financial_model.calculate_ROI_single_day()
+    daily_profit = my_sim.financial_model.calculate_daily_profit()
+    print(f"daily profit: {daily_profit}")
+    print(orders_delivered)
     with open(args.output, "w") as f:
-        f.write(f"{args.weight},{args.n_drones},{profit},{costs},{revenue}\n")
+        f.write(f"{args.weight},{args.n_drones},{roi},{total_profit},{total_costs},{total_revenue},{initial_costs},{orders_delivered}\n")

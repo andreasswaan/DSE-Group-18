@@ -186,13 +186,13 @@ class MissionPlanning:
                     travel = travel_matrix[i, j]
                     if i != j and i >= n_depots:
                         model.addConstr(
-                            b[j, k] <= b[i, k] - (distance_matrix[i, j] * conversion_meters * drone.energy_per_meter)
+                            b[j, k] <= b[i, k] - (distance_matrix[i, j] * conversion_meters * drone.energy_per_meter / 0.8)
                               - constants.TO_land_energy * travel + M * (1 - x[i, j, k]),
                             name=f"battery_{i}_{j}_{k}"
                         )
                     elif i != j:
                         model.addConstr(
-                            b[j, k] <= 100 - (distance_matrix[i, j] * conversion_meters * drone.energy_per_meter)
+                            b[j, k] <= 100 - (distance_matrix[i, j] * conversion_meters * drone.energy_per_meter / 0.8)
                               - constants.TO_land_energy + M * (1 - x[i, j, k]),
                             name=f"battery_from_depot_{i}_{j}_{k}"
                         )
@@ -286,7 +286,7 @@ class MissionPlanning:
             s = drone_start_nodes[k]
             for i in range(n_nodes):
                 if i != s: 
-                    model.addConstr(t_dep[i, k] >= t_arr[i, k] + waiting_times[i]*(0 if i >= n_nodes - n_depots and gp.quicksum(x[d,i,k] for d in range(n_depots*2)) or nodes[i].name==nodes[j].name else 1)
+                    model.addConstr(t_dep[i, k] >= t_arr[i, k] + waiting_times[i]*(0 if i >= n_nodes - n_depots and gp.quicksum(x[d,i,k] for d in range(n_depots)) or nodes[i].name==nodes[j].name else 1)
                                     - M * (1 - gp.quicksum(x[j, i, k] for j in range(n_nodes) if j != i)), name=f"dep_after_arr_{i}_{k}")
                 if i >= n_depots and i < n_nodes - n_depots:  # if it's not a depot
                     model.addConstr(t_dep[i, k] <=t_arr[i, k] + constants.max_waiting_time
