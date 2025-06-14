@@ -54,7 +54,7 @@ class FinancialModel:
                 constants.staff_cost_second_depot
             ) * (num_depots - 1)
         for depot in self.depots:
-            monthly_costs += constants.rent_increase_per_meter * np.sqrt((self.city.reso/2-depot.xpos)**2 + (self.city.reso/2-depot.ypos)**2)*6000/ self.city.reso
+            monthly_costs += constants.rent_increase_per_meter * np.sqrt((264-depot.xpos)**2 + (472-depot.ypos)**2)*10
         return monthly_costs
     
     def calculate_costs_per_delivery(self):
