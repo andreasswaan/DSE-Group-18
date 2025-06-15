@@ -1,7 +1,9 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from prelim_des.constants import g
 from prelim_des.utils.import_toml import load_toml
+from globals import main_dir
 
 
 def max_ax_for_bank_angle(theta_deg, toml):
@@ -91,17 +93,19 @@ def plot_pizza_performance_envelope(toml):
         linestyles="--",
         linewidths=2,
     )
-    plt.xlabel("Bank angle θ (degrees)")
-    plt.ylabel("Horizontal acceleration $a_x$ (m/s²)")
-    plt.title("Pizza Performance Envelope: No Slip and Folding Risk")
+    plt.xlabel("Bank angle θ [deg]", fontsize=16, labelpad=10)
+    plt.ylabel("Horizontal acceleration $a_x$ [m/s²]", fontsize=16, labelpad=10)
+    plt.tick_params(labelsize=14)
+    # plt.title("Pizza Performance Envelope: No Slip and Folding Risk")
     green_patch = plt.Rectangle((0, 0), 1, 1, color="green", label="Safe (No Slip)")
     red_patch = plt.Rectangle((0, 0), 1, 1, color="red", label="Slip Risk")
-    blue_line = plt.Line2D(
-        [0], [0], color="blue", linestyle="--", label="Folding Limit"
-    )
-    plt.legend(handles=[green_patch, red_patch, blue_line])
+    # blue_line = plt.Line2D(
+    #     [0], [0], color="blue", linestyle="--", label="Folding Limit"
+    # )
+    plt.legend(handles=[green_patch, red_patch], fontsize=14)
     plt.grid(True)
     plt.tight_layout()
+    plt.savefig(os.path.join(main_dir, "prelim_des", "plots", "pizza_performance_envelope.pdf"), format="pdf", dpi=300, bbox_inches='tight')
     plt.show()
 
     # Lateral acceleration plot

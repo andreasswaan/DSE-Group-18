@@ -46,7 +46,7 @@ if print:
 # print(f"Wing surface area: {drone.wing.S}")
 
 # drone.wing.plot_planform(save_plot=True)
-# print(f"Aspect ratio: {drone.wing.geom_AR}")
+print(f"Aspect ratio: {drone.wing.geom_AR}")
 # print(f"Mean aerodynamic chord (MAC): {drone.wing.MAC}")
 
 # print(drone.wing.c_root, drone.wing.c_tip, drone.wing.S)

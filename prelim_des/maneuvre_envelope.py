@@ -120,25 +120,26 @@ def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=False):
             n_max + 0.05,
             "n_max",
             color="orange",
-            fontsize=11,
+            fontsize=14,
             ha="right",
             va="bottom",
             fontweight="bold",
         )
 
-        plt.title("Maneuvering and Gust Envelope for Pizza Drone")
-        plt.xlabel("True Airspeed (m/s)")
-        plt.ylabel("Load Factor (n)")
+        # plt.title("Maneuvering and Gust Envelope for Pizza Drone")
+        plt.xlabel("True Airspeed [m/s]", fontsize=16, labelpad=10)
+        plt.ylabel("Load Factor n [-]", fontsize=16, labelpad=10)
+        plt.tick_params(labelsize=14)
         plt.xlim(0, V_dive + 2)
         plt.grid(True)
-        plt.legend()
+        plt.legend(fontsize=14)
         plt.tight_layout()
         plt.savefig(
-            os.path.join(main_dir, "prelim_des", "maneuver_gust_envelope.svg"),
-            format="svg",
+            os.path.join(main_dir, "prelim_des", "maneuver_gust_envelope.pdf"),
+            format="pdf",
             dpi=300,
         )
-        plt.show()
+        plt.close()
 
     return n_max
 

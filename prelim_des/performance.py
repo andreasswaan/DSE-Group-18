@@ -382,7 +382,7 @@ class Performance:
             xy=(ranges[0], mtows[0]),
             xytext=(5, 5),
             textcoords="offset points",
-            fontsize=10,
+            fontsize=14,
             fontweight="bold",
             color="darkred",
             arrowprops=dict(arrowstyle="->", lw=1, color="gray"),
@@ -395,7 +395,7 @@ class Performance:
             xy=(ranges[B_index], mtows[B_index]),
             xytext=(5, 5),
             textcoords="offset points",
-            fontsize=10,
+            fontsize=14,
             fontweight="bold",
             color="darkred",
             arrowprops=dict(arrowstyle="->", lw=1, color="gray"),
@@ -407,16 +407,22 @@ class Performance:
             xy=(ranges[-1], mtows[-1]),
             xytext=(5, 5),
             textcoords="offset points",
-            fontsize=10,
+            fontsize=14,
             fontweight="bold",
             color="darkred",
             arrowprops=dict(arrowstyle="->", lw=1, color="gray"),
         )
 
-        plt.xlabel("Range [km]")
-        plt.ylabel("Total Weight [kg]")
-        plt.title("Payload-Range Diagram with Mass Breakdown")
-        plt.legend()
+        plt.xlabel("Range [km]", fontsize=16, labelpad=10)
+        plt.ylabel("Total Weight [kg]", fontsize=16, labelpad=10)
+        plt.tick_params(labelsize=14)
+        plt.ylim(oews.min()*0.9, mtows.max() * 1.1)
+        # plt.title("Payload-Range Diagram with Mass Breakdown")
+        plt.legend(fontsize=14)
         plt.grid(True)
         plt.tight_layout()
+        plt.savefig(
+            os.path.join(main_dir, "prelim_des", "plots", "payload_range_diagram.pdf"),
+            dpi=300, format="pdf", bbox_inches="tight"
+        )
         plt.show()
