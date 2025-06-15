@@ -127,8 +127,8 @@ class Drone(Point):
             self.targets.pop(0)
             #if isinstance(self.target, Restaurant):
             #    self.restaurant_order_nodes.pop(0)
-            if isinstance(self.target, Order):
-                self.target.status = True
+            #if isinstance(self.target, Order):
+            #    self.target.status = True
             self.target = self.targets[0] if self.targets else None
             self.calculate_path()
             self.state = 'moving'  
@@ -254,6 +254,11 @@ class Drone(Point):
             self.load -= self.target.demand
             self.departure_times[0] = self.simulation.timestamp + self.target.waiting_time
             self.target.delivered_at = self.simulation.timestamp
+            if self.simulation.timestamp  > self.target.arrival_time + constants.deliver_time_window:
+                print(f"Warning: Drone {self.drone_id} delivered order {self.target.order_id} late at {self.simulation.timestamp}, \
+                      expected at {self.target.arrival_time + constants.deliver_time_window}.")
+            else:
+                self.target.status = True 
         elif isinstance(self.target, Restaurant):
             self.load += self.restaurant_order_nodes[0].demand
             self.restaurant_order_nodes.pop(0)
@@ -647,7 +652,7 @@ if __name__ == "__main__":
     logger=Logger()
 )
     n_steps = int(constants.time_window / my_sim.dt)
-    my_sim.change_order_volume(1/9)
+    my_sim.change_order_volume(1/45)
     my_sim.weight = args.weight
     for i in range(n_steps):
         my_sim.take_step()
@@ -669,6 +674,14 @@ if __name__ == "__main__":
     roi, total_profit, total_costs, total_revenue, initial_costs = my_sim.financial_model.calculate_ROI_single_day()
     daily_profit = my_sim.financial_model.calculate_daily_profit()
     print(f"daily profit: {daily_profit}")
+    print(f"total profit: {total_profit}")
+    print(f"total costs: {total_costs}")
     print(orders_delivered)
+    distnce_travelled = np.sum([drone.distance_travelled for drone in my_sim.drones], axis=0)
+    total_distance = np.sum(distnce_travelled)
+    print(f"Total distance travelled by all drones: {total_distance} m")
+    n_pizzas_delivered = sum([order.s + order.m + order.l for order in my_sim.order_book.values() if order.status])
+    n_pizzas_placed = sum([order.s + order.m + order.l for order in my_sim.order_book.values()])
+    print(f"Total number of pizzas delivered: {n_pizzas_delivered} out of {n_pizzas_placed} placed orders")
     with open(args.output, "w") as f:
         f.write(f"{args.weight},{args.n_drones},{roi},{total_profit},{total_costs},{total_revenue},{initial_costs},{orders_delivered}\n")

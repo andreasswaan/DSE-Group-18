@@ -52,6 +52,8 @@ class MissionPlanning:
                                     distance_matrix[j, k] = node1.distance(node2)
                         #self.solve([drones[0]], drone_start_nodes, depots, restaurants, subcluster, nodes, distance_matrix)
                         self.solve(drones, drone_start_nodes, depots, restaurants, subcluster, nodes, distance_matrix, conversion_meters=conversion_meters, weight = weight)
+                        for order in subcluster:
+                            order.being_delivered = True
         
     def setup_problem(self):
         #print("-------------------------time:", self.simulation.timestamp, "-------------------------")

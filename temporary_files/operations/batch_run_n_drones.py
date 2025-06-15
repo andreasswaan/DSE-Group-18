@@ -10,15 +10,15 @@ raw_results_dir = os.path.join(output_dir, "results_raw")
 os.makedirs(output_dir, exist_ok=True)
 os.makedirs(raw_results_dir, exist_ok=True)
 
-n_droness = range(5, 30, 5)
+n_droness = range(6, 14, 2)
 weight = -0.3
 depot_dict = [{
     'depot_id': 0,
-    'xpos': 264,
-    'ypos': 472,
+    'xpos': 250,
+    'ypos': 450,
     'capacity': 10,
     }]
-seeds = [0, 1, 2, 3, 4]  # You can change this list as needed
+seeds = [0]  # You can change this list as needed
 depot_name = "centre depot"
 all_profits = []
 

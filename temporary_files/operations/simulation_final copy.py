@@ -127,8 +127,8 @@ class Drone(Point):
             self.targets.pop(0)
             #if isinstance(self.target, Restaurant):
             #    self.restaurant_order_nodes.pop(0)
-            if isinstance(self.target, Order):
-                self.target.status = True
+            #if isinstance(self.target, Order):
+            #    self.target.status = True
             self.target = self.targets[0] if self.targets else None
             self.calculate_path()
             self.state = 'moving'  
@@ -169,7 +169,8 @@ class Drone(Point):
             self.state = 'moving'
         orders = self.simulation.mp.get_orders()
         orders = [order for order in orders if not order.being_delivered and order.status == False and order.arrival_time >= self.simulation.timestamp - 150 and order.arrival_time <= self.simulation.timestamp + 450 and order.demand + self.load <= self.max_capacity]
-        orders = sorted(orders, key=lambda x: x.distance(self))
+        orders = sorted(orders, key=lambda x: x.restaurant.distance(self))
+        orders = [orders[i] for i in range(min(len(orders),10))]  # limit the number of orders to max_orders_per_mission
         if not orders:
             return
         targets = list(self.targets)
@@ -253,6 +254,11 @@ class Drone(Point):
             self.load -= self.target.demand
             self.departure_times[0] = self.simulation.timestamp + self.target.waiting_time
             self.target.delivered_at = self.simulation.timestamp
+            if self.simulation.timestamp  > self.target.arrival_time + constants.deliver_time_window:
+                print(f"Warning: Drone {self.drone_id} delivered order {self.target.order_id} late at {self.simulation.timestamp}. \
+                      Expected delivery time was {self.target.arrival_time}.")
+            else:
+                self.target.status = True 
         elif isinstance(self.target, Restaurant):
             self.load += self.restaurant_order_nodes[0].demand
             self.restaurant_order_nodes.pop(0)
@@ -682,7 +688,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--weight", type=float, default=-0.1)
     parser.add_argument("--output", type=str, default="result_weight.txt")
-    parser.add_argument('--seed', type=int, required=False, default=0)
+    parser.add_argument('--seed', type=int, required=False, default=1)
     parser.add_argument("--n_drones", type=int, default=n_drones)
     parser.add_argument("--depot_dict", type=str, default=json.dumps(depot_dict))
     args = parser.parse_args()
@@ -715,11 +721,11 @@ if __name__ == "__main__":
     logger=Logger()
 )
     n_steps = int(constants.time_window / my_sim.dt)
-    my_sim.change_order_volume(1/9)
+    my_sim.change_order_volume(1/ 45)
     my_sim.weight = args.weight
-    #for i in range(n_steps):
-    #    my_sim.take_step()
-    animate_simulation(my_sim, n_steps, interval=10)
+    for i in range(n_steps):
+        my_sim.take_step()
+    #animate_simulation(my_sim, n_steps, interval=10)
     #plt.plot(np.linspace(0, constants.time_window, len(my_sim.orders_per_time)), my_sim.orders_per_time, label='Orders per time step')
     #plt.xlabel('Time step')
     #plt.ylabel('Number of orders')
@@ -737,6 +743,14 @@ if __name__ == "__main__":
     roi, total_profit, total_costs, total_revenue, initial_costs = my_sim.financial_model.calculate_ROI_single_day()
     daily_profit = my_sim.financial_model.calculate_daily_profit()
     print(f"daily profit: {daily_profit}")
+    print(f"total profit: {total_profit}")
+    print(f"total costs: {total_costs}")
     print(orders_delivered)
+    distnce_travelled = np.sum([drone.distance_travelled for drone in my_sim.drones], axis=0)
+    total_distance = np.sum(distnce_travelled)
+    print(f"Total distance travelled by all drones: {total_distance} m")
+    n_pizzas_delivered = sum([order.s + order.m + order.l for order in my_sim.order_book.values() if order.status])
+    n_pizzas_placed = sum([order.s + order.m + order.l for order in my_sim.order_book.values()])
+    print(f"Total number of pizzas delivered: {n_pizzas_delivered} out of {n_pizzas_placed} placed orders")
     with open(args.output, "w") as f:
         f.write(f"{args.weight},{args.n_drones},{roi},{total_profit},{total_costs},{total_revenue},{initial_costs},{orders_delivered}\n")
