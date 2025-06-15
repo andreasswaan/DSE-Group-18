@@ -10,7 +10,6 @@ from prelim_des.constants import *
 from prelim_des.performance import Performance
 from prelim_des.utils.import_toml import load_toml
 from src.initial_sizing.database.read_database import get_MTOW_from_payload
-import utils.define_logging  # do not remove this line, it sets up logging configuration
 import logging
 
 toml = load_toml()
@@ -22,7 +21,7 @@ class Drone:
     structure: Structure
     propulsion: PropulsionSystem
     perf: Performance
-    structural_analysis:StructuralAnalysis
+    structural_analysis: StructuralAnalysis
     MTOW: float
     OEW: float
 
@@ -36,7 +35,7 @@ class Drone:
         self.tail = Tail_Hori_Veri(self)
         self.structure = Structure(self)
         self.propulsion = PropulsionSystem(self)
-        self.structural_analysis = StructuralAnalysis(self,2,"wing")
+        self.structural_analysis = StructuralAnalysis(self, 2, "fuselage")
         self.sensor_mass = toml["config"]["sensors"]["mass"]
 
     def class_1_weight_estimate(self):
@@ -48,6 +47,7 @@ class Drone:
             toml["config"]["payload"]["n_box"] * toml["config"]["payload"]["box_weight"]
         )
         design_payload = self.structure.delivery_mechanism_weight() + self.max_payload
+        # design_payload = self.max_payload
         self.MTOW = get_MTOW_from_payload(design_payload)
         self.OEW = self.MTOW - self.max_payload
         if self.OEW <= 0:
@@ -119,7 +119,12 @@ class Drone:
         return self.MTOW, self.OEW
 
     def iterative_weight_estimate(
-        self, transition=False, max_iterations=100, tolerance=0.01, plot=False, PRINT=False
+        self,
+        transition=False,
+        max_iterations=100,
+        tolerance=0.01,
+        plot=False,
+        PRINT=False,
     ):
         """
         Perform an iterative weight estimate until convergence.

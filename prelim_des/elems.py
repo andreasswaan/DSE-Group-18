@@ -6,12 +6,11 @@ if TYPE_CHECKING:
     from prelim_des.drone import Drone
 import numpy as np
 import matplotlib.pyplot as plt
-from constants import g
+from prelim_des.constants import g
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.utils.unit_converter import ImperialConverter
-import utils.define_logging  # do not remove this line, it sets up logging configuration
 import logging
-from idealized_structure import run_structure_analysis
+from prelim_des.idealized_structure import run_structure_analysis
 
 toml = load_toml()
 
@@ -264,7 +263,7 @@ class Wing:
 
 class Fuselage:
     weight: float
-    
+
     def __init__(self, drone: Drone):
         """Fuselage class."""
         logging.debug("Initializing Fuselage class...")
@@ -321,6 +320,7 @@ class Fuselage:
 
 class LandingGear:
     weight: float
+
     def __init__(self, drone: Drone):
         """Landing gear class."""
         logging.debug("Initializing LandingGear class...")
@@ -356,30 +356,33 @@ class LandingGear:
             0.013 * ImperialConverter.mass_kg_lbs(self.drone.MTOW)
             + +ImperialConverter.mass_kg_lbs(wheel_tire_assembly_weight)
         )
-    
+
     @property
     def calc_weight(self):
-        
+
         weight_per_leg = 0.017
         total_weight = self.n_legs * weight_per_leg
         self.weight = total_weight
-        
+
         return total_weight
+
 
 class Tail_Hori_Veri:
     weight: float
+
     def __init__(self, drone: Drone):
         """Landing gear class."""
         logging.debug("Initializing LandingGear class...")
 
         self.drone = drone
-        
+
     @property
     def calc_weight(self):
         wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
-            self.drone, "fuselage", fuselage_case=2)
+            self.drone, "fuselage", fuselage_case=2
+        )
         self.weight = tail_mass
-    
+
         return tail_mass
 
 

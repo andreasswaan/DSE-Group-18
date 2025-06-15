@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from prelim_des.drone import Drone
 import numpy as np
@@ -8,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from prelim_des.mission import Mission
 from prelim_des.performance import Performance
-from constants import ρ, g
+from prelim_des.constants import ρ, g
 from globals import main_dir
 
 
@@ -34,7 +35,7 @@ def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=False):
     # Gust velocities at each reference speed (example values, adjust as needed)
     # U_gusts = [12.5, 10.0, 5.0]  # [at V_B, V_cruise, V_dive]
     U_gusts = [7.0, 6.0, 4.0]  # [at V_B, V_cruise, V_dive]
-    
+
     # Calculate delta_n at each reference speed
     V_refs = [V_B, V_cruise, V_dive]
     gust_points = []
@@ -146,6 +147,7 @@ def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=False):
 # Example usage:
 if __name__ == "__main__":
     from prelim_des.drone import Drone
+
     mission = Mission("DRCCRCCRCCD")
     drone = Drone()
     perf = Performance(drone, mission)
