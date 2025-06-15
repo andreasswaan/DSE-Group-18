@@ -1,0 +1,10 @@
+Depot,Objective weight,N_Drones, ROI, Profit, Costs, Revenue, Initial Costs
+centre depot,-0.3,20.0, 1724.40, 5765195.56, 2307235.69, 8072431.25, 334330.00,383.0
+Depot,Objective weight,N_Drones, ROI, Profit, Costs, Revenue, Initial Costs
+far depot,-0.3,20.0, 1765.47, 5902510.70, 2180414.30, 8082925.00, 334330.00,378.0
+Depot,Objective weight,N_Drones, ROI, Profit, Costs, Revenue, Initial Costs
+intermediate depot,-0.3,20.0, 1818.70, 6080466.62, 2264345.88, 8344812.50, 334330.00,399.0
+Depot,Objective weight,N_Drones, ROI, Profit, Costs, Revenue, Initial Costs
+two depots far,-0.3,20.0, 1446.92, 5147556.59, 2425737.16, 7573293.75, 355760.00,365.0
+Depot,Objective weight,N_Drones, ROI, Profit, Costs, Revenue, Initial Costs
+depot far and centre,-0.3,20.0, 1641.67, 5840389.73, 2536360.27, 8376750.00, 355760.00,393.0
