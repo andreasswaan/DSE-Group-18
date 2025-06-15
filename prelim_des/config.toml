@@ -94,8 +94,8 @@ box_width = 0.45                          # m
 box_length = 0.45                         # m
 n_pax = 0                                 # people
 box_weight = 0.5                          # kg
-n_box = 5                                 # -
-del_mech_weight = 1.5                     # kg
+n_box = 6                                 # -
+del_mech_weight = 1.4                     # kg
 pizza_diameter = 0.42                     # m
 static_friction_coeff = 0.4               # -, for cardboard to cardboard, lower is more conservative
 #-----------------------------------------------------------------------------------------------------------------------
