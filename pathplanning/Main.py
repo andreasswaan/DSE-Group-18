@@ -94,7 +94,7 @@ def select_random_point():
 # smoothed_path = smooth_path(path, walkable)
 
 paths_n = []
-alpha_step = 0.5
+alpha_step = 0.2
 alphas = np.arange(0.0, 1+alpha_step, alpha_step)
 num_runs = 1
 np.random.seed(3)
@@ -108,6 +108,9 @@ for i in range(num_runs):
     end = tuple([250,500])
     start = tuple([160,290])
     end = tuple([275,330])
+    start = tuple([180,460])
+    end = tuple([270,520])
+    end = tuple([211,555])
     # start = (30, 49)
     # end = (32, 76)
     print(f"Start point: {start}, End point: {end}")
@@ -188,7 +191,7 @@ legend_elements = [
 
 ax.legend(handles=legend_elements, loc='upper right', frameon=True)
 
-ax.set_title("A* Path on Weighted Delft Grid")
+ax.set_title("A* Path on Weighted Delft Grid at Varying Alpha Values")
 ax.axis("off")
 plt.tight_layout()
 plt.show()
@@ -196,32 +199,36 @@ plt.show()
 # Print Pareto-eque curve
 fig2, ax2 = plt.subplots()
 
+# Choose a colormap for alphas
+alpha_cmap = plt.cm.viridis
+alpha_colors = [alpha_cmap(i / (len(alphas)-1)) for i in range(len(alphas))]
 
+# Plot each path with a different color and label for alpha
+for alpha_idx, alpha in enumerate(alphas):
+    path_points = paths_n[0][alpha_idx][0]  # paths_n[run][alpha][0] is the path
+    if len(path_points) > 1:
+        xs, ys = zip(*path_points)
+        ax.plot(xs, ys, color=alpha_colors[alpha_idx], linewidth=2,
+                label=f'alpha={alpha:.2f}', zorder=6)
 
-for paths in paths_n: 
-    distances = [p[1] for p in paths]
-    noises = [p[2] for p in paths]
-    ax2.plot(distances, noises, marker='o', alpha=0.4, color='orange')
-    
-# Transpose paths_n so that each element is a list of results for a single alpha across runs
-paths_n_T = list(zip(*paths_n))  # shape: (num_alphas, num_runs)
+# Plot big markers for start and end points
+ax.scatter(start[0], start[1], s=120, c='navy', edgecolors='white', linewidths=2, marker='o', label='Start (restaurant)', zorder=10)
+ax.scatter(end[0], end[1], s=120, c='lime', edgecolors='black', linewidths=2, marker='*', label='End point', zorder=10)
 
-avg_distances = [np.mean([p[1] for p in alpha_group]) for alpha_group in paths_n_T]
-avg_noises = [np.mean([p[2] for p in alpha_group]) for alpha_group in paths_n_T]
-ax2.plot(avg_distances, avg_noises, color='black', label='Mean Relation', marker='x',)
-
-# Label every second alpha value
-for i, (x, y) in enumerate(zip(avg_distances, avg_noises)):
-    if np.round(alphas[i],1) == 0.0 or np.round(alphas[i],1) == 0.2 or np.round(alphas[i],1) == 1.0:
-        ax2.text(x+0.5, y, f"{alphas[i]:.2f}", fontsize=10, ha='left', va='bottom', color='black')
-
+# To avoid duplicate legend entries, only show each alpha label once
+handles, labels = ax.get_legend_handles_labels()
+unique = dict()
+for h, l in zip(handles, labels):
+    if l not in unique and l is not None:
+        unique[l] = h
+ax.legend(unique.values(), unique.keys(), loc='upper right', frameon=True)
 
 ax2.set_xlabel('Distance [m]')
 ax2.set_ylabel('Public disturbance due to noise')
 ax2.set_title('Path Distance vs Public Disturbance at Varying Alpha')
 ax2.legend()
 # plt.tight_layout()
-plt.savefig("pathplanning/figures/pareto_curve_100_seed_3_refined.svg")
+#plt.savefig("pathplanning/figures/pareto_curve_100_seed_3_refined.svg")
 plt.show()
 
 
