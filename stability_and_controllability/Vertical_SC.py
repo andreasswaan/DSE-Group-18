@@ -11,19 +11,19 @@ Mez = 0  # external moment for the Z axis in Nm
 Mey = 0  # external moment for the Y axis in Nm
 Mex = 0  # external moment for the X axis in Nm
 m = 10  # drone mass in kg
-zdot = 0  # Drone vertical velocity in m/s
-z2dot = 0  # Drone vertical acceleration in m/s^2
+zdot = 3  # Drone vertical velocity in m/s
+z2dot = 1  # Drone vertical acceleration in m/s^2
 Iz = 100  # moment of inertia around Z axis ...
-psi2dot = 0  # angular acceleration around Z axis  rad/s^2
+psi2dot = 0.2  # angular acceleration around Z axis  rad/s^2 !!!
 Rt_fx = 2  # moment arm of the vertical thruster in m
 Rt_fy = 2  # moment arm of the vertical thruster in m
 Rt_bx = 2  # moment arm of the vertical thruster in m
 Rt_by = 2  # moment arm of the vertical thruster in m
 Rdx = 1  # moment arm of the Drag for the X axis in  m
 rho = 1.2  # air density in kg/m^3
-Dv = 0.6  # vertical propeller diameter in m
-Dh = 0.6  # horizontal propeller diameter in m
-Ct = 0.15  # propeller efficiency constant 0.11-0.15
+Dv = 0.3  # vertical propeller diameter in m
+Dh = 0.3  # horizontal propeller diameter in m
+Ct = 0.11  # propeller efficiency constant 0.11-0.15
 Cq = 0.03  # aerodynamic drag for blade rotation constant 0.03
 Cd = 1  # drag coefficient for the drone
 S = 10  # area of the drone in the XY plane in m^2
@@ -127,10 +127,22 @@ def vertical_stability_state(
         w5 = M_2[2][0]
         w7 = 0
     wh = E
-    w1 = math.sqrt(w1) * 2 * math.pi / 60
-    w3 = math.sqrt(w3) * 2 * math.pi / 60
-    w5 = math.sqrt(w5) * 2 * math.pi / 60
-    w7 = math.sqrt(w7) * 2 * math.pi / 60
+    if w1 >= 0:
+        w1 = math.sqrt(w1) * 2 * math.pi / 60
+    else:
+        w1 = -math.sqrt(-w1) * 2 * math.pi / 60
+    if w3 >= 0:
+        w3 = math.sqrt(w3) * 2 * math.pi / 60
+    else:
+        w3 = -math.sqrt(-w3) * 2 * math.pi / 60
+    if w5 >= 0:
+        w5 = math.sqrt(w5) * 2 * math.pi / 60
+    else:
+        w5 = -math.sqrt(-w5) * 2 * math.pi / 60
+    if w7 >= 0:
+        w7 = math.sqrt(w7) * 2 * math.pi / 60
+    else:
+        w7 = -math.sqrt(-w7) * 2 * math.pi / 60
     wh = wh * 2 * math.pi / 60
     return (w1, w3, w5, w7, wh)
 
