@@ -206,10 +206,7 @@ def cg_shift(W_old, X_old, W_item, X_item):
 def vertical_tail_sizing(L_fuselage, V_g, X_cg, V, aspect_ratio, drone_thickness):
     S_lat = drone_thickness * L_fuselage
     S = (
-        (2 * X_cg - L_fuselage)
-        * V_g**2
-        * S_lat
-        / (math.pi * V**2 * (L_fuselage - X_cg))
+        (2 * X_cg - L_fuselage) * V**2 * S_lat / (math.pi * V**2 * (L_fuselage - X_cg))
     ) / aspect_ratio
     return S
 
