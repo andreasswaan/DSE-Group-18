@@ -29,12 +29,12 @@ def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=False):
     V_cruise = drone.perf.V_cruise
 
     # Reference speeds
-    V_B = getattr(drone, "V_B", 0.7 * V_cruise)  # Use attribute or estimate
+    V_B = getattr(drone, "V_B", 0.9 * V_cruise)  # Use attribute or estimate
     V_dive = 1.5 * V_cruise
 
     # Gust velocities at each reference speed (example values, adjust as needed)
     # U_gusts = [12.5, 10.0, 5.0]  # [at V_B, V_cruise, V_dive]
-    U_gusts = [7.0, 6.0, 4.0]  # [at V_B, V_cruise, V_dive]
+    U_gusts = [5.0, 4.70, 3.0]  # [at V_B, V_cruise, V_dive]
 
     # Calculate delta_n at each reference speed
     V_refs = [V_B, V_cruise, V_dive]
@@ -194,7 +194,7 @@ def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=False):
             plt.ylim()[0] + 6.5,
             r"$V_B$",
             color="purple",
-            fontsize=13,
+            fontsize=15,
             ha="center",
             va="bottom",
             fontweight="bold",
@@ -206,7 +206,7 @@ def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=False):
             plt.ylim()[0] + 6.5,
             r"$V_C$",
             color="brown",
-            fontsize=13,
+            fontsize=15,
             ha="center",
             va="bottom",
             fontweight="bold",
@@ -218,7 +218,7 @@ def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=False):
             plt.ylim()[0] + 6.5,
             r"$V_{D}$",
             color="black",
-            fontsize=13,
+            fontsize=15,
             ha="center",
             va="bottom",
             fontweight="bold",
@@ -229,8 +229,8 @@ def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=False):
         plt.tick_params(labelsize=14)
         plt.xlim(0, V_dive + 1)
         plt.ylim(-2, n_max + 2)
-        plt.grid(True)
-        plt.legend(fontsize=13, loc="best")
+        plt.grid(True, alpha=0.5)
+        plt.legend(fontsize=14, loc="best")
         plt.tight_layout()
         plt.savefig(
             os.path.join(main_dir, "prelim_des", "plots", "maneuver_gust_envelope.pdf"),
@@ -247,7 +247,7 @@ def plot_maneuver_and_gust_envelope(drone: Drone, U_de=None, plot=False):
 if __name__ == "__main__":
     from prelim_des.drone import Drone
 
-    mission = Mission("DRCCRCCRCCD")
+    mission = Mission("DRCCRCCD")
     drone = Drone()
     perf = Performance(drone, mission)
     drone.perf = perf

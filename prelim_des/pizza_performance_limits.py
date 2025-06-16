@@ -75,7 +75,7 @@ def plot_pizza_performance_envelope(toml):
     effective_offset = pizza_radius * np.sin(phi_grid)
     folding_limit = effective_offset <= (pizza_radius - support_margin)
 
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(7, 6))
     plt.contourf(
         np.degrees(theta_grid),
         ax_grid,
@@ -95,6 +95,7 @@ def plot_pizza_performance_envelope(toml):
     )
     plt.xlabel("Bank angle θ [deg]", fontsize=16, labelpad=10)
     plt.ylabel("Horizontal acceleration $a_x$ [m/s²]", fontsize=16, labelpad=10)
+    plt.xlim(0, 35)
     plt.tick_params(labelsize=14)
     # plt.title("Pizza Performance Envelope: No Slip and Folding Risk")
     green_patch = plt.Rectangle((0, 0), 1, 1, color="green", label="Safe (No Slip)")
@@ -103,7 +104,7 @@ def plot_pizza_performance_envelope(toml):
     #     [0], [0], color="blue", linestyle="--", label="Folding Limit"
     # )
     plt.legend(handles=[green_patch, red_patch], fontsize=14)
-    plt.grid(True)
+    plt.grid(True, alpha=0.5)
     plt.tight_layout()
     plt.savefig(os.path.join(main_dir, "prelim_des", "plots", "pizza_performance_envelope.pdf"), format="pdf", dpi=300, bbox_inches='tight')
     plt.show()
