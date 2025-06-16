@@ -106,10 +106,10 @@ class Performance:
         T = weight * g
         return T
 
-    def cruise_energy(self, range):
-
+    def cruise_energy(self, range, weight):
+        
         energy_cruise = (
-            self.drone.MTOW
+            weight
             * range
             / (
                 self.drone.propulsion.η_elec
@@ -161,7 +161,7 @@ class Performance:
         """
         PL_mass = leg["payload_mass"]
 
-        cruise_energy = self.cruise_energy(leg["distance"])
+        cruise_energy = self.cruise_energy(leg["distance"], PL_mass + self.drone.OEW)
         cruise_power = cruise_energy / (
             leg["distance"] / leg["cruise_speed"]
         )  # Power = Energy / Time
