@@ -159,13 +159,13 @@ min_boom_area=1e-5
 ratio_width_box_to_root_chord = 0.5
 
 [config.structures.wing]
-amount_of_sections = 7
-amount_of_booms_horizontal = 3
-amount_of_booms_vertical = 2
-ratio_width_box_to_root_chord = 0.5
+amount_of_sections = 5
+amount_of_booms_horizontal = 1
+amount_of_booms_vertical = 1
+ratio_width_box_to_root_chord = 0.8
 start_spar_boom_area =  1.8704805295755328e-05 #[m^2]
 start_stringer_boom_area = 1.8704805295755328e-05 #[m^2]
-safety_factor = 3
+safety_factor = 1.5
 web_thickness = 0.001 #[m]
 
 
@@ -174,7 +174,7 @@ web_thickness = 0.001 #[m]
 width_middle_section = 0.55 #   [m]
 height_middle_section = 0.3 #   [m]
 length_middle_section = 1.1  #    [m]
-amount_of_sections_middle = 6
+amount_of_sections_middle = 7
 
 width_start_section = 0.23 #   [m]
 height_start_section = 0.1 #   [m]
@@ -188,15 +188,15 @@ amount_of_sections_end = 4
 
 propeller_rod_length = 0.3 #[m]
 
-wing_to_fuselage_root_chord_ratio = 0.5 #[m] basically how many sections the loads of thw wing spread over
+wing_to_fuselage_root_chord_ratio = 1 #[m] basically how many sections the loads of thw wing spread over
 
 amount_of_booms_horizontal = 3
 amount_of_booms_vertical = 2
 
-start_spar_boom_area = 0.01 #[m^2]
-start_stringer_boom_area = 0.001 #[m^2]
-safety_factor = 3
-web_thickness = 0.001 #[m]
+start_spar_boom_area = 0.001 #[m^2]
+start_stringer_boom_area = 0.0001 #[m^2]
+safety_factor = 1.5
+web_thickness = 0.0001 #[m]
 
 #-----------------------------------------------------------------------------------------------------------------------
 

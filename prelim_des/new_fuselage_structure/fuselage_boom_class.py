@@ -37,7 +37,7 @@ class FuselageBoom:
         self.area = area
         self.section = None
         self.type = type
-        self.failure_method = ""
+        self.failure_method = None
         self.id = id
         self.type = type
         pass

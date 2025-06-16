@@ -47,9 +47,10 @@ class Aerodynamics:
 
     @property
     def CD(self) -> float:
+
+        CL_cruise = self.cl_from_alpha(self.drone.perf.AOA_cruise)
         return self.CD_0 + (
-            self.CL_cruise**2
-            / (np.pi * self.oswald_efficiency * self.drone.wing.geom_AR)
+            CL_cruise**2 / (np.pi * self.oswald_efficiency * self.drone.wing.geom_AR)
         )
 
     def __base_cl_cruise(self, alpha):

@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch
 import numpy as np
 from prelim_des.new_wing_structure.material_class import Material
+from prelim_des.constants import g
 
 toml = load_toml()
 
@@ -232,24 +233,24 @@ class WingStructuralAnalysis:
         reaction_moment_x = 0
         for _, section in enumerate(self.sections):
             reaction_moment_x -= (section.shear_z + section.weight) * section.y_pos
-        print("Reaction moment x", reaction_moment_x)
+        # print("Reaction moment x", reaction_moment_x)
 
         reaction_moment_z = 0
         for _, section in enumerate(self.sections):
             reaction_moment_z -= section.shear_x * section.y_pos
-        print("Reaction moment z", reaction_moment_z)
+        # print("Reaction moment z", reaction_moment_z)
 
         reaction_force_x = 0
         for _, section in enumerate(self.sections):
             reaction_force_x -= section.shear_x
-        print("Reaction force x", reaction_force_x)
+        # print("Reaction force x", reaction_force_x)
 
         reaction_force_z = 0
         for _, section in enumerate(self.sections):
             reaction_force_z -= section.shear_z + section.weight
-        print("Reaction force z", reaction_force_z)
+        # print("Reaction force z", reaction_force_z)
 
-        print("analysis_shear_z", reaction_force_z)
+        # print("analysis_shear_z", reaction_force_z)
         return reaction_moment_x, reaction_moment_z, reaction_force_x, reaction_force_z
 
     def calc_analysis_forces(self):
@@ -274,6 +275,15 @@ class WingStructuralAnalysis:
             )
 
         print("analysis_shear_z", self.sections[0].analysis_shear_z)
+
+    def apply_propeller_folding_mech_weight(self):
+        shear_z = 0.225 * g  # TODO: siddarth implement the regression
+        position = 0.85  # [m]
+
+        closest_section = min(
+            self.sections, key=lambda section: abs(section.y_pos - position)
+        )
+        closest_section.shear_z += shear_z
 
     def apply_boom_area(self, spar_area: float | None, stringer_area: float | None):
         if spar_area == None:
@@ -350,6 +360,7 @@ class WingStructuralAnalysis:
         for _, section in enumerate(self.sections):
             weight += section.weight
         print("wing weight", weight, "N")
+        return weight
 
     def perform_iterations(self):
         area_reduction_factor = 0.01

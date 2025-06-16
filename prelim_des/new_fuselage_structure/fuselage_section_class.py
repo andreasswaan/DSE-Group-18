@@ -20,6 +20,8 @@ class FuselageSection:
     "applied torsion must be in Nm"
     booms: list[FuselageBoom]
 
+    ansys_load = float
+
     analysis_moment_y: float
     analysis_moment_z: float
     analysis_shear_y: float
@@ -40,12 +42,14 @@ class FuselageSection:
         self.analysis_shear_y = 0.0
         self.analysis_shear_z = 0.0
         self.analysis_normal_force = 0.0
+        self.ansys_load = 0.0
         self.name = name
         self.length = length
         self.top_flange_ids = []
         self.right_flange_ids = []
         self.bottom_flange_ids = []
         self.left_flange_ids = []
+        self.special_section = False  # This means that the section is intersected by either the wing or the propellers
 
         pass
 
