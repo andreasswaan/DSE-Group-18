@@ -2,6 +2,9 @@ from prelim_des.drone import Drone
 from prelim_des.mission import Mission
 from prelim_des.new_fuselage_structure.fuselage_boom_class import FuselageBoom
 from prelim_des.new_fuselage_structure.fuselage_section_class import FuselageSection
+from prelim_des.new_fuselage_structure.utils.thickness_to_stress_estimation import (
+    calculate_stress_ansys,
+)
 from prelim_des.new_wing_structure.wing_boom_class import WingBoom
 from prelim_des.new_wing_structure.wing_section_class import WingSection
 from prelim_des.new_wing_structure.wing_structural_analysis import (
@@ -100,6 +103,9 @@ class FuselageStructuralAnalysis:
         self.safety_factor = toml["config"]["structures"]["fuselage"]["safety_factor"]
 
         self.web_thickness = toml["config"]["structures"]["fuselage"]["web_thickness"]
+        self.propeller_rod_length = toml["config"]["structures"]["fuselage"][
+            "propeller_rod_length"
+        ]
 
         self.wing_pos = (
             -self.length_middle_section / 2 - self.length_start_section
@@ -394,7 +400,7 @@ class FuselageStructuralAnalysis:
     def add_wing_analysis(self, wing_analysis: WingStructuralAnalysis):
         self.wing_analysis = wing_analysis
 
-    def calc_wing_reaction_forces(self):
+    def apply_wing_reaction_forces(self):
         ratio = self.wing_to_fuselage_root_chord_ratio
         if self.wing_analysis is None:
             raise RuntimeError(
@@ -405,9 +411,6 @@ class FuselageStructuralAnalysis:
             self.wing_analysis.reaction_forces()
         )
 
-        closest_section = min(
-            self.sections, key=lambda section: abs(section.x_pos - self.wing_pos)
-        )
         width_root_section = self.wing_analysis.sections[0].booms[0].x_pos * 2 * ratio
         back_section_position = -width_root_section / 2 + self.wing_pos
 
@@ -421,15 +424,18 @@ class FuselageStructuralAnalysis:
             range(len(self.sections)),
             key=lambda idx: abs(self.sections[idx].x_pos - back_section_position),
         )
-        amount_of_sections = back_section_index - front_section_index
+        amount_of_sections = back_section_index - front_section_index + 1
         if amount_of_sections == 0:
-            amount_of_sections = 1
+            amount_of_sections = 1 + 1
+
         per_section_wing_shear_z = -wing_force_z / amount_of_sections
         per_section_wing_normal_x = -wing_force_x / amount_of_sections
 
         for sec in self.sections[front_section_index : back_section_index + 1]:
             sec.shear_z += per_section_wing_shear_z
             sec.normal_force += per_section_wing_normal_x
+            sec.ansys_load += wing_moment_x / amount_of_sections
+            sec.special_section = True
 
         print("front_section_index", front_section_index)
         print("back_section_index", back_section_index)
@@ -444,7 +450,7 @@ class FuselageStructuralAnalysis:
         location_front_props = -self.length_start_section
         location_back_props = -self.length_start_section - self.length_middle_section
         thrust_per_propeller = self.drone.MTOW / 4 * g * 2  # ASSUMPTION
-
+        moment_by_propeller = thrust_per_propeller * self.propeller_rod_length
         closest_front_section = min(
             self.sections, key=lambda section: abs(section.x_pos - location_front_props)
         )
@@ -455,6 +461,11 @@ class FuselageStructuralAnalysis:
         closest_front_section.shear_z += -2 * thrust_per_propeller
         closest_back_section.shear_z += -2 * thrust_per_propeller
 
+        closest_back_section.special_section = True
+        closest_back_section.ansys_load -= moment_by_propeller / 2
+        closest_front_section.special_section = True
+        closest_front_section.ansys_load -= moment_by_propeller / 2
+
     def apply_back_propeller_loads(self):
         last_section = self.sections[-1]
         thrust_per_propeller = (
@@ -464,9 +475,9 @@ class FuselageStructuralAnalysis:
         last_section.normal_force += thrust_per_propeller
 
     def apply_tail_loads(self):
-        tail_shear_z = 10  # TODO
+        tail_shear_z = 5  # TODO
         tail_shear_y = 100
-        tail_drag_x = -100
+        tail_drag_x = -10
         tail_position = -1.3  # [m]
 
         closest_section = min(
@@ -476,6 +487,42 @@ class FuselageStructuralAnalysis:
         closest_section.shear_z += tail_shear_z
         closest_section.shear_y += tail_shear_y
         closest_section.normal_force += tail_drag_x
+
+    def apply_propeller_motor_weight_front(self):
+        shear_z = (
+            self.drone.propulsion.motor.weight()
+            + self.drone.propulsion.ver_prop.weight()
+        ) * 2
+        position = self.length_start_section  # [m]
+        moment = position * shear_z
+        closest_section = min(
+            self.sections, key=lambda section: abs(section.x_pos - position)
+        )
+        closest_section.special_section = True
+        closest_section.ansys_load += moment
+        closest_section.shear_z += shear_z
+
+    def apply_propeller_motor_weight_back(self):
+        shear_z = (
+            self.drone.propulsion.motor.weight()
+            + self.drone.propulsion.ver_prop.weight()
+        ) * 2
+        position = self.length_start_section + self.length_middle_section  # [m]
+        moment = position * shear_z
+        closest_section = min(
+            self.sections, key=lambda section: abs(section.x_pos - position)
+        )
+        closest_section.special_section = True
+        closest_section.ansys_load += moment
+        closest_section.shear_z += shear_z
+
+    def apply_delivery_mech_weight(self):
+        shear_z = toml["config"]["payload"]["del_mech_weight"]
+        position = self.length_start_section + self.length_middle_section / 2  # [m]
+        closest_section = min(
+            self.sections, key=lambda section: abs(section.x_pos - position)
+        )
+        closest_section.shear_z += shear_z
 
     def apply_boom_material(self):
         for _, section in enumerate(self.sections):
@@ -636,17 +683,32 @@ class FuselageStructuralAnalysis:
             plt.show()
 
     def apply_boom_area(self, spar_area: float | None, stringer_area: float | None):
+
         if spar_area == None:
             spar_area = self.start_spar_boom_area
         if stringer_area == None:
             stringer_area = self.start_stringer_boom_area
 
         for _, section in enumerate(self.sections):
-            for _, boom in enumerate(section.booms):
+
+            for i, boom in enumerate(section.booms):
+                added_area = 0
+                if False:
+                    added_area = (
+                        self.web_thickness
+                        * abs(
+                            section.booms[i - 1].y_pos
+                            - boom.y_pos
+                            + section.booms[i - 1].z_pos
+                            - boom.z_pos
+                        )
+                        / 6
+                    )
                 if boom.type == "spar":
-                    boom.area = spar_area
+
+                    boom.area = spar_area + added_area
                 else:
-                    boom.area = stringer_area
+                    boom.area = stringer_area + added_area
 
     def check_buckling_fail(self, boom: FuselageBoom):
         length = boom.section.length
@@ -663,10 +725,19 @@ class FuselageStructuralAnalysis:
             return True
 
     def check_shear_fail(self, section: FuselageSection):
+        if section.special_section:
+            ansys_stress = (
+                calculate_stress_ansys(self.web_thickness)
+                * section.ansys_load
+                * 3
+                / 0.05**2
+            )
+        else:
+            ansys_stress = 0
         """This needs to be checked"""
         sum_shear_flow = sum(abs(boom.shear_flow_delta) for boom in section.booms)
 
-        tau = sum_shear_flow / self.web_thickness
+        tau = sum_shear_flow / self.web_thickness + ansys_stress
 
         if tau * self.safety_factor > self.material.mat_tau_max:
             """Structure fails"""
@@ -701,7 +772,7 @@ class FuselageStructuralAnalysis:
                 boom.failure_method = "shear_fail"
                 print("Failure method", "shear_fail")
 
-                failed_booms.extend(section.booms[:])
+                failed_booms.extend(section.booms)
                 continue
 
         if len(failed_booms) == 0:
@@ -717,7 +788,8 @@ class FuselageStructuralAnalysis:
         return weight
 
     def perform_iterations(self):
-        area_reduction_factor = 0.01
+        area_reduction_factor = 0.001
+        web_grow_factor = 0.0001
         area_spar = self.start_spar_boom_area
         area_stringer = self.start_stringer_boom_area
 
@@ -727,11 +799,22 @@ class FuselageStructuralAnalysis:
             self.calc_analysis_forces()
             failed, failed_booms = self.check_structure_fail()
             if failed:
-                if all(boom.type == "spar" for boom in failed_booms):
+                if all(
+                    boom.failure_method == "shear_fail" or boom.failure_method == None
+                    for boom in failed_booms
+                ):
+                    print("shear_fail")
+                    self.web_thickness += web_grow_factor
+                    area_spar = area_spar + area_spar * area_reduction_factor
+                    area_stringer = (
+                        area_stringer + area_stringer * area_reduction_factor
+                    )
+
+                elif all(boom.type == "spar" for boom in failed_booms):
                     print("Failed spar")
                     area_spar = area_spar + 2 * area_spar * area_reduction_factor
 
-                if all(boom.type == "stringer" for boom in failed_booms):
+                elif all(boom.type == "stringer" for boom in failed_booms):
                     print("Failed stringer")
                     area_stringer = (
                         area_stringer + 2 * area_stringer * area_reduction_factor
@@ -746,10 +829,17 @@ class FuselageStructuralAnalysis:
                     self.apply_boom_area(area_spar, area_stringer)
                     self.calc_analysis_forces()
                     print("Done with iterations")
-                    break
+                    print("Minimum thickness", self.web_thickness)
 
+                    break
+                for boom in failed_booms:
+                    boom.failure_method == None
             area_spar = area_spar - area_spar * area_reduction_factor
             area_stringer = area_stringer - area_stringer * area_reduction_factor
+            # print("Thickness", self.web_thickness)
+            # print("area_spar", area_spar)
+            # print("area_stringer", area_stringer)
+            print("weight", self.weight)
 
 
 if __name__ == "__main__":
@@ -775,14 +865,20 @@ if __name__ == "__main__":
     wing_structural_analysis.apply_lift()
     wing_structural_analysis.apply_drag()
     wing_structural_analysis.perform_iterations()
+    wing_structural_analysis.plot_wing_structure()
 
     fuselage_structural_analysis.add_wing_analysis(wing_structural_analysis)
-    fuselage_structural_analysis.calc_wing_reaction_forces()
+    fuselage_structural_analysis.apply_wing_reaction_forces()
     fuselage_structural_analysis.apply_propeller_loads()
     fuselage_structural_analysis.apply_back_propeller_loads()
     fuselage_structural_analysis.apply_tail_loads()
+    fuselage_structural_analysis.apply_propeller_motor_weight_front()
+    fuselage_structural_analysis.apply_propeller_motor_weight_back()
+    fuselage_structural_analysis.apply_delivery_mech_weight()
     fuselage_structural_analysis.perform_iterations()
     print("Final weight", fuselage_structural_analysis.weight)
+    print("Final weight wing", wing_structural_analysis.weight)
+
     fuselage_structural_analysis.calc_analysis_forces(True)
     fuselage_structural_analysis.plot_fuselage_structure()
 

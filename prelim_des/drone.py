@@ -47,7 +47,7 @@ class Drone:
             toml["config"]["payload"]["n_box"] * toml["config"]["payload"]["box_weight"]
         )
         design_payload = self.structure.delivery_mechanism_weight() + self.max_payload
-        # design_payload = self.max_payload
+        design_payload = self.max_payload
         self.MTOW = get_MTOW_from_payload(design_payload)
         self.OEW = self.MTOW - self.max_payload
         if self.OEW <= 0:
