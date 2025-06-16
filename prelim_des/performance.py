@@ -54,7 +54,8 @@ class Performance:
         )  # Using lift equation with horizontal equilibrium
         return S
 
-    def wing_area_iterations(self, mass):
+    def wing_area_iterations(self):
+        mass = self.drone.MTOW
         AOA = self.AOA_cruise
         difference_S = 10
         old_wing_surface = 1000000
