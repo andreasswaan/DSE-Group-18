@@ -9,6 +9,7 @@ from prelim_des.internals import layout_var
 from prelim_des.internals import layout_const
 from prelim_des.idealized_structure import get_fuselage_dimensions
 from prelim_des.internals import get_cg_groups
+from prelim_des.constants import g
 
 
 if TYPE_CHECKING:
@@ -26,7 +27,7 @@ def item_input_sort():
     items = list(layout_var.items())
     sorted_items = sorted(items, key=lambda item: item[1]["x"])
     W_list = [item[1]["m"] for item in sorted_items]
-    W_list = [p * 9.81 for p in W_list]
+    W_list = [p * g for p in W_list]
     X_list = [item[1]["x"] for item in sorted_items]
     X_list = [p / 1000 for p in X_list]
     X_reverse = X_list[::-1]
@@ -48,7 +49,7 @@ def main_horizontal_stability(
     Cm_ac = data["config"]["horizontal_sc"]["Cm_ac"]  # ac moment constant
     Cl_h = data["config"]["horizontal_sc"]["Cl_h"]  # tail cl
     Cl_alpha_tailless = drone.aero.cl_alpha_slope()
-    Cl_tailless = drone.aero.cl_alpha(drone.aero.AOA_cruise)
+    Cl_tailless = drone.aero.cl_alpha_slope(drone.aero.AOA_cruise)
 
     Dxw = drone.wing.c_root / 2  # m , from LEMAC to wing CG
     drone_thickness = get_fuselage_dimensions(case=2)[1]
