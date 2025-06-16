@@ -11,7 +11,7 @@ from matplotlib import cm
 import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D
 from prelim_des.constants import g
-from prelim_des.structure import Material
+from prelim_des.structure import Boom, Material
 from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
 from prelim_des.utils.load_materials import load_materials
 from prelim_des.utils.import_toml import load_toml

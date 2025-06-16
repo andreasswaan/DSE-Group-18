@@ -205,10 +205,10 @@ web_thickness = 0.001 #[m]
 S_M = 0.05
 LEMAC_In = 0.1
 LEMAC_Out = 0.2
-Vh_V = 0.8
+Vh_V = 0.9
 taper_ratio_tail = 0.5 
 Aspect_ratio_tail = 3
-d_e_d_alpha = 0.5
+d_e_d_alpha = 0.3
 V_g = 7 
 
 
@@ -216,3 +216,6 @@ V_g = 7
 [config.sensors]
 
 mass = 0.26         # kg
+Cl_alpha_h = 6.28
+Cm_ac = -0.15
+Cl_h = -0.33

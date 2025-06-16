@@ -4,12 +4,8 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import tomllib
-
 from prelim_des.internals import layout_var
-from prelim_des.internals import layout_const
 from prelim_des.idealized_structure import get_fuselage_dimensions
-from prelim_des.internals import get_cg_groups
-
 
 if TYPE_CHECKING:
     from prelim_des.drone import Drone
@@ -21,17 +17,8 @@ if TYPE_CHECKING:
 with open("prelim_des/config.toml", "rb") as f:
     data = tomllib.load(f)
 
-
-def item_input_sort():
-    items = list(layout_var.items())
-    sorted_items = sorted(items, key=lambda item: item[1]["x"])
-    W_list = [item[1]["m"] for item in sorted_items]
-    W_list = [p * 9.81 for p in W_list]
-    X_list = [item[1]["x"] for item in sorted_items]
-    X_list = [p / 1000 for p in X_list]
-    X_reverse = X_list[::-1]
-    W_reverse = W_list[::-1]
-    return X_list, W_list, X_reverse, W_reverse
+# Structures Values
+X_fuselage = 0.5  # m, distance from nose to fuselage CG
 
 # Aerodynamics Values
 Cl_alpha_h = 4  # tail Cl alpha
@@ -40,43 +27,37 @@ Cm_ac = -0.1  # ac moment constant
 Cl_h = -0.2  # tail cl
 Cl_tailless = 0.3  # tailess aircraft cl
 
-# Vertical tail
-X_cg = 7  # m
-aspect_ratio = 5
-v_taper_ratio = 0.5
+
+def item_input_sort():
+    N = 1
+    W_list = []
+    X_list = []
+    while N == 1:
+        W = float(input("Weight input kg:"))
+        X = float(input("Distance from nose m:"))
+        W_list.append(W)
+        X_list.append(X)
+        choice = int(input("1. continue / 2. end :"))
+        if choice == 2:
+            N = 0
+    X_reverse = X_list[::-1]
+    W_reverse = W_list[::-1]
+    return X_list, W_list, X_reverse, W_reverse
 
 
 # MAIN
 def main_horizontal_stability(
     drone: Drone,
+    X_fuselage,  # Talk to Andy
+    Cl_alpha_h,  # Constant, talk to Andreas
+    Cl_alpha_tailless,  # Constant, talk to Andreas
+    Cm_ac,  # Constant, talk to Andreas
+    Cl_h,  # Constant, talk to Andreas
+    Cl_tailless,  # Constant, talk to Andreas,
     graph=False,
 ):
-    X_fuselage = (
-        get_cg_groups(layout_const, drone.fuselage, drone.wing, drone.tail)["fuselage"][
-            "x"
-        ]
-    ) / 1000
-    Cl_alpha_h = data["config"]["horizontal_sc"]["Cl_alpha_h"]  # tail Cl alpha
-    Cm_ac = data["config"]["horizontal_sc"]["Cm_ac"]  # ac moment constant
-    Cl_h = data["config"]["horizontal_sc"]["Cl_h"]  # tail cl
-    Cl_alpha_tailless = drone.aero.cl_alpha_slope()
-    Cl_tailless = drone.aero.cl_alpha(drone.aero.AOA_cruise)
-
     Dxw = drone.wing.c_root / 2  # m , from LEMAC to wing CG
     drone_thickness = get_fuselage_dimensions(case=2)[1]
-    X_fuselage=0.5,  # Talk to Andy
-    Dxw=0.8,  # Talk to Andy
-    Cl_alpha_h=0.9,  # Constant, talk to Andreas
-    Cl_alpha_tailless=0.7,  # Constant, talk to Andreas
-    Cm_ac=-1,  # Constant, talk to Andreas
-    Cl_h=0.8,  # Constant, talk to Andreas
-    Cl_tailless=0.8,  # Constant, talk to Andreas,
-    X_cg=1,
-    aspect_ratio=3,
-    v_taper_ratio=0.5,
-    graph=False,
-
-
     W_fuselage = drone.fuselage.weight  # kg, fuselage weight
     W_wing = drone.wing.weight  # kg, wing weight
     S_M = data["config"]["horizontal_sc"]["S_M"]  # safety margin
@@ -99,8 +80,6 @@ def main_horizontal_stability(
 
     V_g = data["config"]["horizontal_sc"]["V_g"]
     V = data["config"]["mission"]["cruise_speed"]
-
-    drone_thickness = data["config"]["mission"]["cruise_speed"]
 
     mac = drone.wing.mac
     L_fuselage = drone.fuselage.length  # m, fuselage length
@@ -153,8 +132,6 @@ def main_horizontal_stability(
 
     b_v, c_v_small, c_v_big = vertical_tail_sizing(
         L_fuselage, V_g, X_cg, V, Aspect_ratio_tail, taper_ratio_tail, drone_thickness
-        L_fuselage, V_g, X_cg, V, aspect_ratio, v_taper_ratio, drone_thickness
-
     )
 
     if graph:
@@ -568,10 +545,18 @@ if __name__ == "__main__":
     perf = Performance(drone, mission)
     drone.perf = perf
     drone.class_1_weight_estimate()
-    drone.wing.S = perf.wing_area(drone.OEW)
     drone.class_2_weight_estimate(transition=True)
+    
+    drone.aero.cl_alpha_slope()
 
     main_horizontal_stability(
         drone,
+        X_fuselage,
+        Dxw,
+        Cl_alpha_h,
+        Cl_alpha_tailless,
+        Cm_ac,
+        Cl_h,
+        Cl_tailless,
         graph=True,
     )
