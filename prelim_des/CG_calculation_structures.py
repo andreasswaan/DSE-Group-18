@@ -1,20 +1,37 @@
-from idealized_structure import create_rectangular_section, FuselageStructure, WingStructure, TailStructure, materials, get_fuselage_dimensions, g
-from drone import Drone
-from performance import Performance
-from mission import Mission
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass
+from prelim_des.idealized_structure import (
+    create_rectangular_section,
+    FuselageStructure,
+    WingStructure,
+    TailStructure,
+    materials,
+    get_fuselage_dimensions,
+    g,
+)
+
 import matplotlib.pyplot as plt
 
-drone = Drone()
-mission = Mission("DRCCRCCRCCD")
-perf = Performance(drone, mission)
-drone.perf = perf
-drone.class_1_weight_estimate()
-drone.wing.S = perf.wing_area(drone.OEW)
-# --- Parameters (match your main code) ---
-fuselage_case = 2  # or 1, as desired
+if __name__ == "__main__":
+    from prelim_des.drone import Drone
+    from prelim_des.performance import Performance
+    from prelim_des.mission import Mission
+
+    drone = Drone()
+    mission = Mission("DRCCRCCRCCD")
+    perf = Performance(drone, mission)
+    drone.perf = perf
+    drone.class_1_weight_estimate()
+    drone.wing.S = perf.wing_area(drone.OEW)
+    # --- Parameters (match your main code) ---
+    fuselage_case = 2  # or 1, as desired
 
 # Fuselage dimensions
-fuselage_width, fuselage_height, fuselage_length = get_fuselage_dimensions(fuselage_case)
+fuselage_width, fuselage_height, fuselage_length = get_fuselage_dimensions(
+    fuselage_case
+)
 
 root_section = create_rectangular_section(
     width=drone.wing.c_root,
@@ -26,12 +43,15 @@ root_section = create_rectangular_section(
     materials=materials,
 )
 
+
 # Wing structure
 class DummyDrone:
     class Wing:
         span = drone.wing.span  # Example value, replace with your drone.wing.span
         taper = drone.wing.taper  # Example value, replace with your drone.wing.taper
+
     wing = Wing()
+
 
 dummy_drone = DummyDrone()
 wing = WingStructure(
@@ -97,9 +117,11 @@ tail = TailStructure(
     z0=0.0,
 )
 
+
 class Material:
     def __init__(self, density):
         self.density = density
+
 
 class Boom:
     def __init__(self, x, y, z, area, material):
@@ -109,13 +131,17 @@ class Boom:
         self.area = area
         self.material = material
 
+
 class Section:
     def __init__(self, x_section, booms):
         self.x_section = x_section  # global x of section (e.g. along fuselage)
         self.booms = booms
 
     def mass(self, segment_length=1.0):
-        return sum(boom.area * segment_length * boom.material.density for boom in self.booms)
+        return sum(
+            boom.area * segment_length * boom.material.density for boom in self.booms
+        )
+
 
 # Compute x and z CG for the wing
 def compute_wing_cg_xz(wing: WingStructure) -> tuple[float, float]:
@@ -135,6 +161,7 @@ def compute_wing_cg_xz(wing: WingStructure) -> tuple[float, float]:
         return 0.0, 0.0
     return x_weighted_sum / total_mass, z_weighted_sum / total_mass
 
+
 # Compute x and z CG for the fuselage
 def compute_fuselage_cg_xz(fuselage: FuselageStructure) -> tuple[float, float]:
     total_mass = 0.0
@@ -152,6 +179,7 @@ def compute_fuselage_cg_xz(fuselage: FuselageStructure) -> tuple[float, float]:
     if total_mass == 0:
         return 0.0, 0.0
     return x_weighted_sum / total_mass, z_weighted_sum / total_mass
+
 
 # Compute x and z CG for the tail (horizontal and vertical)
 def compute_tail_cg_xz(tail: TailStructure) -> tuple[float, float]:
@@ -182,6 +210,7 @@ def compute_tail_cg_xz(tail: TailStructure) -> tuple[float, float]:
         return 0.0, 0.0
     return x_weighted_sum / total_mass, z_weighted_sum / total_mass
 
+
 wing_cg_x, wing_cg_z = compute_wing_cg_xz(wing)
 fuselage_cg_x, fuselage_cg_z = compute_fuselage_cg_xz(fuselage)
 tail_cg_x, tail_cg_z = compute_tail_cg_xz(tail)
@@ -193,52 +222,55 @@ print(f"Tail CG: x={float(tail_cg_x):.3f} m, z={float(tail_cg_z):.3f} m")
 
 def plot_fuselage_structure_3d(fuselage):
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection="3d")
     for x_section, section in fuselage.sections:
         xs = [x_section + boom.x for boom in section.booms]
-        ys = [boom.z if hasattr(boom, 'z') else 0.0 for boom in section.booms]
+        ys = [boom.z if hasattr(boom, "z") else 0.0 for boom in section.booms]
         zs = [boom.y for boom in section.booms]
-        ax.plot(xs, ys, zs, 'o-', alpha=0.5)
+        ax.plot(xs, ys, zs, "o-", alpha=0.5)
     ax.set_xlabel("x (fuselage length) [m]")
     ax.set_ylabel("y (lateral) [m]")
     ax.set_zlabel("z (vertical) [m]")
     ax.set_title("Fuselage Boom Layout (3D)")
     plt.show()
 
+
 def plot_wing_structure_3d(wing):
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection="3d")
     for y, section in wing.sections:
         xs = [boom.x for boom in section.booms]
         ys = [y for _ in section.booms]
         zs = [boom.y for boom in section.booms]
-        ax.plot(xs, ys, zs, 'o-', alpha=0.5)
+        ax.plot(xs, ys, zs, "o-", alpha=0.5)
     ax.set_xlabel("x (chordwise) [m]")
     ax.set_ylabel("y (spanwise) [m]")
     ax.set_zlabel("z (vertical) [m]")
     ax.set_title("Wing Boom Layout (3D)")
     plt.show()
 
+
 def plot_tail_structure_3d(tail):
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection="3d")
     # Horizontal tail
     for pos, section in tail.horiz_sections:
         xs = [pos[0] + boom.x for boom in section.booms]
         ys = [pos[1] for _ in section.booms]
         zs = [pos[2] for _ in section.booms]
-        ax.plot(xs, ys, zs, 'o-', color='blue', alpha=0.5)
+        ax.plot(xs, ys, zs, "o-", color="blue", alpha=0.5)
     # Vertical tail
     for pos, section in tail.vert_sections:
         xs = [pos[0] + boom.x for boom in section.booms]
         ys = [pos[1] for _ in section.booms]
         zs = [pos[2] + boom.y for boom in section.booms]
-        ax.plot(xs, ys, zs, 'o-', color='red', alpha=0.5)
+        ax.plot(xs, ys, zs, "o-", color="red", alpha=0.5)
     ax.set_xlabel("x [m]")
     ax.set_ylabel("y [m]")
     ax.set_zlabel("z [m]")
     ax.set_title("Tail Boom Layout (3D)")
     plt.show()
+
 
 # Example usage:
 # plot_fuselage_structure_3d(fuselage)
@@ -246,15 +278,17 @@ def plot_tail_structure_3d(tail):
 # plot_tail_structure_3d(tail)
 
 
-
 import numpy as np
+
 
 # Dummy material for booms
 class DummyMaterial:
     def __init__(self, density=2700):
         self.density = density
 
+
 dummy_material = DummyMaterial()
+
 
 # Dummy Section and Boom classes if not already defined
 class DummyBoom:
@@ -265,9 +299,11 @@ class DummyBoom:
         self.area = area
         self.material = material
 
+
 class DummySection:
     def __init__(self, booms):
         self.booms = booms
+
 
 # Create a simple rectangular wing: 5 spanwise sections, each with 4 corner booms
 n_sections = 5
@@ -280,25 +316,27 @@ sections = []
 for i in range(n_sections):
     y = i * span / (n_sections - 1)  # spanwise position
     booms = [
-        DummyBoom(0, -thickness/2, area, dummy_material),         # leading edge, bottom
-        DummyBoom(0, thickness/2, area, dummy_material),          # leading edge, top
-        DummyBoom(chord, -thickness/2, area, dummy_material),     # trailing edge, bottom
-        DummyBoom(chord, thickness/2, area, dummy_material),      # trailing edge, top
-        DummyBoom(chord, thickness/3, area, dummy_material),
-        DummyBoom(chord, thickness/7, area, dummy_material),     
-        DummyBoom(chord, thickness/4, area, dummy_material),       
-        DummyBoom(chord, thickness/6, area, dummy_material),
-        DummyBoom(chord, thickness/5, area, dummy_material),             
-        DummyBoom(chord, thickness/8, area, dummy_material),
-        DummyBoom(chord, thickness/9, area, dummy_material),
-        ]
+        DummyBoom(0, -thickness / 2, area, dummy_material),  # leading edge, bottom
+        DummyBoom(0, thickness / 2, area, dummy_material),  # leading edge, top
+        DummyBoom(chord, -thickness / 2, area, dummy_material),  # trailing edge, bottom
+        DummyBoom(chord, thickness / 2, area, dummy_material),  # trailing edge, top
+        DummyBoom(chord, thickness / 3, area, dummy_material),
+        DummyBoom(chord, thickness / 7, area, dummy_material),
+        DummyBoom(chord, thickness / 4, area, dummy_material),
+        DummyBoom(chord, thickness / 6, area, dummy_material),
+        DummyBoom(chord, thickness / 5, area, dummy_material),
+        DummyBoom(chord, thickness / 8, area, dummy_material),
+        DummyBoom(chord, thickness / 9, area, dummy_material),
+    ]
     sections.append((y, DummySection(booms)))
+
 
 # Dummy WingStructure class for compatibility with your plotting/CG code
 class DummyWing:
     def __init__(self, sections, dy):
         self.sections = sections
         self.dy = dy
+
 
 dummy_wing = DummyWing(sections, span / (n_sections - 1))
 

@@ -160,7 +160,7 @@ ratio_width_box_to_root_chord = 0.5
 
 [config.structures.wing]
 amount_of_sections = 5
-amount_of_booms_horizontal = 1
+amount_of_booms_horizontal = 2
 amount_of_booms_vertical = 1
 ratio_width_box_to_root_chord = 0.8
 start_spar_boom_area =  1.8704805295755328e-05 #[m^2]
@@ -191,7 +191,7 @@ propeller_rod_length = 0.3 #[m]
 wing_to_fuselage_root_chord_ratio = 1 #[m] basically how many sections the loads of thw wing spread over
 
 amount_of_booms_horizontal = 3
-amount_of_booms_vertical = 2
+amount_of_booms_vertical = 3
 
 start_spar_boom_area = 0.001 #[m^2]
 start_stringer_boom_area = 0.0001 #[m^2]

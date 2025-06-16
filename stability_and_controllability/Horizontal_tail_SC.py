@@ -33,6 +33,7 @@ def item_input_sort():
     W_reverse = W_list[::-1]
     return X_list, W_list, X_reverse, W_reverse
 
+
 # Aerodynamics Values
 Cl_alpha_h = 4  # tail Cl alpha
 Cl_alpha_tailless = 5  # no tail Cl alpha
@@ -64,18 +65,17 @@ def main_horizontal_stability(
 
     Dxw = drone.wing.c_root / 2  # m , from LEMAC to wing CG
     drone_thickness = get_fuselage_dimensions(case=2)[1]
-    X_fuselage=0.5,  # Talk to Andy
-    Dxw=0.8,  # Talk to Andy
-    Cl_alpha_h=0.9,  # Constant, talk to Andreas
-    Cl_alpha_tailless=0.7,  # Constant, talk to Andreas
-    Cm_ac=-1,  # Constant, talk to Andreas
-    Cl_h=0.8,  # Constant, talk to Andreas
-    Cl_tailless=0.8,  # Constant, talk to Andreas,
-    X_cg=1,
-    aspect_ratio=3,
-    v_taper_ratio=0.5,
-    graph=False,
-
+    X_fuselage = (0.5,)  # Talk to Andy
+    Dxw = (0.8,)  # Talk to Andy
+    Cl_alpha_h = (0.9,)  # Constant, talk to Andreas
+    Cl_alpha_tailless = (0.7,)  # Constant, talk to Andreas
+    Cm_ac = (-1,)  # Constant, talk to Andreas
+    Cl_h = (0.8,)  # Constant, talk to Andreas
+    Cl_tailless = (0.8,)  # Constant, talk to Andreas,
+    X_cg = (1,)
+    aspect_ratio = (3,)
+    v_taper_ratio = (0.5,)
+    graph = (False,)
 
     W_fuselage = drone.fuselage.weight  # kg, fuselage weight
     W_wing = drone.wing.weight  # kg, wing weight
@@ -152,9 +152,20 @@ def main_horizontal_stability(
     X_wing = X_LEMAC + Dxw  # m
 
     b_v, c_v_small, c_v_big = vertical_tail_sizing(
-        L_fuselage, V_g, X_cg, V, Aspect_ratio_tail, taper_ratio_tail, drone_thickness
-        L_fuselage, V_g, X_cg, V, aspect_ratio, v_taper_ratio, drone_thickness
-
+        L_fuselage,
+        V_g,
+        X_cg,
+        V,
+        Aspect_ratio_tail,
+        taper_ratio_tail,
+        drone_thickness,
+        L_fuselage,
+        V_g,
+        X_cg,
+        V,
+        aspect_ratio,
+        v_taper_ratio,
+        drone_thickness,
     )
 
     if graph:

@@ -292,11 +292,23 @@ class WingStructuralAnalysis:
             stringer_area = self.start_stringer_boom_area
 
         for _, section in enumerate(self.sections):
-            for _, boom in enumerate(section.booms):
+            for i, boom in enumerate(section.booms):
+                added_area = 0
+                if False:
+                    added_area = (
+                        self.web_thickness
+                        * abs(
+                            section.booms[i - 1].x_pos
+                            - boom.x_pos
+                            + section.booms[i - 1].z_pos
+                            - boom.z_pos
+                        )
+                        / 6
+                    )
                 if boom.type == "spar":
-                    boom.area = spar_area
+                    boom.area = spar_area + added_area
                 else:
-                    boom.area = stringer_area
+                    boom.area = stringer_area + added_area
 
     def check_buckling_fail(self, boom: WingBoom):
         length = boom.section.length

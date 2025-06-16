@@ -834,6 +834,8 @@ class FuselageStructuralAnalysis:
                     break
                 for boom in failed_booms:
                     boom.failure_method == None
+            if self.web_thickness < 0.001:
+                self.web_thickness = 0.001
             area_spar = area_spar - area_spar * area_reduction_factor
             area_stringer = area_stringer - area_stringer * area_reduction_factor
             # print("Thickness", self.web_thickness)

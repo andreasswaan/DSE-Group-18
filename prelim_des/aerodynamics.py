@@ -43,7 +43,6 @@ class Aerodynamics:
         self.drone = drone
         self.CL_slope_aircraft = toml["config"]["aero"]["CL_slope_aircraft"]
         self.AOA_cruise = toml["config"]["performance"]["AOA_cruise"]
-        
 
     @property
     def CD(self) -> float:
@@ -72,7 +71,7 @@ class Aerodynamics:
         cl_at_req_alpha = np.interp(alpha, AOA, avg_cl_alpha)
         return cl_at_req_alpha
 
-    def cl_from_alpha(self, alpha, save_plot=True):
+    def cl_from_alpha(self, alpha, save_plot=False):
         """
         Estimate the cl of the drone based on alpha (deg).
         If the root chord and tip chord are defined it will
@@ -113,7 +112,7 @@ class Aerodynamics:
 
         return cl_at_req_alpha
 
-    def cl_alpha_slope(self, save_plot=True):
+    def cl_alpha_slope(self, save_plot=False):
         """
         Estimate the cl of the drone based on alpha (deg).
         If the root chord and tip chord are defined it will
@@ -148,14 +147,13 @@ class Aerodynamics:
             os.makedirs(folder, exist_ok=True)
             plt.savefig(os.path.join(folder, "AOA vs Cl"), dpi=300, bbox_inches="tight")
             plt.close()
-    
+
         reg = linear_model.LinearRegression()
         X = np.array(AOA[:-1]).reshape(-1, 1)
         y = np.array(cl_alpha[:-1])
         reg.fit(X, y)
         print(reg.coef_[0])
         return reg.coef_[0]
-
 
     def lift(self, V: float, CL) -> float:
         """

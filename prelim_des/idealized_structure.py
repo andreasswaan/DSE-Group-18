@@ -20,7 +20,6 @@ from prelim_des.utils.load_materials import load_materials
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.structure import Boom
 from typing import Literal
-from stability_and_controllability.Horizontal_tail_SC import main_horizontal_stability
 
 # === CONFIG & MATERIALS ===
 
