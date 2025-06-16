@@ -6,11 +6,10 @@ import matplotlib.pyplot as plt
 
 if TYPE_CHECKING:
     from prelim_des.drone import Drone
-from constants import ρ
+from prelim_des.constants import ρ
 from prelim_des.utils.import_toml import load_toml
-import utils.define_logging  # do not remove this line, it sets up logging configuration
 import logging
-from utils.CFD_simulation_results import (
+from prelim_des.utils.CFD_simulation_results import (
     average_cl_alpha,
     AOA,
     tip_chord_cl_alpha,
@@ -69,7 +68,7 @@ class Aerodynamics:
         cl_at_req_alpha = np.interp(alpha, AOA, avg_cl_alpha)
         return cl_at_req_alpha
 
-    def cl_alpha(self, alpha, save_plot=True):
+    def cl_from_alpha(self, alpha, save_plot=True):
         """
         Estimate the cl of the drone based on alpha (deg).
         If the root chord and tip chord are defined it will
@@ -158,9 +157,11 @@ class Aerodynamics:
         b = float(self.drone.wing.span)  # Use the drone's wing span
         CL_cruise = self.drone.aero.CL_cruise
         V_max = toml["config"]["mission"]["max_velocity"]
-        L_total = float(self.drone.aero.lift(V_max, CL_cruise))  # Total lift at max velocity
+        L_total = float(
+            self.drone.aero.lift(V_max, CL_cruise)
+        )  # Total lift at max velocity
         return (4 * L_total / (np.pi * b)) * np.sqrt(1 - (2 * y / b) ** 2)
-    
+
     def constant_drag_distribution(self) -> float:
         """
         Returns drag per unit span (N/m) at spanwise position y.

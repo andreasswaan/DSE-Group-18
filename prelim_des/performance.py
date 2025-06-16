@@ -9,11 +9,10 @@ from matplotlib import colors
 if TYPE_CHECKING:
     from prelim_des.drone import Drone
     from prelim_des.mission import Mission
-from constants import ρ, g
+from prelim_des.constants import ρ, g
 from globals import main_dir
 from prelim_des.utils.import_toml import load_toml
-import utils.define_logging  # do not remove this line, it sets up logging configuration
-from utils.unit_converter import TimeConverter, ImperialConverter
+from prelim_des.utils.unit_converter import TimeConverter, ImperialConverter
 from matplotlib.patches import Patch
 
 toml = load_toml()
@@ -49,7 +48,7 @@ class Performance:
         """Calculate required wing surface area for given weight and cruise speed."""
 
         AOA = self.AOA_cruise
-        cl_cruise = self.drone.aero.cl_alpha(AOA)
+        cl_cruise = self.drone.aero.cl_from_alpha(AOA)
         S = (
             mass * g / (0.5 * ρ * self.V_cruise**2 * cl_cruise)
         )  # Using lift equation with horizontal equilibrium
@@ -63,16 +62,15 @@ class Performance:
         while abs(difference_S) > 0.001:
             if n > 1000:
                 raise RuntimeError("the wing did not converge")
-            cl_cruise = self.drone.aero.cl_alpha(AOA)
+            cl_cruise = self.drone.aero.cl_from_alpha(AOA)
             self.drone.wing.S = (
                 mass * g / (0.5 * ρ * self.V_cruise**2 * cl_cruise)
             )  # Using lift equation with horizontal equilibrium
             difference_S = old_wing_surface - self.drone.wing.S
             old_wing_surface = self.drone.wing.S
-            print(self.drone.wing.S)
 
             n = +1
-        self.drone.wing.plot_planform()
+        # self.drone.wing.plot_planform()
 
     def cruise_thrust(self, D):
         """Calculate thrust required during cruise."""
@@ -209,7 +207,13 @@ class Performance:
                 f"Hover Energy: {hover_energy[0]:.2f} J",
                 f"Leg Mass: {self.drone.OEW + PL_mass} kg",
             )
-        leg_energy = cruise_energy + take_off_energy + landing_energy + hover_energy + transition_energy
+        leg_energy = (
+            cruise_energy
+            + take_off_energy
+            + landing_energy
+            + hover_energy
+            + transition_energy
+        )
         # print(f"Energy breakdown: Cruise Energy: {cruise_energy[0]:.2f} J, "
         #       f"Takeoff Energy: {take_off_energy[0]:.2f} J, "
         #       f"Landing Energy: {landing_energy[0]:.2f} J, "

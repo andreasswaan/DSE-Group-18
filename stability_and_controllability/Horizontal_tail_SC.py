@@ -4,6 +4,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import tomllib
+
 if TYPE_CHECKING:
     from prelim_des.drone import Drone
 
@@ -25,7 +26,7 @@ Cm_ac = -0.1  # ac moment constant
 Cl_h = -0.2  # tail cl
 Cl_tailless = 0.3  # tailess aircraft cl
 
-#Vertical tail
+# Vertical tail
 X_cg = 7  # m
 aspect_ratio = 5
 v_taper_ratio = 0.5
@@ -34,19 +35,19 @@ v_taper_ratio = 0.5
 # MAIN
 def main_horizontal_stability(
     drone: Drone,
-    X_fuselage, # Talk to Andy
-    Dxw, # Talk to Andy
-    Cl_alpha_h, # Constant, talk to Andreas
-    Cl_alpha_tailless, # Constant, talk to Andreas
-    Cm_ac, # Constant, talk to Andreas
-    Cl_h, # Constant, talk to Andreas
-    Cl_tailless, # Constant, talk to Andreas,
-    X_cg,
-    aspect_ratio,
-    v_taper_ratio,   
+    X_fuselage=0.5,  # Talk to Andy
+    Dxw=0.8,  # Talk to Andy
+    Cl_alpha_h=0.9,  # Constant, talk to Andreas
+    Cl_alpha_tailless=0.7,  # Constant, talk to Andreas
+    Cm_ac=-1,  # Constant, talk to Andreas
+    Cl_h=0.8,  # Constant, talk to Andreas
+    Cl_tailless=0.8,  # Constant, talk to Andreas,
+    X_cg=1,
+    aspect_ratio=3,
+    v_taper_ratio=0.5,
     graph=False,
-    ):
-    
+):
+
     W_fuselage = drone.fuselage.weight  # kg, fuselage weight
     W_wing = drone.wing.weight  # kg, wing weight
     S_M = data["config"]["horizontal_sc"]["S_M"]  # safety margin
@@ -66,17 +67,17 @@ def main_horizontal_stability(
     d_e_d_alpha = data["config"]["horizontal_sc"][
         "d_e_d_alpha"
     ]  # downwash effect something
-    
+
     V_g = data["config"]["horizontal_sc"]["V_g"]
     V = data["config"]["mission"]["cruise_speed"]
     drone_thickness = data["config"]["mission"]["cruise_speed"]
-    
+
     mac = drone.wing.mac
     L_fuselage = drone.fuselage.length  # m, fuselage length
     X_ac = 0.25 * mac
     Lh = L_fuselage
     S_wing = drone.wing.S  # m^2, wing area
-    
+
     LEMAC_In = LEMAC_In * L_fuselage
     LEMAC_Out = LEMAC_Out * L_fuselage
 
@@ -111,13 +112,15 @@ def main_horizontal_stability(
     b_h, c_h_small, c_h_big = horizontal_tail_area_sizing(
         tail_area_ratio, S_wing, taper_ratio_tail, Aspect_ratio_tail
     )
-    
+
     # Extra initial values
 
     X_LEMAC = wing_position
     X_wing = X_LEMAC + Dxw  # m
-    
-    b_v, c_v_small,c_v_big = vertical_tail_sizing(L_fuselage, V_g, X_cg, V, aspect_ratio, v_taper_ratio,drone_thickness)
+
+    b_v, c_v_small, c_v_big = vertical_tail_sizing(
+        L_fuselage, V_g, X_cg, V, aspect_ratio, v_taper_ratio, drone_thickness
+    )
 
     if graph:
         main_cg_range_with_graph(
@@ -166,15 +169,26 @@ def main_horizontal_stability(
         stab_cont_lines_plot(
             y_tail, x_stab, x_control, x_cg_start, x_cg_end, tail_area_ratio
         )
-    return x_cg_start, x_cg_end, wing_position, b_h, c_h_small, c_h_big, b_v, c_v_small, c_v_big
+    return (
+        x_cg_start,
+        x_cg_end,
+        wing_position,
+        b_h,
+        c_h_small,
+        c_h_big,
+        b_v,
+        c_v_small,
+        c_v_big,
+    )
 
 
 # CG range graph
 def cg_shift(W_old, X_old, W_item, X_item):
     return W_old + W_item, (W_old * X_old + W_item * X_item) / (W_old + W_item)
 
+
 def vertical_tail_sizing(
-    L_fuselage, V_g, X_cg, V, aspect_ratio, v_taper_ratio,drone_thickness
+    L_fuselage, V_g, X_cg, V, aspect_ratio, v_taper_ratio, drone_thickness
 ):
     S_lat = drone_thickness * L_fuselage
     S = (
@@ -525,7 +539,6 @@ if __name__ == "__main__":
     drone.perf = perf
     drone.class_1_weight_estimate()
     drone.class_2_weight_estimate(transition=True)
- 
 
     main_horizontal_stability(
         drone,

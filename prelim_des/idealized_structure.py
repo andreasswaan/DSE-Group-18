@@ -11,15 +11,16 @@ from matplotlib import cm
 import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D
 from prelim_des.constants import g
-from structure import Material
+from prelim_des.structure import Material
 from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
 from prelim_des.utils.load_materials import load_materials
 from prelim_des.utils.import_toml import load_toml
 
 from prelim_des.utils.load_materials import load_materials
 from prelim_des.utils.import_toml import load_toml
-from structure import Boom
-
+from prelim_des.structure import Boom
+from typing import Literal
+from stability_and_controllability.Horizontal_tail_SC import main_horizontal_stability
 
 # === CONFIG & MATERIALS ===
 
@@ -28,9 +29,6 @@ materials = load_materials(toml)
 
 
 # === LOAD DISTRIBUTIONS ===
-
-
-
 
 
 # def constant_weight_distribution(
@@ -52,19 +50,15 @@ materials = load_materials(toml)
 #     return W_total / (b / 2)  # Divide by half-span (modelling half wing)
 
 
-
-
-
 # === STRUCTURAL CLASSES ===
 
 
-
-
 class IdealizedSection:
-    def __init__(self, booms: list[Boom]):
+    def __init__(self, booms: list[Boom], width=None):
         self.booms = booms
         self.centroid_x, self.centroid_y = self.calc_centroid()
         self.Ixx, self.Iyy, self.Ixy = self.calc_moments()
+        self.width = width
 
     def calc_centroid(self):
         A_total = sum(b.area for b in self.booms)
@@ -243,9 +237,10 @@ def create_rectangular_section(
                 )
             )
 
-    section = IdealizedSection(booms)
-    section.width = width  # <-- Add this line
+    section = IdealizedSection(booms, width)
+    # section.width = width  # <-- Add this line
     section.height = height  # <-- (optional, for symmetry)
+
     return section
 
 
@@ -456,8 +451,6 @@ class FuselageStructure:
             stresses = section.bending_stress(Mx=Mz, My=0)
             stresses_per_section.append(stresses)
         return stresses_per_section
-
-    import numpy as np
 
     def draw_moment_arrow(
         self, ax, origin, axis="z", radius=0.1, direction=1, color="purple", lw=2
@@ -721,6 +714,7 @@ class WingStructure:
         self.dy = self.span / 2 / (n_sections - 1)
         self.sections = self.generate_sections()
         self.total_weight = None
+        self.width = root_section.width
 
     def generate_sections(self) -> list[tuple[float, IdealizedSection]]:
         """
@@ -1139,6 +1133,8 @@ class TailStructure:
         n_sections: int,
         horiz_section: IdealizedSection,
         vert_section: IdealizedSection,
+        horiz_taper_ratio: float = 1.0,
+        vert_taper_ratio: float = 1.0,
         x0: float = 0.0,  # x-location of tail root (relative to fuselage)
         z0: float = 0.0,  # z-location of tail root (relative to fuselage)
     ):
@@ -1149,6 +1145,8 @@ class TailStructure:
         self.n_sections = n_sections
         self.horiz_section = horiz_section
         self.vert_section = vert_section
+        self.horiz_taper_ratio = horiz_taper_ratio
+        self.vert_taper_ratio = vert_taper_ratio
         self.x0 = x0
         self.z0 = z0
         self.horiz_sections = self.generate_horizontal_sections()
@@ -1159,7 +1157,20 @@ class TailStructure:
         sections = []
         for i in range(self.n_sections):
             y = -self.horiz_span / 2 + i * self.horiz_span / (self.n_sections - 1)
+            frac = (y + self.horiz_span / 2) / self.horiz_span
+            scale = 1 - (1 - self.horiz_taper_ratio) * frac
+            scaled_booms = [
+                Boom(
+                    x=boom.x * scale,
+                    y=boom.y * scale,
+                    area=boom.area * (scale**2),
+                    boom_type=boom.type,
+                    material=boom.material,
+                )
+                for boom in self.horiz_section.booms
+            ]
             pos = np.array([self.x0, y, self.z0])
+            section = IdealizedSection(scaled_booms)
             sections.append((pos, self.horiz_section))
         return sections
 
@@ -1168,7 +1179,20 @@ class TailStructure:
         sections = []
         for i in range(self.n_sections):
             z = self.z0 + i * self.vert_span / (self.n_sections - 1)
+            frac = i / (self.n_sections - 1)  # 0 at root, 1 at tip
+            scale = 1 - (1 - self.vert_taper_ratio) * frac
+            scaled_booms = [
+                Boom(
+                    x=boom.x * scale,
+                    y=boom.y * scale,
+                    area=boom.area * (scale**2),
+                    boom_type=boom.type,
+                    material=boom.material,
+                )
+                for boom in self.vert_section.booms
+            ]
             pos = np.array([self.x0, 0.0, z])
+            section = IdealizedSection(scaled_booms)
             sections.append((pos, self.vert_section))
         return sections
 
@@ -1418,13 +1442,14 @@ def euler_buckling_stress(E, K, L, r):
 def size_wing_for_min_mass(
     wing: "WingStructure",
     lift_per_section: list[float],
+    drag_per_section: list[float],
     weight_per_section: list[float],
     shear_thickness: float,  # = 0.002,
     safety_factor: float,  # = 2.0,
-    area_scale_start: float = 3.0,  # Start with a large, safe scale
+    area_scale_start: float = 4,  # Start with a large, safe scale
     area_scale_step: float = 0.02,
     min_scale: float = 0.01,
-    max_iter: int = 200,
+    max_iter: int = 50000,
     wing_point_loads: list[dict] = None,
 ):
     original_areas = [
@@ -1433,7 +1458,7 @@ def size_wing_for_min_mass(
     area_scale = area_scale_start
     last_safe = None
 
-    for _ in range(max_iter):
+    while True:
         # Reset all boom areas to original, then scale
         for orig_areas, (_, section) in zip(original_areas, wing.sections):
             for boom, orig_area in zip(section.booms, orig_areas):
@@ -1443,13 +1468,16 @@ def size_wing_for_min_mass(
             section.centroid_x, section.centroid_y = section.calc_centroid()
             section.Ixx, section.Iyy, section.Ixy = section.calc_moments()
 
-        # Recompute loads and stresses
+        # Recompute loads and stresses for lift and drag
         total_vertical_load = [
-            L - W for L, W in zip(lift_per_section, weight_per_section)
+            L - W
+            for L, W in zip(
+                lift_per_section, weight_per_section
+            )  # L-W because weight cancels lift
         ]
-        moments_x, stresses_per_section = wing.compute_bending_stresses(
-            total_vertical_load
-        )
+        total_horizontal_load = [
+            L for L, W in zip(drag_per_section, weight_per_section)
+        ]
 
         # --- Add point loads to the correct sections ---
         if wing_point_loads:
@@ -1460,9 +1488,23 @@ def size_wing_for_min_mass(
                 )
                 total_vertical_load[idx] += pl.get("Pz", 0)
 
-        moments_x, stresses_per_section = wing.compute_bending_stresses(
+        moments_x, stresses_per_section_z = wing.compute_bending_stresses(
             total_vertical_load
         )
+
+        moments_z, stresses_per_section_x = wing.compute_bending_stresses(
+            total_horizontal_load
+        )
+        # calculate the resultant normal stress per boom due to bending
+        resultant_normal_stress = []
+        for section in range(len(stresses_per_section_z)):
+            resultant_section = []
+            for boom in range(len(stresses_per_section_z[section])):
+                stress_x = stresses_per_section_x[section][boom]
+                stress_z = stresses_per_section_z[section][boom]
+                added_stress = np.sqrt(stress_x**2 + stress_z**2)
+                resultant_section.append(added_stress)
+            resultant_normal_stress.append(resultant_section)
 
         # Shear stresses
         shear_forces = []
@@ -1478,7 +1520,7 @@ def size_wing_for_min_mass(
         # Find critical stress (yield/shear)
         critical = find_critical_stress(
             [sec for _, sec in wing.sections],
-            stresses_per_section,
+            resultant_normal_stress,
             shear_stresses_per_section,
         )
         allowable_with_sf = critical["allowable"] / safety_factor
@@ -1511,6 +1553,7 @@ def size_wing_for_min_mass(
         else:
             # The previous scale was the last safe one
             if last_safe is not None:
+                print("last safe", last_safe)
                 return last_safe[1], last_safe[0]
             else:
                 raise RuntimeError(
@@ -1523,6 +1566,7 @@ def size_wing_for_min_mass(
         # )
 
     if last_safe is not None:
+        print(last_safe)
         return last_safe[1], last_safe[0]
     raise RuntimeError("Failed to find a safe structure within max_iter iterations.")
 
@@ -1816,6 +1860,239 @@ def size_tail_for_min_mass(
 # === MAIN EXECUTION ===
 
 
+class StructuralAnalysis:
+    wing_weight: float
+
+    def __init__(
+        self,
+        drone: Drone,
+        fuselage_case: Literal[1, 2],
+        prop_connection: Literal["wing", "fuselage"],
+    ):
+        self.drone = drone
+        self.SAFETY_FACTOR = toml["config"]["structures"]["SAFETY_FACTOR"]
+        self.shear_thickness = toml["config"]["structures"]["shear_thickness"]
+        self.min_boom_area = toml["config"]["structures"]["min_boom_area"]
+        self.ratio_width_box_to_root_chord = toml["config"]["structures"][
+            "ratio_width_box_to_root_chord"
+        ]
+        self.fuselage_case = fuselage_case
+        self.prop_connection = prop_connection
+        (
+            self.battery_weight,
+            self.sensors_weight,
+            self.computing_module_weight,
+            self.miscellaneous_weight,
+            self.pizza_weight_1,
+            self.pizza_weight_2,
+            self.mechanisms_weight,
+            self.payload_insulator_weight,
+        ) = get_fuselage_payload_weights(fuselage_case)
+
+    @property
+    def wing_root_section(self):
+        width = float(self.drone.wing.c_root) * self.ratio_width_box_to_root_chord
+        print("width:", width)
+        print("height:", float(self.drone.wing.thick_over_chord * width))
+
+        return create_rectangular_section(
+            width=width,  # Assumption
+            height=float(self.drone.wing.thick_over_chord * width),
+            n_regular_booms=12,
+            spar_cap_area=5e-4,
+            regular_boom_area=1e-4,
+            material_name="al_6061_t4",
+            materials=materials,
+        )
+
+    def create_wing_structure(self):
+        self.wing_structure = WingStructure(
+            n_sections=10,
+            root_section=self.wing_root_section,
+            drone=self.drone,
+        )
+
+    @property
+    def fuselage_root_section(self):
+        return create_rectangular_section(
+            width=float(self.drone.wing.c_root),
+            height=float(
+                self.drone.wing.thick_over_chord * self.drone.wing.chord(y=0.0)
+            ),
+            n_regular_booms=12,
+            spar_cap_area=5e-3,
+            regular_boom_area=1e-3,
+            material_name="al_6061_t4",
+            materials=materials,
+        )
+
+    @property
+    def fuselage_structure(self):
+        return FuselageStructure(
+            length=self.fuselage_length,
+            n_sections=20,
+            root_section=self.fuselage_root_section,
+            taper_ratio=1.0,
+        )
+
+    @property
+    def fuselage_width(self):
+        return get_fuselage_dimensions(self.fuselage_case)[0]
+
+    @property
+    def fuselage_height(self):
+        return get_fuselage_dimensions(self.fuselage_case)[1]
+
+    @property
+    def fuselage_length(self):
+        return get_fuselage_dimensions(self.fuselage_case)[2]
+
+    @property
+    def fuselage_prop_loads(self):
+        wing = self.wing_structure
+        max_thrust = self.drone.MTOW * 2
+        return [
+            {
+                "x": 2.5 * wing.width,
+                "y": wing.span / 2 / 3,
+                "z": 0.0,
+                "Pz": max_thrust / 4,
+            },
+            {
+                "x": -1.5 * wing.width,
+                "y": wing.span / 2 / 3,
+                "z": 0.0,
+                "Pz": max_thrust / 4,
+            },
+            {
+                "x": 2.5 * wing.width,
+                "y": -wing.span / 2 / 3,
+                "z": 0.0,
+                "Pz": max_thrust / 4,
+            },
+            {
+                "x": -1.5 * wing.width,
+                "y": -wing.span / 2 / 3,
+                "z": 0.0,
+                "Pz": max_thrust / 4,
+            },
+        ]
+
+    @property
+    def wing_prop_loads(self):
+        """all forces of the propellers when activated (in wing context)"""
+        wing = self.wing_structure
+        max_thrust = self.drone.MTOW * 2
+        # print("max thrust", max_thrust)
+        return [
+            {
+                "x": 1.5 * wing.width,
+                "y": wing.span / 2 / 3,
+                "z": 0.0,
+                "Pz": max_thrust / 4,
+            },
+            {
+                "x": -1.5 * wing.width,
+                "y": wing.span / 2 / 3,
+                "z": 0.0,
+                "Pz": max_thrust / 4,
+            },
+        ]
+
+    @property
+    def motor_weight_loads_wing(self):
+        motor_weight = self.drone.propulsion.motor.weight() * g  # [N]
+        return [{**pl, "Pz": -motor_weight} for pl in self.wing_prop_loads]
+
+    @property
+    def n_max(self):
+        return plot_maneuver_and_gust_envelope(self.drone, plot=False)
+
+    @property
+    def wing_point_loads_cruise(self):
+        """all forces on the wing with their coordinates in cruise"""
+        if self.prop_connection == "wing":
+            wing_point_loads = []  # forces of propellers thrust
+            wing_point_loads.extend(
+                self.motor_weight_loads_wing
+            )  # forces of motor weight
+
+        if self.prop_connection == "fuselage":
+            wing_point_loads = []
+
+        wing_point_loads.extend(
+            self.wing_folding_load
+        )  # forces due to wing folding mechanism
+        return wing_point_loads
+
+    @property
+    def wing_folding_load(self):
+        """Forces and coordinates of weight due to folding mechanism"""
+        weight_folding = toml["config"]["wing"]["wing_folding_weight"]
+        weight_folding_N = weight_folding / 2 * g
+        y_folding = self.wing_structure.span / 2 / 2
+        return [{"y": y_folding, "Pz": -weight_folding_N}]
+
+    @property
+    def wing_point_loads_vtol(self):
+        """all forces on the wing with their coordinates in vtol"""
+        if self.prop_connection == "wing":
+            # print("inside if")
+            wing_point_loads = self.wing_prop_loads  # forces of propellers thrust
+            wing_point_loads.extend(
+                self.motor_weight_loads_wing
+            )  # forces of motor weight
+
+        if self.prop_connection == "fuselage":
+            wing_point_loads = []
+
+        wing_point_loads.extend(
+            self.wing_folding_load
+        )  # forces due to wing folding mechanism
+        return wing_point_loads
+
+    def run_wing_analysis(self):
+        self.create_wing_structure()
+        wing_structure = self.wing_structure
+        dy = wing_structure.dy
+
+        lift_per_section_cruise = [
+            self.drone.aero.elliptical_lift_distribution(y) * dy * self.n_max
+            for y, _ in wing_structure.sections
+        ]
+
+        drag_per_section_cruise = [
+            self.drone.aero.constant_drag_distribution() * dy
+            for y, _ in wing_structure.sections
+        ]
+        weight_per_section = [sec.mass(dy) * g for _, sec in wing_structure.sections]
+        print("start calculations for the vtol")
+        min_wing_mass_vtol, wing_scale_vtol = size_wing_for_min_mass(
+            wing_structure,
+            [0.0 for _ in wing_structure.sections],
+            [0.0 for _ in wing_structure.sections],
+            weight_per_section,
+            shear_thickness=self.shear_thickness,
+            safety_factor=self.SAFETY_FACTOR,
+            wing_point_loads=self.wing_point_loads_vtol,
+        )
+        print("start calculations for the cruise")
+        min_wing_mass_cruise, wing_scale_cruise = size_wing_for_min_mass(
+            wing_structure,
+            lift_per_section_cruise,
+            drag_per_section_cruise,
+            weight_per_section,
+            shear_thickness=self.shear_thickness,
+            safety_factor=self.SAFETY_FACTOR,
+            wing_point_loads=self.wing_point_loads_cruise,
+        )
+
+        wing_weight = np.max([min_wing_mass_cruise, min_wing_mass_vtol]) * 2
+        self.wing_weight = wing_weight
+        print("wing weight", wing_weight)
+        return wing_weight
+
+
 def run_structure_analysis(
     drone: Drone,
     prop_connection: str = "wing",
@@ -1823,11 +2100,11 @@ def run_structure_analysis(
     fuselage_case=2,  # or 2, (1 for chubby, 2 for elongated fuselage)
     # banked=False,  # Set to False for normal cruise, True for banked case
     plot=False,
-    print_bool=False,
+    PRINT=False,
 ):
 
     n_max = plot_maneuver_and_gust_envelope(drone, plot=False)
-    if print_bool:
+    if PRINT:
         print(f"{n_max} g's maximum load factor from maneuver envelope.")
 
     # FIX FIX FIX, those values are educated guesses, but what values should they have? These might be correct
@@ -1837,10 +2114,11 @@ def run_structure_analysis(
     )
     min_boom_area = 1e-5  # m^2, minimum area for a boom
     motor_weight_kg = 0.2  # 200g per motor, waiting for proper weght from Ishaan
-    motor_weight = motor_weight_kg * g  # [N]
+    motor_weight = drone.propulsion.motor.weight() * g  # [N]
 
     # Create root cross-section
     # FIX THIS -> call correct values
+
     root_section = create_rectangular_section(
         width=float(drone.wing.c_root),
         height=float(drone.wing.thick_over_chord * drone.wing.chord(y=0.0)),
@@ -2234,12 +2512,24 @@ def run_structure_analysis(
     # wing.plot_deformed_wing(vertical_deflections)
 
     # Tail Creation - CHANGE VALUES !!!!!!!!!! --- !!!!!!!!!!! FIX FIX FIX
+    """
+    _, _, _, b_h, c_h_small, c_h_big, b_v, c_v_small, c_v_big = (
+        main_horizontal_stability(drone)
+    )
 
+    horiz_span = b_h
+    horiz_chord = c_h_big
+    vert_span = b_v
+    vert_chord = c_v_big
+    horiz_taper = c_h_small / c_h_big
+    vert_taper = c_v_small / c_v_big
+    """
     horiz_span = 0.6
     horiz_chord = 0.15
     vert_span = 0.25
     vert_chord = 0.12
-
+    horiz_taper = 1
+    vert_taper = 1
     horiz_section = create_rectangular_section(
         width=horiz_chord,
         height=0.02,
@@ -2268,6 +2558,8 @@ def run_structure_analysis(
         n_sections=10,
         horiz_section=horiz_section,
         vert_section=vert_section,
+        horiz_taper_ratio=horiz_taper,
+        vert_taper_ratio=vert_taper,
         x0=1.1 * fuselage_length,  # example: place at rear of fuselage
         z0=0.0,
     )
@@ -2306,7 +2598,7 @@ def run_structure_analysis(
         point_loads = []
 
         lift_per_section = [
-           drone.aero.elliptical_lift_distribution(y) * dy for y, _ in wing.sections
+            drone.aero.elliptical_lift_distribution(y) * dy for y, _ in wing.sections
         ]
         weight_per_section = [sec.mass(dy) * g for _, sec in wing.sections]
         drag_per_section = [
@@ -2314,9 +2606,9 @@ def run_structure_analysis(
         ]
 
         # Calculate total forces on the wing
-        total_lift = sum(lift_per_section) * n_max
+        total_lift = sum(lift_per_section)
         total_weight = sum(weight_per_section)
-        total_drag = sum(drag_per_section) * n_max**2
+        total_drag = sum(drag_per_section)
 
         net_vertical_force = total_lift - total_weight  # Pz (upwards positive)
         net_drag_force = total_drag
@@ -2494,7 +2786,6 @@ def run_structure_analysis(
                 wing_point_loads_mode = []
                 fuselage_point_loads_mode = fuselage_prop_loads.copy()
                 fuselage_point_loads_mode += motor_weight_loads_fuselage
-            total_lift = sum(lift_per_section)
             wing_reaction = total_lift / 2  # assuming two attach points
             # Use correct x, y, z for your attach points
             fuselage_point_loads_mode = [
@@ -2601,9 +2892,14 @@ def run_structure_analysis(
         wing_folding_load = {"y": y_folding, "Pz": -weight_folding_N}
         wing_point_loads_mode.append(wing_folding_load)
 
+        drag_per_section_cruise = [
+            drone.aero.constant_drag_distribution() * dy for y, _ in wing.sections
+        ]
+
         min_wing_mass, wing_scale = size_wing_for_min_mass(
             wing,
             lift_per_section,
+            drag_per_section_cruise,
             weight_per_section,
             shear_thickness=shear_thickness,
             safety_factor=SAFETY_FACTOR,
@@ -2669,16 +2965,7 @@ def run_structure_analysis(
         # print(f"[INFO] Fuselage dimensions (case {fuselage_case}): width={fuselage_width:.3f} m, height={fuselage_height:.3f} m, length={fuselage_length:.3f} m")
         # print(f"[INFO] Fuselage initial structural mass: {fuselage.mass():.3f} kg")
 
-        payload_weight = (
-            battery_weight
-            + sensors_weight
-            + computing_module_weight
-            + miscellaneous_weight
-            + pizza_weight_1
-            + pizza_weight_2
-            + mechanisms_weight
-            + payload_insulator_weight
-        )
+        payload_weight = miscellaneous_weight
 
         payload_per_section = [
             payload_weight / fuselage.n_sections for _ in range(fuselage.n_sections)
@@ -2716,7 +3003,7 @@ def run_structure_analysis(
     fuselage_critical_mode = max(results, key=lambda m: results[m]["fuselage_mass"])
     tail_critical_mode = max(results, key=lambda m: results[m]["tail_mass"])
 
-    if print_bool:
+    if PRINT:
         print("\n=== STRUCTURE SIZING SUMMARY ===")
         print(
             f"Wing: Critical mode is '{wing_critical_mode}' with mass {2* results[wing_critical_mode]['wing_mass']:.2f} kg"
@@ -2736,7 +3023,7 @@ def run_structure_analysis(
     tail_critical_scale = results[tail_critical_mode]["tail_scale"]
 
     # Example: print or use these variables
-    if print_bool == True:
+    if PRINT:
         print(f"Wing critical scale: {wing_critical_scale:.2f}")
         print(f"Fuselage critical scale: {fuselage_critical_scale:.2f}")
 
@@ -2744,7 +3031,7 @@ def run_structure_analysis(
     if wing_critical_mode == "cruise":
         # All lift from wings, no propeller loads
         lift_per_section_plot = [
-           drone.aero.elliptical_lift_distribution(y) * dy for y, _ in wing.sections
+            drone.aero.elliptical_lift_distribution(y) * dy for y, _ in wing.sections
         ]
         wing_point_loads_plot = []
     elif wing_critical_mode == "vtol":
@@ -2932,7 +3219,47 @@ def run_structure_analysis(
 
 
 # TODO: add the horizontal propeller to tail and add weight of all propellers to the fuselage
-# TODO: add weight of wing folding mechanism to the wing, remember to divide by 2 - done for now
-# TODO: load factor from plot_load something from siddarth in the code
-# TODO: fix fuselage mass loop - seems to be fixed for now, but check it
 # TODO: fix all references in this code
+
+
+# def check_hollow_cylinder(
+#     axial_load_N, length_m, outer_d_m, inner_d_m, E_Pa, yield_strength_Pa, density
+# ):
+#     """
+#     Checks if a hollow cylinder can support a given axial load.
+#     Returns (is_safe, utilization_ratio, buckling_ratio, sigma_max, sigma_cr)
+#     """
+#     A = np.pi / 4 * (outer_d_m**2 - inner_d_m**2)  # cross-sectional area
+#     I = np.pi / 64 * (outer_d_m**4 - inner_d_m**4)  # moment of inertia
+#     r = np.sqrt(I / A)  # radius of gyration
+
+#     # Compressive stress
+#     sigma_max = axial_load_N / A
+
+#     # Euler buckling (pinned-pinned, K=1)
+#     K = 1.0
+#     sigma_cr = (np.pi**2 * E_Pa) / ((K * length_m / r) ** 2)
+
+#     # Utilization ratios
+#     utilization_ratio = sigma_max / yield_strength_Pa
+#     buckling_ratio = sigma_max / sigma_cr
+
+#     is_safe = utilization_ratio < 1.0 and buckling_ratio < 1.0
+
+#     mass = A * length_m * density  # mass of the cylinder
+
+#     return is_safe, utilization_ratio, buckling_ratio, sigma_max, sigma_cr, mass
+
+
+# is_safe, util, buckl, sigma, sigma_cr, mass = check_hollow_cylinder(
+#     axial_load_N=25 * g / 4,
+#     length_m=0.03,
+#     outer_d_m=0.07,
+#     inner_d_m=0.064,
+#     E_Pa=0.001e9,  # 69e9,
+#     yield_strength_Pa=2e6,  # 250e6,
+#     density=900,  # 2700,
+# )
+# print(
+#     f"Safe: {is_safe}, Utilization: {util:.2f}, Buckling: {buckl:.2f}, Sigma: {sigma:.1f} Pa, Buckling Stress: {sigma_cr:.1f} Pa, Mass: {4*mass:.3f} kg"
+# )

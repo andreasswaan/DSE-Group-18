@@ -4,11 +4,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from prelim_des.drone import Drone
 import numpy as np
-from constants import ρ, g
+from prelim_des.constants import ρ, g
 from prelim_des.utils.unit_converter import ImperialConverter, TimeConverter
 from prelim_des.utils.import_toml import load_toml
 from prelim_des.constants import g
-import utils.define_logging  # do not remove this line, it sets up logging configuration
 import logging
 
 
@@ -38,6 +37,7 @@ class PropulsionSystem:
 
 class Battery:
     weight: float  # Placeholder for battery weight
+
     def __init__(self):
         logging.debug("Initializing Battery class...")
 
@@ -52,7 +52,9 @@ class Battery:
     def calc_weight(self, energy_required: float) -> float:
         weight = energy_required / (self.energy_density * self.batt_energy_ratio)
         if weight < 0:
-            logging.error("Calculated battery weight is negative. Check energy requirements.")
+            logging.error(
+                "Calculated battery weight is negative. Check energy requirements."
+            )
             raise ValueError("Battery weight cannot be negative.")
         self.weight = weight
         return weight
@@ -71,8 +73,8 @@ class Motor:
         Returns:
         int: Number of motors required.
         """
-        n_vert = 8
-        n_hor = 2
+        n_vert = 4
+        n_hor = 1
         return n_vert + n_hor  # Total number of motors (8 vertical + 2 horizontal)
 
     def weight(self):
@@ -84,14 +86,14 @@ class Motor:
         return (
             0.16 * self.n_motors()
         )  # Placeholder value, should be replaced with a real calculation
-    
+
     def max_thrust(self) -> float:
         """
         Placeholder method to calculate the maximum thrust produced by the motor.
         Returns:
         float: Maximum thrust including all motors in Newtons.
         """
-        T_motor_AS2820_KV880_max_thrust = 24.153779 # N
+        T_motor_AS2820_KV880_max_thrust = 24.153779  # N
         return T_motor_AS2820_KV880_max_thrust * self.n_motors()  # N
 
 
@@ -136,7 +138,9 @@ class VertPropeller:
             logging.warning(
                 f"Thrust {thrust} N is outside the expected range (30-100 N). Power calculation may not be accurate."
             )
-        total_power = power_per_power * self.n_vert_prop()  # Total power for all vertical propellers
+        total_power = (
+            power_per_power * self.n_vert_prop()
+        )  # Total power for all vertical propellers
         if print == True:
             print(f"Power required for vertical propellers: {total_power} W")
         return total_power

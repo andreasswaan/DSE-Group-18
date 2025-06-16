@@ -156,6 +156,48 @@ mat_delta_y_2 = 180                         # MPa (Flexural)
 SAFETY_FACTOR = 1.5
 shear_thickness = 0.002
 min_boom_area=1e-5
+ratio_width_box_to_root_chord = 0.5
+
+[config.structures.wing]
+amount_of_sections = 7
+amount_of_booms_horizontal = 3
+amount_of_booms_vertical = 2
+ratio_width_box_to_root_chord = 0.5
+start_spar_boom_area =  1.8704805295755328e-05 #[m^2]
+start_stringer_boom_area = 1.8704805295755328e-05 #[m^2]
+safety_factor = 3
+web_thickness = 0.001 #[m]
+
+
+[config.structures.fuselage]
+
+width_middle_section = 0.55 #   [m]
+height_middle_section = 0.3 #   [m]
+length_middle_section = 1.1  #    [m]
+amount_of_sections_middle = 6
+
+width_start_section = 0.23 #   [m]
+height_start_section = 0.1 #   [m]
+length_start_section = 0.3 #   [m]
+amount_of_sections_start = 3
+
+width_end_section = 0.15 #   [m]
+height_end_section = 0.1 #   [m]
+length_end_section = 0.4    # [m]
+amount_of_sections_end = 4
+
+propeller_rod_length = 0.3 #[m]
+
+wing_to_fuselage_root_chord_ratio = 0.5 #[m] basically how many sections the loads of thw wing spread over
+
+amount_of_booms_horizontal = 3
+amount_of_booms_vertical = 2
+
+start_spar_boom_area = 0.01 #[m^2]
+start_stringer_boom_area = 0.001 #[m^2]
+safety_factor = 3
+web_thickness = 0.001 #[m]
+
 #-----------------------------------------------------------------------------------------------------------------------
 
 [config.horizontal_sc]
@@ -168,3 +210,9 @@ taper_ratio_tail = 0.5
 Aspect_ratio_tail = 3
 d_e_d_alpha = 0.5
 V_g = 7 
+
+
+#-----------------------------------------------------------------------------------------------------------------------
+[config.sensors]
+
+mass = 0.26         # kg

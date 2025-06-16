@@ -1,5 +1,6 @@
 from __future__ import annotations
-from structure import Material
+from prelim_des.structure import Material
+
 
 def load_materials(toml: dict) -> dict[str, Material]:
     material_dict = {}
