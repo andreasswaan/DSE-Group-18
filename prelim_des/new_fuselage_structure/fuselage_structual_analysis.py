@@ -847,7 +847,7 @@ class FuselageStructuralAnalysis:
             # print("Thickness", self.web_thickness)
             # print("area_spar", area_spar)
             # print("area_stringer", area_stringer)
-            print("weight", self.weight)
+            # print("weight", self.weight)
 
 
 if __name__ == "__main__":

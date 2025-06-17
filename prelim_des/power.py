@@ -142,7 +142,7 @@ class VertPropeller:
             print(f"Power required for propeller: {power} W")
         thrust_per_prop = thrust / self.n_vert_prop()
         power_per_power = 0.18 * thrust_per_prop**2 + 9.99 * thrust_per_prop - 16.74
-        if thrust_per_prop < 0 or thrust > 60:
+        if thrust_per_prop < 0 or thrust_per_prop > 60:
             print(Warning(
                 f"Thrust {thrust_per_prop} N is outside the expected range (0-60 N). Power calculation may not be accurate."
             ))

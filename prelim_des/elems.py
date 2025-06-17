@@ -189,7 +189,7 @@ class Wing:
                 print(Warning("Wing mass is too high for folding, check the design!"))
         
         self.weight = wing_mass + mass_folding
-        print(f"Wing mass: {wing_mass:.2f} kg")
+        # print(f"Wing mass: {wing_mass:.2f} kg")
         return wing_mass + mass_folding
 
     def plot_planform(self, save_plot=True, filename="wing_planform.png"):
@@ -408,11 +408,12 @@ class Tail_Hori_Veri:
 
     @property
     def calc_weight(self):
-        wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
-            self.drone, "fuselage", fuselage_case=2
-        )
+        tail_mass_fraction = toml["config"]["tail"]["mass_fraction"]
+        # wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
+        #     self.drone, "fuselage", fuselage_case=2
+        # )
+        tail_mass = self.drone.MTOW * tail_mass_fraction
         self.weight = tail_mass
-
         return tail_mass
 
 
