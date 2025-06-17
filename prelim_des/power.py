@@ -167,7 +167,7 @@ class VertPropeller:
         Returns:
         float: Estimated weight in kg.
         """
-        return 0.012 * self.n_vert_prop()
+        return 0.050 * self.n_vert_prop()
 
 
 class HorPropeller(VertPropeller):
@@ -192,4 +192,4 @@ class HorPropeller(VertPropeller):
         Returns:
         float: Estimated weight in kg.
         """
-        return 0.012 * self.n_hor_prop()
+        return 0.050 * self.n_hor_prop()
