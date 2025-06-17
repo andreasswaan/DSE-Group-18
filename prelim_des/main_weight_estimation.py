@@ -20,7 +20,7 @@ drone = Drone()
 perf = Performance(drone, mission)
 drone.perf = perf
 
-drone.class_1_weight_estimate()
+drone.class_1_weight_estimate(del_mech=False)
 print("Drone MTOW:", drone.MTOW)
 # print("Drone OEW:", drone.OEW)
 

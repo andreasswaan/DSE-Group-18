@@ -66,16 +66,24 @@ class Motor:
         logging.debug("Initializing Motor class...")
 
         pass
-
-    def n_motors(self) -> int:
+    
+    @property
+    def n_motors_hor(self) -> int:
         """
         Placeholder method to calculate the number of motors required based on power.
         Returns:
         int: Number of motors required.
         """
-        n_vert = 4
-        n_hor = 1
-        return n_vert + n_hor  # Total number of motors (8 vertical + 2 horizontal)
+        return 1  
+    
+    @property
+    def n_motors_vert(self) -> int:
+        """
+        Placeholder method to calculate the number of vertical motors required.
+        Returns:
+        int: Number of vertical motors.
+        """
+        return 4
 
     def weight(self):
         """
@@ -83,8 +91,8 @@ class Motor:
         Returns:
         float: Estimated weight of the motor in kg.
         """
-        return (
-            0.16 * self.n_motors()
+        return ( self.n_motors_hor * 0.16 + self.n_motors_vert * 0.25
+            
         )  # Placeholder value, should be replaced with a real calculation
 
     def max_thrust(self) -> float:
@@ -133,11 +141,11 @@ class VertPropeller:
         if print == True:
             print(f"Power required for propeller: {power} W")
         thrust_per_prop = thrust / self.n_vert_prop()
-        power_per_power = 40.518 * thrust_per_prop - 645.22
-        if thrust < 28 or thrust > 110:
-            logging.warning(
-                f"Thrust {thrust} N is outside the expected range (30-100 N). Power calculation may not be accurate."
-            )
+        power_per_power = 0.18 * thrust_per_prop**2 + 9.99 * thrust_per_prop - 16.74
+        if thrust_per_prop < 0 or thrust > 60:
+            print(Warning(
+                f"Thrust {thrust_per_prop} N is outside the expected range (0-60 N). Power calculation may not be accurate."
+            ))
         total_power = (
             power_per_power * self.n_vert_prop()
         )  # Total power for all vertical propellers
