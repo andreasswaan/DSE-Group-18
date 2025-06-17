@@ -416,13 +416,13 @@ class WingStructuralAnalysis:
 
         print("Final spar boom area", self.sections[0].booms[0].area)
         print("Final stringer boom area", self.sections[0].booms[1].area)
-        print("First section height", self.sections[0].booms[0].z_pos)
 
 
 if __name__ == "__main__":
     from prelim_des.drone import Drone
     from prelim_des.mission import Mission
     from prelim_des.performance import Performance
+
     mission = Mission("DRCCRCD")
     drone = Drone()
     perf = Performance(drone, mission)
