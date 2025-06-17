@@ -59,7 +59,7 @@ print(
 print(f"Aspect ratio: {drone.wing.geom_AR}")
 # print(f"Mean aerodynamic chord (MAC): {drone.wing.MAC}")
 
-# print(drone.wing.c_root, drone.wing.c_tip, drone.wing.S)
+print(drone.wing.c_root, drone.wing.c_tip, drone.wing.S)
 # print(drone.wing.span)
 # print(drone.wing.x_ac_lemac)
 # print(drone.wing.c_root, drone.wing.c_tip, drone.wing.S)

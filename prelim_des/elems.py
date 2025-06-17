@@ -413,7 +413,7 @@ class Tail_Hori_Veri:
         #     self.drone, "fuselage", fuselage_case=2
         # )
         tail_mass = self.drone.MTOW * tail_mass_fraction
-        self.weight = tail_mass
+        self.weight = float(tail_mass)
         return tail_mass
 
 

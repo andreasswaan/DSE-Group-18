@@ -15,6 +15,7 @@ toml = load_toml()
 
 
 class PropulsionSystem:
+    current_weight: float  # Placeholder for propulsion system weight
     def __init__(self, drone: Drone):
         logging.debug("Initializing PropulsionSystem class...")
 
@@ -27,12 +28,16 @@ class PropulsionSystem:
         self.η_prop = toml["config"]["propeller"]["eff_prop"]
 
     def weight(self, energy_required: float = None) -> float:
-        return (
+        propulsion_weight = (
             self.battery.calc_weight(energy_required)
             + self.motor.weight()
             + self.ver_prop.weight()
             + self.hor_prop.weight()
         )
+        self.current_weight = float(propulsion_weight)
+        
+        return propulsion_weight
+        
 
 
 class Battery:

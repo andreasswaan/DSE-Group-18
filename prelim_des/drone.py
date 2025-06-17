@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import matplotlib.pyplot as plt
 from globals import main_dir
 from prelim_des.idealized_structure import StructuralAnalysis
@@ -139,15 +140,33 @@ class Drone:
             or self.OEW is None
         ):
             self.class_1_weight_estimate()
+            
         mtow_history = [self.MTOW]
         self.wing.S = self.perf.wing_area(self.MTOW)
         S_history = [self.wing.S]
+        
+        wing_w_history = [0]
+        fus_w_history = [0]
+        landing_gear_w_history = [0]
+        propulsion_w_history = [0]
+        tail_w_history = [0]
+        sensor_w_history = [0]
+        
         for i in range(max_iterations):
             MTOW_prev = self.MTOW
             self.class_2_weight_estimate(transition, PRINT=PRINT)
             mtow_history.append(self.MTOW)
             self.wing.S = self.perf.wing_area(self.MTOW)
             S_history.append(self.wing.S)
+            
+            # Update the weights of each component
+            wing_w_history.append(self.wing.weight)
+            fus_w_history.append(self.fuselage.weight)
+            landing_gear_w_history.append(self.landing_gear.weight)
+            propulsion_w_history.append(self.propulsion.current_weight)
+            tail_w_history.append(self.tail.weight)
+            sensor_w_history.append(self.sensor_mass)
+            
             if abs(self.MTOW - MTOW_prev) < tolerance * MTOW_prev:
                 print(
                     f"Converged after {i + 1} iterations: MTOW = {self.MTOW[0]:.2f} kg, OEW = {self.OEW[0]:.2f} kg"
@@ -160,7 +179,18 @@ class Drone:
             raise ValueError(
                 "Weight estimate did not converge within the maximum number of iterations."
             )
-
+        
+        n_iterations = i + 1
+        component_weights_dict = {
+            "wing_weight_history": np.array(wing_w_history),
+            "fuselage_weight_history": np.array(fus_w_history),
+            "landing_gear_weight_history": np.array(landing_gear_w_history),
+            "propulsion_weight_history": np.array(propulsion_w_history),
+            "tail_weight_history": np.array(tail_w_history),
+            "sensor_weight_history": np.array(sensor_w_history),
+        }
+               
+        
         if plot:
             plot_path = os.path.join(main_dir, "prelim_des", "plots", "weight_estimate")
             os.makedirs(plot_path, exist_ok=True)
@@ -187,4 +217,4 @@ class Drone:
             plt.savefig(os.path.join(plot_path, "wing_area_convergence.png"), dpi=300)
             plt.close()
 
-        return self.MTOW, self.OEW
+        return self.MTOW, self.OEW, mtow_history, S_history, n_iterations, component_weights_dict
