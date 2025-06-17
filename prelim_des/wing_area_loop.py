@@ -17,4 +17,4 @@ perf = Performance(drone, mission)
 drone.perf = perf
 drone.MTOW = 12
 
-drone.perf.wing_area_iterations(22)
+drone.perf.wing_area_iterations()
