@@ -63,12 +63,16 @@ class WingStructuralAnalysis:
             self.sections.append(section)
 
             width = (
-                self.drone.wing.chord(i * wing_span_fraction)
+                self.drone.wing.chord(
+                    i * wing_span_fraction
+                )  # VV change function to constant
                 * self.ratio_width_box_to_root_chord
             )
 
             height = (
-                self.drone.wing.chord(i * wing_span_fraction)
+                self.drone.wing.chord(
+                    i * wing_span_fraction
+                )  # VV change ratio to constant in TOML
                 * self.ratio_width_box_to_root_chord
                 * self.drone.wing.thick_over_chord
             )
@@ -429,10 +433,18 @@ if __name__ == "__main__":
 
     wing_structural_analysis = WingStructuralAnalysis(drone, material)
     wing_structural_analysis.make_wing_structure()
-    wing_structural_analysis.apply_lift()
-    wing_structural_analysis.apply_drag()
-    wing_structural_analysis.perform_iterations()
+    wing_structural_analysis.apply_lift()  # VV comment out
+    wing_structural_analysis.apply_drag()  # VV comment out
+    wing_structural_analysis.perform_iterations()  # VV comment out
+    wing_structural_analysis.add_point_load()  # VV add point loads
+    wing_structural_analysis.apply_boom_material()  # VV
+    wing_structural_analysis.apply_boom_area(None, None)  # VV
+    wing_structural_analysis.calc_analysis_forces()  # VV
+    wing_moment_x, wing_moment_z, wing_force_x, wing_force_z = (
+        wing_structural_analysis.reaction_forces()
+    )  # VV
 
+    wing_structural_analysis.sections[0].booms[0].normal_stress  # VV
     # wing_structural_analysis.add_point_load(1, 1, 1, Fx=-50)
     # wing_structural_analysis.reaction_forces()
 
