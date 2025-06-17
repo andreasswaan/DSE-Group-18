@@ -1,5 +1,11 @@
-from prelim_des.drone import Drone
-from prelim_des.mission import Mission
+# from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
+    from prelim_des.mission import Mission
+    
+
 from prelim_des.new_fuselage_structure.fuselage_boom_class import FuselageBoom
 from prelim_des.new_fuselage_structure.fuselage_section_class import FuselageSection
 from prelim_des.new_fuselage_structure.utils.thickness_to_stress_estimation import (
@@ -32,7 +38,7 @@ class FuselageStructuralAnalysis:
 
     def __init__(
         self,
-        drone: Drone,
+        drone,
         material: Material,
     ):
         self.drone = drone
@@ -845,6 +851,8 @@ class FuselageStructuralAnalysis:
 
 
 if __name__ == "__main__":
+    from prelim_des.drone import Drone
+    from prelim_des.mission import Mission
     mission = Mission("DRCCRCD")
     drone = Drone()
     perf = Performance(drone, mission)

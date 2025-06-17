@@ -37,8 +37,9 @@ class Drone:
         self.propulsion = PropulsionSystem(self)
         self.structural_analysis = StructuralAnalysis(self, 2, "fuselage")
         self.sensor_mass = toml["config"]["sensors"]["mass"]
+        self.wing_structural_analysis = None
 
-    def class_1_weight_estimate(self):
+    def class_1_weight_estimate(self, del_mech=True):
         """
         Estimate the weight of the drone using a class 1 weight estimate.
         This method uses the database to calculate the empty operating weight (OEW) and maximum takeoff weight (MTOW).
@@ -46,8 +47,10 @@ class Drone:
         self.max_payload = (
             toml["config"]["payload"]["n_box"] * toml["config"]["payload"]["box_weight"]
         )
-        design_payload = self.structure.delivery_mechanism_weight() + self.max_payload
-        design_payload = self.max_payload
+        if del_mech:
+            design_payload = self.structure.delivery_mechanism_weight() + self.max_payload
+        else:
+            design_payload = self.max_payload
         self.MTOW = get_MTOW_from_payload(design_payload)
         self.OEW = self.MTOW - self.max_payload
         if self.OEW <= 0:

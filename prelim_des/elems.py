@@ -2,6 +2,10 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
+from prelim_des.new_fuselage_structure.fuselage_structual_analysis import FuselageStructuralAnalysis
+from prelim_des.new_wing_structure.material_class import Material
+from prelim_des.new_wing_structure.wing_structural_analysis import WingStructuralAnalysis
+
 if TYPE_CHECKING:
     from prelim_des.drone import Drone
 import numpy as np
@@ -168,7 +172,21 @@ class Wing:
         # wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
         #     self.drone, "fuselage", fuselage_case=2
         # )
-        wing_mass = self.drone.structural_analysis.run_wing_analysis() * 2
+        material = Material("al_6061_t4")
+        wing_structural_analysis = WingStructuralAnalysis(self.drone,material)
+        self.drone.wing_structural_analysis = wing_structural_analysis
+        wing_structural_analysis.make_wing_structure()
+        wing_structural_analysis.apply_lift()
+        wing_structural_analysis.apply_drag()
+        wing_structural_analysis.perform_iterations()
+        wing_mass = wing_structural_analysis.weight * 2 / g
+        
+        if wing_mass < 0.85:
+            mass_folding = 0.1283*2
+        else:
+            mass_folding = 0.1733*2
+            if wing_mass > 2.75:
+                print(Warning("Wing mass is too high for folding, check the design!"))
         
         self.weight = wing_mass + mass_folding
         print(f"Wing mass: {wing_mass:.2f} kg")
@@ -311,10 +329,21 @@ class Fuselage:
         #     + self.drone.structure.delivery_mechanism_weight()
         # )
         # Assuming that a pax weighs 100kg and that a pizza weighs 300 g.
-
-        wing_mass, fuselage_mass, tail_mass = run_structure_analysis(
-            self.drone, "fuselage", fuselage_case=2
-        )
+        material = Material("al_6061_t4")
+        fuselage_structural_analysis = FuselageStructuralAnalysis(self.drone, material)
+        fuselage_structural_analysis.make_fuselage_structure()
+        fuselage_structural_analysis.add_wing_analysis(self.drone.wing_structural_analysis)
+        fuselage_structural_analysis.apply_wing_reaction_forces()
+        fuselage_structural_analysis.apply_propeller_loads()
+        fuselage_structural_analysis.apply_back_propeller_loads()
+        fuselage_structural_analysis.apply_tail_loads()
+        fuselage_structural_analysis.apply_propeller_motor_weight_front()
+        fuselage_structural_analysis.apply_propeller_motor_weight_back()
+        fuselage_structural_analysis.apply_delivery_mech_weight()
+        fuselage_structural_analysis.perform_iterations()
+        
+        fuselage_mass = fuselage_structural_analysis.weight /g
+        
         self.weight = fuselage_mass + self.drone.structure.delivery_mechanism_weight()
         return fuselage_mass + self.drone.structure.delivery_mechanism_weight()
 

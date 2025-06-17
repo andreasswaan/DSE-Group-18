@@ -1,9 +1,15 @@
-from prelim_des.drone import Drone
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
+    from prelim_des.performance import Performance
+    from prelim_des.mission import Mission
+
+
 from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
-from prelim_des.mission import Mission
+
 from prelim_des.new_wing_structure.wing_boom_class import WingBoom
 from prelim_des.new_wing_structure.wing_section_class import WingSection
-from prelim_des.performance import Performance
 from prelim_des.utils.arrows import Arrow3D
 from prelim_des.utils.import_toml import load_toml
 from mpl_toolkits.mplot3d import Axes3D
@@ -23,7 +29,7 @@ class WingStructuralAnalysis:
 
     sections = list["WingSection"]
 
-    def __init__(self, drone: Drone, material: Material):
+    def __init__(self, drone, material: Material):
         self.drone = drone
         self.material = material
         self.sections_amount = toml["config"]["structures"]["wing"][
@@ -414,6 +420,9 @@ class WingStructuralAnalysis:
 
 
 if __name__ == "__main__":
+    from prelim_des.drone import Drone
+    from prelim_des.mission import Mission
+    from prelim_des.performance import Performance
     mission = Mission("DRCCRCD")
     drone = Drone()
     perf = Performance(drone, mission)

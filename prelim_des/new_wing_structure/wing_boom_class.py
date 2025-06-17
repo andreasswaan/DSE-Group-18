@@ -1,4 +1,4 @@
-from prelim_des.drone import Drone
+
 from typing import TYPE_CHECKING, Literal
 from prelim_des.constants import g
 from prelim_des.new_wing_structure.material_class import Material

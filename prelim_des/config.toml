@@ -193,7 +193,7 @@ wing_to_fuselage_root_chord_ratio = 1 #[m] basically how many sections the loads
 amount_of_booms_horizontal = 3
 amount_of_booms_vertical = 3
 
-start_spar_boom_area = 0.001 #[m^2]
+start_spar_boom_area = 0.0001 #[m^2]
 start_stringer_boom_area = 0.0001 #[m^2]
 safety_factor = 1.5
 web_thickness = 0.0001 #[m]

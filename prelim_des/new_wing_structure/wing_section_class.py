@@ -1,4 +1,7 @@
-from prelim_des.drone import Drone
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from prelim_des.drone import Drone
 from prelim_des.new_wing_structure.wing_boom_class import WingBoom
 
 
@@ -25,7 +28,7 @@ class WingSection:
     analysis_shear_z: float
     analysis_normal_force: float
 
-    def __init__(self, drone: Drone, name: str = None, length=0):
+    def __init__(self, drone, name: str = None, length=0):
         self.drone = drone
         self.booms = []
         self.moment_x = 0.0
@@ -82,6 +85,7 @@ class WingSection:
 
 
 if __name__ == "__main__":
+    from prelim_des.drone import Drone
     drone = Drone()
     section = WingSection(drone)
     boom_1 = WingBoom(-1.000, -1.732, 0.002863)
