@@ -96,7 +96,7 @@ class Motor:
         Returns:
         float: Estimated weight of the motor in kg.
         """
-        return ( self.n_motors_hor * 0.16 + self.n_motors_vert * 0.25
+        return ( self.n_motors_hor * 0.39 + self.n_motors_vert * 0.39
             
         )  # Placeholder value, should be replaced with a real calculation
 
