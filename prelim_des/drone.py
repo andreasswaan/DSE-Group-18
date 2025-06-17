@@ -125,6 +125,7 @@ class Drone:
     def iterative_weight_estimate(
         self,
         transition=False,
+        iter_wing_planform=False,
         max_iterations=100,
         tolerance=0.01,
         plot=False,
@@ -156,7 +157,11 @@ class Drone:
             MTOW_prev = self.MTOW
             self.class_2_weight_estimate(transition, PRINT=PRINT)
             mtow_history.append(self.MTOW)
-            self.wing.S = self.perf.wing_area(self.MTOW)
+            
+            if iter_wing_planform:
+                self.perf.wing_area_iterations()
+            else:
+                self.wing.S = self.perf.wing_area(self.MTOW)
             S_history.append(self.wing.S)
             
             # Update the weights of each component
