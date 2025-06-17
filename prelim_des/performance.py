@@ -349,7 +349,7 @@ class Performance:
         plt.figure(figsize=(10, 6))
 
         # OEW line
-        plt.axhline(OEW_base, color="gray", linestyle="--", linewidth=1.2, label="OEW")
+        # plt.axhline(OEW_base, color="gray", linestyle="--", linewidth=1.2, label="OEW")
 
         # MTOW line at point B
         mtow_B = OEW_base + n_pizza_max * pizza_mass + n_battery_max * mass_per_battery
@@ -376,7 +376,7 @@ class Performance:
             step="pre",
         )
         plt.step(
-            ranges, mtows, where="pre", color=MTOW_COLOR, linewidth=1.5, label="MTOW"
+            ranges, mtows, where="pre", color=MTOW_COLOR, linewidth=1.5
         )
         plt.scatter(ranges, mtows, color=POINT_COLOR, zorder=5)
 
@@ -423,7 +423,7 @@ class Performance:
         plt.tick_params(labelsize=14)
         plt.ylim(oews.min()*0.9, mtows.max() * 1.1)
         # plt.title("Payload-Range Diagram with Mass Breakdown")
-        plt.legend(fontsize=14)
+        plt.legend(fontsize=14, loc='upper left')
         plt.grid(True)
         plt.tight_layout()
         plt.savefig(

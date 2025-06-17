@@ -172,7 +172,7 @@ web_thickness = 0.001 #[m]
 [config.structures.fuselage]
 
 width_middle_section = 0.55 #   [m]
-height_middle_section = 0.3 #   [m]
+height_middle_section = 0.35 #   [m]
 length_middle_section = 1.1  #    [m]
 amount_of_sections_middle = 7
 

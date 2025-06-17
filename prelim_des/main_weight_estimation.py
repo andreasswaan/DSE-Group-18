@@ -68,4 +68,4 @@ print(f"Aspect ratio: {drone.wing.geom_AR}")
 
 # drone.perf.cruise_noise(plot=True)
 
-# drone.perf.payload_range_diagram()
+drone.perf.payload_range_diagram()
