@@ -26,6 +26,13 @@ mtow, oew, mtow_history, S_history, n_iterations, component_dict = drone.iterati
     transition=True, iter_wing_planform=True, plot=False, max_iterations=100, tolerance=0.001
 )
 
+drone.wing.plot_planform(save_plot=True)
+
+print(drone.wing.c_root, drone.wing.c_tip, drone.wing.S)
+print(drone.wing.span)
+print(drone.wing.MAC)
+
+
 t1 = datetime.datetime.now()
 print(f"\nTime taken for iterative weight estimate: {t1 - t0}\n")
 
@@ -34,28 +41,28 @@ os.makedirs(plot_path, exist_ok=True)
 data_path = os.path.join("prelim_des", "iterations", "data")
 os.makedirs(data_path, exist_ok=True)
 
-plt.figure(figsize=(8, 6))
-plt.plot(
-    np.arange(1, len(mtow_history) + 1),
-    mtow_history,
-    marker="o",
-    color="#1f77b4",
-    label="MTOW Convergence",
-)
-plt.xlabel("Iteration", fontsize=16, labelpad=10)
-plt.ylabel("Total Weight [kg]", fontsize=16, labelpad=10)
-plt.tick_params(labelsize=14)
-plt.ylim(np.min(mtow_history) * 0.9, np.max(mtow_history) * 1.1)
-plt.legend(fontsize=14, loc="upper right")
-plt.grid(True)
-plt.tight_layout()
-plt.savefig(
-    os.path.join(plot_path, "iter_wing_mtow_convergence.pdf"),
-    dpi=300,
-    format="pdf",
-    bbox_inches="tight",
-)
-plt.close()
+# plt.figure(figsize=(8, 6))
+# plt.plot(
+#     np.arange(1, len(mtow_history) + 1),
+#     mtow_history,
+#     marker="o",
+#     color="#1f77b4",
+#     label="MTOW Convergence",
+# )
+# plt.xlabel("Iteration", fontsize=16, labelpad=10)
+# plt.ylabel("Total Weight [kg]", fontsize=16, labelpad=10)
+# plt.tick_params(labelsize=14)
+# plt.ylim(np.min(mtow_history) * 0.9, np.max(mtow_history) * 1.1)
+# plt.legend(fontsize=14, loc="upper right")
+# plt.grid(True)
+# plt.tight_layout()
+# plt.savefig(
+#     os.path.join(plot_path, "iter_wing_mtow_convergence.pdf"),
+#     dpi=300,
+#     format="pdf",
+#     bbox_inches="tight",
+# )
+# plt.close()
 
 # Save results in a dictionary and store as npz
 results_dict = {

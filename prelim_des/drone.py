@@ -108,8 +108,10 @@ class Drone:
             print(
                 f"Component Weights: Wing = {self.wing.weight:.2f} kg, "
                 f"Fuselage = {self.fuselage.weight:.2f} kg, "
+                f"Tail = {self.tail.weight:.2f} kg, "
                 f"Landing Gear = {float(self.landing_gear.weight):.2f} kg, "
                 f"Propulsion = {self.propulsion.weight(mission_energy)[0]:.2f} kg"
+                f"Sensor = {self.sensor_mass:.2f} kg, "
             )
 
         self.max_payload = (

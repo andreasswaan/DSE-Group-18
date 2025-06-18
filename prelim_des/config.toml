@@ -213,7 +213,7 @@ LEMAC_In = 0.1
 LEMAC_Out = 0.2
 Vh_V = 0.9
 taper_ratio_tail = 0.5 
-Aspect_ratio_tail = 3
+Aspect_ratio_tail = 2
 d_e_d_alpha = 0.3
 V_g = 7 
 
