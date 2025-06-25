@@ -1,0 +1,2 @@
+Depot,Objective weight,N_Drones, ROI, Profit, Costs, Revenue, Initial Costs
+centre depot-0.1,10.0, 468.13, 892685.41, 1822914.59, 2715600.00, 190690.00,129.0

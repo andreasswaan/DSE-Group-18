@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Place Your Pizza Order</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map { height: 400px; width: 100%; }
+        body { font-family: Arial, sans-serif; margin: 20px; }
+    </style>
+</head>
+<body>
+    <h2>Click on the map to place your order</h2>
+    <div id="map"></div>
+    <form id="orderForm">
+        <label>Restaurant:
+            <select id="restaurant" required>
+                {% for name in restaurants %}
+                    <option value="{{ name }}">{{ name }}</option>
+                {% endfor %}
+            </select>
+        </label><br>
+        <label>Your initials: <input type="text" id="initials" maxlength="2" required></label><br>
+        <input type="hidden" id="xpos">
+        <input type="hidden" id="ypos">
+        <button type="submit">Submit Order</button>
+    </form>
+    <div id="status"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([51.999, 4.373], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        var marker;
+        map.on('click', function(e) {
+            if (marker) map.removeLayer(marker);
+            marker = L.marker(e.latlng).addTo(map);
+            document.getElementById('xpos').value = e.latlng.lng;
+            document.getElementById('ypos').value = e.latlng.lat;
+        });
+
+        document.getElementById('orderForm').onsubmit = function(e) {
+            e.preventDefault();
+            var data = {
+                restaurant: document.getElementById('restaurant').value,
+                initials: document.getElementById('initials').value,
+                xpos: document.getElementById('xpos').value,
+                ypos: document.getElementById('ypos').value
+            };
+            fetch('/submit_order', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(resp => resp.json()).then(resp => {
+                document.getElementById('status').innerText = "Order submitted!";
+            });
+        };
+    </script>
+</body>
+</html>

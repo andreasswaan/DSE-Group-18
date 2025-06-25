@@ -73,11 +73,12 @@ def fix_corner_jumps(path, walkable):
     
 def calculate_smooth_path(start, end, walkable, density_map, MIN_TURN_RADIUS_GRID=1, alpha=0.7):
     
-    if not walkable[start[1], start[0]] or not walkable[end[1], end[0]]:
-        return [], 0, 0
+    #if not walkable[start[1], start[0]] or not walkable[end[1], end[0]]:
+    #    return [], 0, 0
     path_total = a_star_search_8dir(start, end, walkable, density_map=density_map, alpha=alpha)
     path = path_total[0]  # Extract the path from the tuple
     path = fix_corner_jumps(path, walkable)
+    
     
     if not path:
         print(f"❌ No path found for alpha={alpha:.2f}")

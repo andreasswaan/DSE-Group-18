@@ -7,6 +7,7 @@ import scipy.stats as stats
 import copy
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import requests
 
 from temporary_files.operations.mission_planning_2 import MissionPlanning
 
@@ -18,6 +19,8 @@ import constants
 np.random.seed(42)
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
 n_drones = constants.n_drones
+ORDERS_URL = "http://127.0.0.1:5000/get_orders"
+seen_order_ids = set()
 
 class Point():
     def __init__(self, xpos: float, ypos: float) -> None:
@@ -428,6 +431,26 @@ class Simulation:
             orders = [order for order in orders if order.delivered_at - order.arrival_time <= constants.deliver_time_window]
             self.orders_per_time.append(len(orders))
 
+        if self.timestamp % 30 == 0:
+            response = requests.get(ORDERS_URL)
+            orders = response.json()
+            for order in orders:
+                # Use a unique identifier for each order, e.g., a combination of xpos, ypos, time, pizzas
+                order_id = (order['xpos'], order['ypos'], order['time'], order['pizzas'], order['restaurant_id'])
+                if order_id not in seen_order_ids:
+                    # Add the order to your simulation
+                    new_order = Order(
+                        xpos=float(order['xpos']),
+                        ypos=float(order['ypos']),
+                        m=int(order['pizzas']),
+                        arrival_time=int(order['time']),
+                        restaurant_id=order['restaurant_id'],
+                        restaurant=next((r for r in self.city.restaurants if r.restaurant_id == order['restaurant_id']), None)
+                    )
+                    self.order_book[new_order.id] = new_order
+                    seen_order_ids.add(order_id)
+                    print(f"Added order from web: {order}")
+
         for drone in self.drones:
             drone.update_drone(self.dt)
         self.timestamp += self.dt
@@ -654,9 +677,9 @@ if __name__ == "__main__":
     n_steps = int(constants.time_window / my_sim.dt)
     my_sim.change_order_volume(1/45)
     my_sim.weight = args.weight
-    for i in range(n_steps):
-        my_sim.take_step()
-    #animate_simulation(my_sim, n_steps, interval=10)
+    #for i in range(n_steps):
+    #    my_sim.take_step()
+    animate_simulation(my_sim, n_steps, interval=10)
     #plt.plot(np.linspace(0, constants.time_window, len(my_sim.orders_per_time)), my_sim.orders_per_time, label='Orders per time step')
     #plt.xlabel('Time step')
     #plt.ylabel('Number of orders')

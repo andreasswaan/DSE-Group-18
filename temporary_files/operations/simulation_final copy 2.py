@@ -7,6 +7,8 @@ import scipy.stats as stats
 import copy
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import requests
+from pyproj import Transformer
 
 from temporary_files.operations.mission_planning_2 import MissionPlanning
 
@@ -18,6 +20,8 @@ import constants
 np.random.seed(42)
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
 n_drones = constants.n_drones
+ORDERS_URL = "http://127.0.0.1:5000/get_orders"
+seen_order_ids = set()
 
 class Point():
     def __init__(self, xpos: float, ypos: float) -> None:
@@ -361,6 +365,8 @@ class Drone(Point):
             # Multiply each coordinate in self.path by conversion_factor
             self.path = [(x * conversion_factor, y * conversion_factor) for x, y in self.path]
             self.movement_path = list(self.path)  # Store a copy for movement
+        else:
+            print(f"Warning: No path found for drone {self.drone_id} from ({self.xpos}, {self.ypos}) to ({self.target.xpos}, {self.target.ypos}).")
 
 class Depot(Point):
     def __init__(self,
@@ -490,17 +496,43 @@ class Simulation:
 
         #if self.timestamp % self.mp_interval == 0:
             # run mission planning
-        #    self.mp.solve_mission_planning(weight=self.weight)
+            #self.mp.solve_mission_planning(weight=self.weight)
             #self.mp.basic_heuristic()
-        if self.timestamp % self.orders_interval == 0:
-            orders = [self.order_book[order_id] for order_id in self.order_book if self.order_book[order_id].status]
-            orders = [order for order in orders if order.delivered_at - order.arrival_time <= constants.deliver_time_window]
-            self.orders_per_time.append(len(orders))
+        if self.timestamp % 30 == 0:
+            response = requests.get(ORDERS_URL)
+            orders = response.json()
+            if len(orders) < 30: #placeholder
+                for order in orders:
+                    # Use a unique identifier for each order, e.g., a combination of xpos, ypos, time, pizzas
+                    order_id = (order['xpos'], order['ypos'], order['initials'], order['restaurant'])
+                    transformer = Transformer.from_crs( "EPSG:4326", "EPSG:28992", always_xy=True)
+                    order['xpos'], order['ypos'] = transformer.transform(order['xpos'], order['ypos'])
+                    order['xpos'] = (order['xpos'] - 81743.0) / 10
+                    order['ypos'] = (order['ypos'] - 442446.208000008) / 10
+                    #print(f"Received order from web: {order}")
 
+                    if order_id not in seen_order_ids:
+                        order_dict = {
+                            'order_id': len(self.logger.order_log),
+                            'restaurant_id': order['restaurant'],
+                            'time': self.timestamp,
+                            's': int(0),
+                            'm': int(3),
+                            'l': int(0),
+                            'arrival_time': 200 + self.timestamp,
+                            'restaurant': next((r for r in self.city.restaurants if r.name == order['restaurant']), None),
+                            'status': False,  # not delivered
+                            'x_delivery_loc': float(order['xpos']),
+                            'y_delivery_loc': float(order['ypos'])
+                        }
+                        self.order_book[order_id] = Order(order_dict)
+                        self.order_book[order_id].initials = order['initials']
+                        print(f"Added order from web: {order}")
+                        seen_order_ids.add(order_id)
         for drone in self.drones:
             drone.update_drone(self.dt)
         self.timestamp += self.dt
-    
+
     def reset(self):
         # reset the simulation
         self.order_book = dict()
@@ -574,33 +606,40 @@ obstacle_grid_7x = np.kron(obstacle_grid, np.ones((scale_factor, scale_factor)))
 
 # -------- SIMULATION ANIMATION --------
 
-def animate_simulation(sim, steps=100, interval=200):
+def animate_simulation(sim, steps=100, interval=200, save_path=None):
     city = sim.city
-    fig, ax = plt.subplots(figsize=(6, 6))
-
+    fig, ax = plt.subplots(figsize=(7, 7))
 
     # Plot the population density as a static background   
-    im = ax.imshow(city.map[:, :, 0].T, cmap='YlOrRd', alpha=1, origin='lower')
-    
-    # Plot the weight grid as a static background
-    # ax.imshow(obstacle_grid_7x, cmap='binary', alpha=1, origin='lower', zorder=50)
+    im = ax.imshow(
+    city.map[:, :, 0].T,
+    cmap='YlOrRd',
+    alpha=1,
+    origin='lower',
+    extent=[0, city.map.shape[0] * 10, 0, city.map.shape[1] * 10]
+)
 
     # Show silent zones as dark gray where silent zone is true
     silent_zone_mask = city.map[:, :, 3].T > 0
     silent_zone_overlay = np.zeros((city.map.shape[1], city.map.shape[0], 4))
     silent_zone_overlay[silent_zone_mask] = [0.2, 0.2, 0.2, 1]
-    ax.imshow(silent_zone_overlay, origin='lower')
+    ax.imshow(
+    silent_zone_overlay,
+    origin='lower',
+    extent=[0, city.map.shape[0] * 10, 0, city.map.shape[1] * 10]
+)
 
+    # Scale all coordinates by 10
     scat_orders = ax.scatter([], [], c='cyan', label='Orders', s=20)
     scat_restaurants = ax.scatter(
-        [r.xpos for r in city.restaurants],
-        [r.ypos for r in city.restaurants],
+        [r.xpos * 10 for r in city.restaurants],
+        [r.ypos * 10 for r in city.restaurants],
         c='blue', marker='s', label='Restaurants', s=20, edgecolors='black'
     )
     scat_depots = ax.scatter(
-        [d.xpos for d in city.depots],
-        [d.ypos for d in city.depots],
-        c='green', marker='^', label='Depots', s=50, edgecolors='black'
+        [d.xpos * 10 for d in city.depots],
+        [d.ypos * 10 for d in city.depots],
+        c='green', marker='^', label='Depots', s=150, edgecolors='black'
     )
     scat_drones = ax.scatter([], [], c='lime', label='Drones', s=20, marker='o', zorder=20)
 
@@ -610,68 +649,63 @@ def animate_simulation(sim, steps=100, interval=200):
         line, = ax.plot([], [], c='magenta', lw=2, alpha=0.8, label='_nolegend_', zorder=10)
         path_lines.append(line)
 
-    ax.set_xlim(0, city.map.shape[0])
-    ax.set_ylim(0, city.map.shape[1])
+    ax.set_xlim(0, city.map.shape[0] * 10)
+    ax.set_ylim(0, city.map.shape[1] * 10)
+    ax.set_xlabel("X position (m)")
+    ax.set_ylabel("Y position (m)")
     ax.legend(loc='upper right')
     title_text = ax.text(0.5, 1.01, '', transform=ax.transAxes, ha='center', va='bottom', fontsize=12)
+    time_text = ax.text(0.2, 0.95, '', transform=ax.transAxes, ha='center', va='bottom', fontsize=12, animated=True)
 
     order_xs, order_ys = [], []
     drone_xs, drone_ys = [], []
-
-    # Prepare text artists for order IDs
-    order_id_texts = []
-    for _ in range(100):
-        txt = ax.text(0, 0, '', color='black', fontsize=8, ha='center', va='bottom')
-        txt.set_visible(False)
-        order_id_texts.append(txt)
+    order_initials_texts = []
 
     def update(frame):
         sim.take_step()
         # Collect undelivered order locations and IDs
+        for txt in order_initials_texts:
+            txt.remove()
+        order_initials_texts.clear()
         order_xs.clear()
         order_ys.clear()
-        order_ids = []
         for order in sim.order_book.values():
             if not order.status and order.arrival_time <= sim.timestamp + constants.time_to_consider_order:
-                order_xs.append(order.xpos)
-                order_ys.append(order.ypos)
-                order_ids.append(order.arrival_time)
+                order_xs.append(order.xpos * 10)
+                order_ys.append(order.ypos * 10)
+                if hasattr(order, 'initials'):
+                    txt = ax.text(order.xpos * 10, order.ypos * 10 + 5, order.initials, color='black', fontsize=10, ha='center')
+                    order_initials_texts.append(txt)
         scat_orders.set_offsets(np.c_[order_xs, order_ys])
-
-        # Update order ID texts
-        for i, txt in enumerate(order_id_texts):
-            if i < len(order_xs):
-                txt.set_position((order_xs[i], order_ys[i] + 1.5))
-                txt.set_text(str(order_ids[i]))
-                txt.set_visible(True)
-            else:
-                txt.set_visible(False)
 
         # Collect drone locations
         drone_xs.clear()
         drone_ys.clear()
         for drone in sim.drones:
-            drone_xs.append(drone.xpos)
-            drone_ys.append(drone.ypos)
+            drone_xs.append(drone.xpos * 10)
+            drone_ys.append(drone.ypos * 10)
         scat_drones.set_offsets(np.c_[drone_xs, drone_ys])
 
         # Update each drone's path line
         for i, drone in enumerate(sim.drones):
-            # Remove path line if drone has arrived (state is 'waiting' or movement_path is empty)
             if (hasattr(drone, 'path') and drone.path and len(drone.path) > 1
                 and getattr(drone, 'state', None) != 'waiting'
                 and getattr(drone, 'movement_path', None)):
-                path_x, path_y = zip(*drone.path)
+                path_x, path_y = zip(*[(x * 10, y * 10) for x, y in drone.path])
                 path_lines[i].set_data(path_x, path_y)
             else:
                 path_lines[i].set_data([], [])
 
-        title_text.set_text(f'Simulation Map Animation\nTime: {sim.timestamp}s, Orders: {len(order_xs)}')
-        return (scat_orders, scat_drones, scat_restaurants, scat_depots, *path_lines, title_text)
+        title_text.set_text(f'Simulation Map Animation')
+        time_text.set_text(f'Time: {sim.timestamp} s')
+        return (scat_orders, scat_drones, scat_restaurants, scat_depots, *path_lines, time_text, *order_initials_texts)
 
     ani = animation.FuncAnimation(
         fig, update, frames=steps, interval=interval, blit=True, repeat=False
     )
+    # Uncomment the next line to save the animation as an MP4
+    # ani.save("simulation_animation.mp4", writer='ffmpeg', fps=1000//interval)
+
     plt.show()
 #animate_simulation(my_sim, n_steps, interval=10)
 #for i in range(n_steps):
@@ -723,9 +757,9 @@ if __name__ == "__main__":
     n_steps = int(constants.time_window / my_sim.dt)
     my_sim.change_order_volume(1/ 45)
     my_sim.weight = args.weight
-    for i in range(n_steps):
-        my_sim.take_step()
-    #animate_simulation(my_sim, n_steps, interval=10)
+    #for i in range(n_steps):
+    #    my_sim.take_step()
+    animate_simulation(my_sim, n_steps, interval=200)
     #plt.plot(np.linspace(0, constants.time_window, len(my_sim.orders_per_time)), my_sim.orders_per_time, label='Orders per time step')
     #plt.xlabel('Time step')
     #plt.ylabel('Number of orders')

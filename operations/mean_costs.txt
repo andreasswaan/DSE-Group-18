@@ -1,0 +1,6 @@
+Mean Costs: 1773508.28
+Mean Revenues: 3164960.62
+Mean Initial Costs: 190690.00
+Mean Orders Delivered: 145.70
+Mean ROI: 729.69
+Mean Profits: [1391452.34141021]
