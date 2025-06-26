@@ -10,7 +10,10 @@ import matplotlib.animation as animation
 import requests
 from pyproj import Transformer
 from matplotlib.widgets import Button
+import threading
+from temporary_files.operations.db import db
 
+callback_done = threading.Event()
 from temporary_files.operations.mission_planning_2 import MissionPlanning
 
 from pathplanning.path_planning_final import calculate_smooth_path
@@ -24,6 +27,19 @@ n_drones = constants.n_drones
 ORDERS_URL = "http://192.168.56.1:5000/get_orders"
 seen_order_ids = set()
 running = False
+
+database_orders = []
+
+
+def on_snapshot(col_snapshot, changes, read_time):
+    print(f"Received {len(changes)} documents")
+    print(changes)
+    for change in changes:
+        print(f"{change.document.to_dict()}")
+        order = change.document.to_dict()
+        order["id"] = change.document.id  # Add document ID to the order
+        database_orders.append(order)
+    callback_done.set()
 
 
 def start_delivery(event):
@@ -597,71 +613,75 @@ class Simulation:
         # run mission planning
         # self.mp.solve_mission_planning(weight=self.weight)
         # self.mp.basic_heuristic()
-        if self.timestamp % 50 == 0:
-            response = requests.get(ORDERS_URL)
-            orders = response.json()
-            if len(orders) < 30:  # placeholder
-                for order in orders:
-                    transformer = Transformer.from_crs(
-                        "EPSG:4326", "EPSG:28992", always_xy=True
-                    )
-                    order["xpos"], order["ypos"] = transformer.transform(
-                        order["xpos"], order["ypos"]
-                    )
-                    order["xpos"] = int((order["xpos"] - 81743.0) / 10)
-                    order["ypos"] = int((order["ypos"] - 442446.208000008) / 10)
-                    # Use a unique identifier for each order, e.g., a combination of xpos, ypos, time, pizzas
-                    order_id = (
-                        order["xpos"],
-                        order["ypos"],
-                        order["initials"],
-                        order["restaurant"],
-                    )
-                    # print(f"Received order from web: {order}")
-                    if order_id not in seen_order_ids:
-                        if (
-                            order["xpos"] < 0
-                            or order["xpos"] > legal_order_grid.shape[0] - 1
-                            or order["ypos"] < 0
-                            or order["ypos"] > legal_order_grid.shape[1] - 1
-                        ):
-                            print(
-                                f"Order at ({order['xpos']}, {order['ypos']}) is not in a the map, skipping."
-                            )
-                            seen_order_ids.add(order_id)
-                            continue
-                        if not legal_order_grid[order["ypos"], order["xpos"]]:
-                            print(
-                                f"Order at ({order['xpos']}, {order['ypos']}) is not in a legal order zone, skipping."
-                            )
-                            seen_order_ids.add(order_id)
-                            continue
-                        order_dict = {
-                            "order_id": len(self.logger.order_log),
-                            "restaurant_id": order["restaurant"],
-                            "time": self.timestamp,
-                            "s": int(0),
-                            "m": int(3),
-                            "l": int(0),
-                            "arrival_time": 200 + self.timestamp,
-                            "restaurant": next(
-                                (
-                                    r
-                                    for r in self.city.restaurants
-                                    if r.name == order["restaurant"]
-                                ),
-                                None,
-                            ),
-                            "status": False,  # not delivered
-                            "x_delivery_loc": float(order["xpos"]),
-                            "y_delivery_loc": float(order["ypos"]),
-                        }
-                        self.order_book[order_id] = Order(order_dict)
-                        self.order_book[order_id].initials = order["initials"]
-                        print(f"Added order from web: {order}")
+        # response = requests.get(ORDERS_URL)
+        # orders = response.json()
+        orders = database_orders
+        print(len(orders))
+        if len(orders) < 30:  # placeholder
+            for order in orders:
+
+                order["ypos"] = order["location"]["lat"]
+                order["xpos"] = order["location"]["lng"]
+                transformer = Transformer.from_crs(
+                    "EPSG:4326", "EPSG:28992", always_xy=True
+                )
+                order["xpos"], order["ypos"] = transformer.transform(
+                    order["xpos"], order["ypos"]
+                )
+                order["xpos"] = int((order["xpos"] - 81743.0) / 10)
+                order["ypos"] = int((order["ypos"] - 442446.208000008) / 10)
+                # Use a unique identifier for each order, e.g., a combination of xpos, ypos, time, pizzas
+                order_id = (
+                    order["xpos"],
+                    order["ypos"],
+                    order["initials"],
+                    order["restaurant"],
+                )
+
+                # print(f"Received order from web: {order}")
+                if order_id not in seen_order_ids:
+                    if (
+                        order["xpos"] < 0
+                        or order["xpos"] > legal_order_grid.shape[0] - 1
+                        or order["ypos"] < 0
+                        or order["ypos"] > legal_order_grid.shape[1] - 1
+                    ):
+                        print(
+                            f"Order at ({order['xpos']}, {order['ypos']}) is not in a the map, skipping."
+                        )
                         seen_order_ids.add(order_id)
-        #if running:
-        if len (self.order_book) > 0:
+                        continue
+                    if not legal_order_grid[order["ypos"], order["xpos"]]:
+                        print(
+                            f"Order at ({order['xpos']}, {order['ypos']}) is not in a legal order zone, skipping."
+                        )
+                        seen_order_ids.add(order_id)
+                        continue
+                    order_dict = {
+                        "order_id": len(self.logger.order_log),
+                        "restaurant_id": order["restaurant"],
+                        "time": self.timestamp,
+                        "s": int(0),
+                        "m": int(3),
+                        "l": int(0),
+                        "arrival_time": 200 + self.timestamp,
+                        "restaurant": next(
+                            (
+                                r
+                                for r in self.city.restaurants
+                                if r.name == order["restaurant"]
+                            ),
+                            None,
+                        ),
+                        "status": False,  # not delivered
+                        "x_delivery_loc": float(order["xpos"]),
+                        "y_delivery_loc": float(order["ypos"]),
+                    }
+                    self.order_book[order_id] = Order(order_dict)
+                    self.order_book[order_id].initials = order["initials"]
+                    print(f"Added order from web: {order}")
+                    seen_order_ids.add(order_id)
+        if running:
             for drone in self.drones:
                 drone.update_drone(self.dt)
             self.timestamp += self.dt
@@ -908,6 +928,15 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
     plt.show()
 
 
+def delete_collection():
+    coll_ref = db.collection("requests")
+    docs = coll_ref.list_documents(page_size=1000)
+    deleted = 0
+    for doc in docs:
+        doc.delete()
+        deleted = deleted + 1
+
+
 # animate_simulation(my_sim, n_steps, interval=10)
 # for i in range(n_steps):
 #   my_sim.take_step()
@@ -922,7 +951,12 @@ depot_dict = [
     }
 ]
 if __name__ == "__main__":
+    delete_collection()
     parser = argparse.ArgumentParser()
+    col_query = db.collection("requests")
+    # Watch the collection query
+    query_watch = col_query.on_snapshot(on_snapshot)
+
     parser.add_argument("--weight", type=float, default=-0.1)
     parser.add_argument("--output", type=str, default="result_weight.txt")
     parser.add_argument("--seed", type=int, required=False, default=1)
