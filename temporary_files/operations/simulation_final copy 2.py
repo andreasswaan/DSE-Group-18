@@ -683,7 +683,7 @@ class Simulation:
                     self.order_book[order_id].initials = order["initials"]
                     print(f"Added order from web: {order}")
                     seen_order_ids.add(order_id)
-        if len(self.order_book) > 0:
+        if len(self.order_book) > 2:
             for drone in self.drones:
                 drone.update_drone(self.dt)
             self.timestamp += self.dt
@@ -777,7 +777,7 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
     city = sim.city
     fig, ax = plt.subplots(figsize=(7, 7))
 
-    img = mpimg.imread("temporary_files/operations/Delft_google_maps.png")
+    img = mpimg.imread("temporary_files/operations/map_delft_for_sim.jpg")
     im = ax.imshow(
         img,
         extent=[-400, city.map.shape[0] * 10 + 100, -50, city.map.shape[1] * 10 + 120],
@@ -792,31 +792,31 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
         origin="lower",
         extent=[0, city.map.shape[0] * 10, 0, city.map.shape[1] * 10],
     )"""
-    img_legal = ax.imshow(
-        legal_order_grid,
-        cmap="Blues",
-        alpha=0.2,
-        origin="lower",
-        zorder=15,
-        interpolation="none",
-    )
-    img_legal.set_extent(
-        [
-            0,
-            legal_order_grid.shape[0] * 5960 / 7400 * 10,
-            0,
-            legal_order_grid.shape[1] * 10 * 7400 / 5960,
-        ]
-    )
+    # img_legal = ax.imshow(
+    #     legal_order_grid,
+    #     cmap="Blues",
+    #     alpha=0.2,
+    #     origin="lower",
+    #     zorder=15,
+    #     interpolation="none",
+    # )
+    # img_legal.set_extent(
+    #     [
+    #         0,
+    #         legal_order_grid.shape[0] * 5960 / 7400 * 10,
+    #         0,
+    #         legal_order_grid.shape[1] * 10 * 7400 / 5960,
+    #     ]
+    # )
     # Show silent zones as dark gray where silent zone is true
     silent_zone_mask = city.map[:, :, 3].T > 0
     silent_zone_overlay = np.zeros((city.map.shape[1], city.map.shape[0], 4))
     silent_zone_overlay[silent_zone_mask] = [0.2, 0.2, 0.2, 1]
-    ax.imshow(
-        silent_zone_overlay,
-        origin="lower",
-        extent=[0, city.map.shape[0] * 10, 0, city.map.shape[1] * 10],
-    )
+    # ax.imshow(
+    #     silent_zone_overlay,
+    #     origin="lower",
+    #     extent=[0, city.map.shape[0] * 10, 0, city.map.shape[1] * 10],
+    # )
 
     # Scale all coordinates by 10
     scat_orders = ax.scatter([], [], c="cyan", label="Orders", s=20)

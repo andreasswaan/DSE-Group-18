@@ -151,8 +151,28 @@ var MapPicker = function MapPicker(_ref) {
           stylers: [{ visibility: "off" }],
         },
         {
-          featureType: "poi.school",
+          featureType: "administrative",
+          stylers: [{ visibility: "off" }],
+        },
+        {
+          featureType: "landscape",
           stylers: [{ visibility: "on" }],
+        },
+        {
+          featureType: "road",
+          stylers: [{ visibility: "on" }],
+        },
+        {
+          featureType: "transit",
+          stylers: [{ visibility: "off" }],
+        },
+        {
+          elementType: "labels",
+          stylers: [{ visibility: "off" }],
+        },
+        {
+          featureType: "poi.school",
+          stylers: [{ visibility: "off" }],
         },
       ],
     });

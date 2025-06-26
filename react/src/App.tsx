@@ -116,6 +116,7 @@ const App = () => {
               maxWidth="600px"
               padding="10px"
               boxSizing="border-box"
+              style={{ rotate: "0deg" }}
             >
               <MapPicker
                 defaultLocation={defaultLocation}
