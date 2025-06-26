@@ -1,10 +1,11 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, url_for
 import json
 import numpy as np
 import uuid
+import qrcode
+import io
 
 app = Flask(__name__)
-
 def load_city_data_from_json(filename):
     """
     Loads city_name, population, restaurants, and silent_zones from a JSON city grid file.
@@ -41,5 +42,19 @@ def submit_order():
 def get_orders():
     return jsonify(orders)
 
+@app.route('/delft_boundary')
+def delft_boundary():
+    return send_file('delft_boundary.geojson', mimetype='application/json')
+
+@app.route('/qr')
+def qr():
+    # Use the local network address or your public URL if sharing with others
+    url = "http://192.168.56.1:5000/"
+    img = qrcode.make(url)
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return send_file(buf, mimetype='image/png')
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='192.168.56.1', debug=True)

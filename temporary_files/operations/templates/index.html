@@ -29,6 +29,17 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         var map = L.map('map').setView([51.999, 4.373], 13);
+        fetch('/delft_boundary')
+        .then(response => response.json())
+        .then(geojson => {
+            L.geoJSON(geojson[0].geojson, {
+            style: {
+                color: 'blue',
+                weight: 2,
+                fill: false
+            }
+            }).addTo(map);
+        });
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19
         }).addTo(map);
@@ -58,5 +69,7 @@
             });
         };
     </script>
+    <h3>Scan to open this site on your phone:</h3>
+    <img src="/qr" alt="QR code to this site">
 </body>
 </html>
