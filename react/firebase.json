@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "dronebezorgd",
     "public": "dist",
     "ignore": [
       "firebase.json",

@@ -335,10 +335,10 @@ class Drone(Point):
                 self.simulation.timestamp + self.target.waiting_time
             )
             self.target.delivered_at = self.simulation.timestamp
-            #if (
+            # if (
             #    self.simulation.timestamp
             #    > self.target.arrival_time + constants.deliver_time_window
-            #):
+            # ):
             if False:
                 print(
                     f"Warning: Drone {self.drone_id} delivered order {self.target.order_id} late at {self.simulation.timestamp}. \
@@ -370,14 +370,14 @@ class Drone(Point):
         if np.linalg.norm(direction_vector) <= np.linalg.norm(step_vector):
             self.xpos, self.ypos = self.target.xpos, self.target.ypos
             self.arrive()
-            #self.distance_travelled[int(self.load)] += (
+            # self.distance_travelled[int(self.load)] += (
             #    np.linalg.norm(direction_vector) * 10
-            #)
+            # )
             return
         else:
             self.xpos += step_vector[0]
             self.ypos += step_vector[1]
-            #self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 10
+            # self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 10
 
     def move_to_target_along_path(self, dt):
         if self.target is None:
@@ -432,7 +432,7 @@ class Drone(Point):
             self.xpos, self.ypos = end
         # Remove all waypoints up to temp
         self.movement_path = self.movement_path[temp:]
-        #self.distance_travelled[int(self.load)] += distance_per_frame * 10
+        # self.distance_travelled[int(self.load)] += distance_per_frame * 10
         return
 
     def calculate_path(self):
@@ -774,7 +774,7 @@ obstacle_grid_7x = np.kron(obstacle_grid, np.ones((scale_factor, scale_factor)))
 def animate_simulation(sim, steps=100, interval=200, save_path=None):
     city = sim.city
     fig, ax = plt.subplots(figsize=(7, 7))
-    #fig.canvas.mpl_connect("button_press_event", start_delivery)
+    # fig.canvas.mpl_connect("button_press_event", start_delivery)
     # Plot the population density as a static background
     im = ax.imshow(
         city.map[:, :, 0].T,
@@ -991,12 +991,12 @@ if __name__ == "__main__":
 
     my_sim = Simulation(city=City(city_dict), logger=Logger())
     n_steps = int(constants.time_window / my_sim.dt)
-    my_sim.change_order_volume(1/45)
+    my_sim.change_order_volume(1 / 45)
     my_sim.weight = args.weight
     # for i in range(n_steps):
     #    my_sim.take_step()
     # Plot the legal order grid in blue with alpha=0.5
-    animate_simulation(my_sim, n_steps*3, interval=40)
+    animate_simulation(my_sim, n_steps * 3, interval=40)
     # plt.plot(np.linspace(0, constants.time_window, len(my_sim.orders_per_time)), my_sim.orders_per_time, label='Orders per time step')
     # plt.xlabel('Time step')
     # plt.ylabel('Number of orders')

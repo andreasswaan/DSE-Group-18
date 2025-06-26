@@ -31,9 +31,12 @@ const App = () => {
   const [defaultLocation] = useState(DefaultLocation);
   const [location, setLocation] = useState(defaultLocation);
   const [zoom, setZoom] = useState(DefaultZoom);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function handleChangeLocation(lat: any, lng: any) {
-    setLocation({ lat: lat, lng: lng });
+    if (!isSubmitting) {
+      setLocation({ lat: lat, lng: lng });
+    }
   }
 
   function handleChangeZoom(newZoom: React.SetStateAction<number>) {
@@ -85,6 +88,7 @@ const App = () => {
       >
         <Formik
           onSubmit={(values) => {
+            setIsSubmitting(true);
             console.log("Submitted");
             addDoc(collection(db, "requests"), {
               initials: values.initials,
@@ -135,8 +139,8 @@ const App = () => {
                   onBlur={handleBlur}
                   error={touched.initials && Boolean(errors.initials)}
                 >
-                  {restaurants.map((restaurant) => (
-                    <MenuItem key={restaurant} value={restaurant}>
+                  {restaurants.map((restaurant, index) => (
+                    <MenuItem key={index} value={restaurant}>
                       {restaurant}
                     </MenuItem>
                   ))}
@@ -156,15 +160,52 @@ const App = () => {
                 error={touched.initials && Boolean(errors.initials)}
                 helperText={touched.initials && errors.initials}
               />
-              {!isSubmitting && (
+              {
                 <Button
                   variant="outlined"
                   onClick={() => handleSubmit()}
                   disabled={isSubmitting}
+                  sx={{ position: "relative", overflow: "hidden" }}
                 >
                   Submit
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      pointerEvents: "none",
+                      animation: isSubmitting
+                        ? "plane-fly 1s linear forwards"
+                        : "none",
+                      transition: "opacity 0.2s",
+                      opacity: isSubmitting ? 1 : 0,
+                    }}
+                  >
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M2 16L22 12L2 8L2 13L17 12L2 11L2 16Z"
+                        fill="#1976d2"
+                      />
+                    </svg>
+                  </span>
+                  <style>
+                    {`
+                    @keyframes plane-fly {
+                    0% { left: 0; opacity: 1; }
+                    80% { opacity: 1; }
+                    100% { left: 100%; opacity: 0; }
+                    }
+                  `}
+                  </style>
                 </Button>
-              )}
+              }
               {isSubmitting && (
                 <Alert
                   severity="success"

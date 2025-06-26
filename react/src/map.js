@@ -113,6 +113,8 @@ var MapPicker = function MapPicker(_ref) {
         {
           center: validLocation,
           zoom: zoom,
+          streetViewControl: false,
+          clickableIcons: false,
         },
         mapTypeId && {
           mapTypeId: mapTypeId,
@@ -142,7 +144,18 @@ var MapPicker = function MapPicker(_ref) {
       strokeOpacity: 0.8,
       strokeWeight: 5,
     });
-
+    map.current.setOptions({
+      styles: [
+        {
+          featureType: "poi",
+          stylers: [{ visibility: "off" }],
+        },
+        {
+          featureType: "poi.school",
+          stylers: [{ visibility: "on" }],
+        },
+      ],
+    });
     if (!marker.current) {
       marker.current = new Google.maps.Marker({
         position: validLocation,
