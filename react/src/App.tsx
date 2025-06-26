@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import Box from "@mui/material/Box";
-import MapPicker from "react-google-map-picker";
+import MapPicker from "./map";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import AppBar from "@mui/material/AppBar";
@@ -20,7 +20,7 @@ import Alert from "@mui/material/Alert";
 
 const DefaultLocation = { lat: 52.01132435503029, lng: 4.3577094736899635 };
 const DefaultZoom = 14;
-// interface Values {
+// interfac Values {
 //   location: { lat: number; lng: number };
 //   initials: string;
 //   restaurant: string;
@@ -58,7 +58,13 @@ const App = () => {
   });
 
   return (
-    <Box width="100vw" height="100vh" display="flex" flexDirection="column">
+    <Box
+      width="100vw"
+      height="100vh"
+      display="flex"
+      flexDirection="column"
+      bgcolor={"white"}
+    >
       <Box sx={{ flexGrow: 0 }}>
         <AppBar position="static">
           <Toolbar>
@@ -105,13 +111,12 @@ const App = () => {
               width="100%"
               maxWidth="600px"
               padding="10px"
-              border="1px solid black"
               boxSizing="border-box"
             >
               <MapPicker
                 defaultLocation={defaultLocation}
                 zoom={zoom}
-                style={{ height: "70%" }}
+                style={{ height: "60%" }}
                 onChangeLocation={handleChangeLocation}
                 onChangeZoom={handleChangeZoom}
                 apiKey="AIzaSyAODS4ExHjKCipXO0ZmVaqv_TGPTpWIZ8c"
