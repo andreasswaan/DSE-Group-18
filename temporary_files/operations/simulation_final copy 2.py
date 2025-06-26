@@ -12,6 +12,8 @@ from pyproj import Transformer
 from matplotlib.widgets import Button
 import threading
 from temporary_files.operations.db import db
+import matplotlib.image as mpimg
+from matplotlib.lines import Line2D
 
 callback_done = threading.Event()
 from temporary_files.operations.mission_planning_2 import MissionPlanning
@@ -681,7 +683,7 @@ class Simulation:
                     self.order_book[order_id].initials = order["initials"]
                     print(f"Added order from web: {order}")
                     seen_order_ids.add(order_id)
-        if running:
+        if len(self.order_book) > 0:
             for drone in self.drones:
                 drone.update_drone(self.dt)
             self.timestamp += self.dt
@@ -774,24 +776,38 @@ obstacle_grid_7x = np.kron(obstacle_grid, np.ones((scale_factor, scale_factor)))
 def animate_simulation(sim, steps=100, interval=200, save_path=None):
     city = sim.city
     fig, ax = plt.subplots(figsize=(7, 7))
+
+    img = mpimg.imread("temporary_files/operations/Delft_google_maps.png")
+    im = ax.imshow(
+        img,
+        extent=[-400, city.map.shape[0] * 10 + 100, -50, city.map.shape[1] * 10 + 120],
+        zorder=0,
+    )
     # fig.canvas.mpl_connect("button_press_event", start_delivery)
     # Plot the population density as a static background
-    im = ax.imshow(
+    """im = ax.imshow(
         city.map[:, :, 0].T,
         cmap="YlOrRd",
         alpha=1,
         origin="lower",
         extent=[0, city.map.shape[0] * 10, 0, city.map.shape[1] * 10],
-    )
-    """img_legal = ax.imshow(
+    )"""
+    img_legal = ax.imshow(
         legal_order_grid,
-        cmap='Blues',
+        cmap="Blues",
         alpha=0.2,
-        origin='lower',
+        origin="lower",
         zorder=15,
-        interpolation='none'
+        interpolation="none",
     )
-    img_legal.set_extent([0, legal_order_grid.shape[0] * 5960/7400 * 10, 0, legal_order_grid.shape[1] * 10*7400/5960])"""
+    img_legal.set_extent(
+        [
+            0,
+            legal_order_grid.shape[0] * 5960 / 7400 * 10,
+            0,
+            legal_order_grid.shape[1] * 10 * 7400 / 5960,
+        ]
+    )
     # Show silent zones as dark gray where silent zone is true
     silent_zone_mask = city.map[:, :, 3].T > 0
     silent_zone_overlay = np.zeros((city.map.shape[1], city.map.shape[0], 4))
@@ -823,7 +839,7 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
         edgecolors="black",
     )
     scat_drones = ax.scatter(
-        [], [], c="lime", label="Drones", s=20, marker="o", zorder=20
+        [], [], c="lime", label="Drones", s=30, marker="o", zorder=20
     )
 
     # Create a Line2D object for each drone's path
@@ -834,11 +850,23 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
         )
         path_lines.append(line)
 
+    handles, labels = ax.get_legend_handles_labels()
+    custom_handle = Line2D(
+        [0],
+        [0],
+        marker="o",
+        color="w",
+        markerfacecolor="black",
+        markersize=8,
+        label="no-fly zones",
+    )
+    handles.append(custom_handle)
+    labels.append("no-fly zones")
     ax.set_xlim(0, city.map.shape[0] * 10)
     ax.set_ylim(0, city.map.shape[1] * 10)
     ax.set_xlabel("X position (m)")
     ax.set_ylabel("Y position (m)")
-    ax.legend(loc="upper right")
+    ax.legend(handles=handles, labels=labels, loc="upper right")
     title_text = ax.text(
         0.5, 1.01, "", transform=ax.transAxes, ha="center", va="bottom", fontsize=12
     )
@@ -881,6 +909,7 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
                         color="black",
                         fontsize=10,
                         ha="center",
+                        zorder=20,
                     )
                     order_initials_texts.append(txt)
         scat_orders.set_offsets(np.c_[order_xs, order_ys])
@@ -991,12 +1020,12 @@ if __name__ == "__main__":
 
     my_sim = Simulation(city=City(city_dict), logger=Logger())
     n_steps = int(constants.time_window / my_sim.dt)
-    my_sim.change_order_volume(1 / 45)
+    my_sim.change_order_volume(0)
     my_sim.weight = args.weight
     # for i in range(n_steps):
     #    my_sim.take_step()
     # Plot the legal order grid in blue with alpha=0.5
-    animate_simulation(my_sim, n_steps * 3, interval=40)
+    animate_simulation(my_sim, n_steps * 3000, interval=40)
     # plt.plot(np.linspace(0, constants.time_window, len(my_sim.orders_per_time)), my_sim.orders_per_time, label='Orders per time step')
     # plt.xlabel('Time step')
     # plt.ylabel('Number of orders')
