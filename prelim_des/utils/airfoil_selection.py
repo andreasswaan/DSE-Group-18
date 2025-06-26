@@ -33,17 +33,19 @@ def make_airfoil_selection(airfoil):
         possible_airfoils.append(airfoil)
 
 
-for folder in os.listdir(root + airfoil_path + NACA_type):
+# for folder in os.listdir(root + airfoil_path + NACA_type):
 
-    if folder.startswith("Symmetrical airfoils"):
-        for folder1 in os.listdir(
-            root + airfoil_path + NACA_type + "\\Symmetrical airfoils"
-        ):
-            make_airfoil_selection(folder + "\\" + folder1)
+#     if folder.startswith("Symmetrical airfoils"):
+#         for folder1 in os.listdir(
+#             root + airfoil_path + NACA_type + "\\Symmetrical airfoils"
+#         ):
+#             make_airfoil_selection(folder + "\\" + folder1)
 
-    else:
-        make_airfoil_selection(folder)
+#     else:
+#         make_airfoil_selection(folder)
 
-print("Possible airfoils that meet the criteria:")
-for airfoil in possible_airfoils:
-    print(airfoil)
+# print("Possible airfoils that meet the criteria:")
+# for airfoil in possible_airfoils:
+#     print(airfoil)
+
+root = os.path.dirname(os.path.abspath(__file__))

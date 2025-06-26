@@ -20,6 +20,16 @@ from matplotlib.patches import FancyArrowPatch
 import numpy as np
 from prelim_des.new_wing_structure.material_class import Material
 
+plt.rcParams.update(
+    {
+        "font.size": 14,  # General text size
+        "axes.titlesize": 16,  # Title font size
+        "axes.labelsize": 14,  # Axis label font size
+        "xtick.labelsize": 12,  # X tick label font size
+        "ytick.labelsize": 12,  # Y tick label font size
+        "legend.fontsize": 12,  # Legend text
+    }
+)
 toml = load_toml()
 
 
@@ -358,7 +368,7 @@ class FuselageStructuralAnalysis:
         ax = fig.add_subplot(projection="3d")
         # Set the initial view: elev (vertical angle), azim (horizontal angle), roll (not directly supported)
         ax.view_init(elev=-30, azim=-45, roll=-180)
-
+        ax.set_proj_type("ortho")
         for i, section in enumerate(self.sections):
             for j, boom in enumerate(self.sections[i].booms):
 
@@ -380,7 +390,7 @@ class FuselageStructuralAnalysis:
 
             shear_x_height = float(section.normal_force) / 100
             shear_x_arrow = Arrow3D(
-                [section.x_pos, section.x_pos - shear_x_height],
+                [section.x_pos - shear_x_height, section.x_pos],
                 [0, 0],
                 [0, 0],
                 mutation_scale=5,
@@ -391,10 +401,9 @@ class FuselageStructuralAnalysis:
             ax.add_artist(shear_x_arrow)
 
         ax.scatter(x_points, y_points, z_points, c="b")
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.set_zlabel("Z")
-        ax.set_title("Wing Structure 3D Plot")
+        ax.set_xlabel("X [m]")
+        ax.set_ylabel("Y [m]")
+        ax.set_zlabel("Z [m]")
         plt.show()
 
     def add_wing_analysis(self, wing_analysis: WingStructuralAnalysis):
@@ -634,6 +643,7 @@ class FuselageStructuralAnalysis:
                 label="Normal Force",
                 color="green",
             )
+            axs[0][1].axis("off")
             axs[0][0].set_xlabel("Position (x)")
             axs[0][0].set_ylabel("Normal Force")
             axs[0][0].set_title("Fuselage Normal Force Diagram")
@@ -641,14 +651,13 @@ class FuselageStructuralAnalysis:
             axs[0][0].grid(True)
 
             axs[1][0].plot(diagram_position, diagram_shear_z, label="Shear Z")
+            axs[1][0].set_xlabel("Position (x)")
             axs[1][0].set_ylabel("Shear Force Z")
             axs[1][0].set_title("Fuselage Shear Force Z Diagram")
             axs[1][0].legend()
             axs[1][0].grid(True)
 
-            axs[1][1].plot(
-                diagram_position, diagram_shear_y, label="Shear Y", color="orange"
-            )
+            axs[1][1].plot(diagram_position, diagram_shear_y, label="Shear Y")
             axs[1][1].set_xlabel("Position (x)")
             axs[1][1].set_ylabel("Shear Force Y")
             axs[1][1].set_title("Fuselage Shear Force Y Diagram")
@@ -864,10 +873,12 @@ if __name__ == "__main__":
 
     wing_structural_analysis = WingStructuralAnalysis(drone, material)
     wing_structural_analysis.make_wing_structure()
+
     wing_structural_analysis.apply_lift()
     wing_structural_analysis.apply_drag()
     wing_structural_analysis.perform_iterations()
     wing_structural_analysis.plot_wing_structure()
+    fuselage_structural_analysis.plot_fuselage_structure()
 
     fuselage_structural_analysis.add_wing_analysis(wing_structural_analysis)
     fuselage_structural_analysis.apply_wing_reaction_forces()
@@ -877,12 +888,11 @@ if __name__ == "__main__":
     fuselage_structural_analysis.apply_propeller_motor_weight_front()
     fuselage_structural_analysis.apply_propeller_motor_weight_back()
     fuselage_structural_analysis.apply_delivery_mech_weight()
+    fuselage_structural_analysis.plot_fuselage_structure()
     fuselage_structural_analysis.perform_iterations()
     print("Final weight", fuselage_structural_analysis.weight)
     print("Final weight wing", wing_structural_analysis.weight)
-
     fuselage_structural_analysis.calc_analysis_forces(True)
-    fuselage_structural_analysis.plot_fuselage_structure()
 
     # for sec in fuselage_structural_analysis.sections:
     #     for boom in sec.booms:

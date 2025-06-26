@@ -190,8 +190,8 @@ propeller_rod_length = 0.3 #[m]
 
 wing_to_fuselage_root_chord_ratio = 1 #[m] basically how many sections the loads of thw wing spread over
 
-amount_of_booms_horizontal = 3
-amount_of_booms_vertical = 3
+amount_of_booms_horizontal = 2
+amount_of_booms_vertical = 1
 
 start_spar_boom_area = 0.001 #[m^2]
 start_stringer_boom_area = 0.0001 #[m^2]

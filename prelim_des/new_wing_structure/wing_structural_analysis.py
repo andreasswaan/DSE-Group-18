@@ -1,3 +1,4 @@
+import os
 from prelim_des.drone import Drone
 from prelim_des.maneuvre_envelope import plot_maneuver_and_gust_envelope
 from prelim_des.mission import Mission
@@ -13,6 +14,16 @@ import numpy as np
 from prelim_des.new_wing_structure.material_class import Material
 from prelim_des.constants import g
 
+plt.rcParams.update(
+    {
+        "font.size": 14,  # General text size
+        "axes.titlesize": 16,  # Title font size
+        "axes.labelsize": 14,  # Axis label font size
+        "xtick.labelsize": 12,  # X tick label font size
+        "ytick.labelsize": 12,  # Y tick label font size
+        "legend.fontsize": 12,  # Legend text
+    }
+)
 toml = load_toml()
 
 
@@ -140,10 +151,11 @@ class WingStructuralAnalysis:
         y_points = []
         z_points = []
         fig = plt.figure()
+
         ax = fig.add_subplot(projection="3d")
         # Set the initial view: elev (vertical angle), azim (horizontal angle), roll (not directly supported)
         ax.view_init(elev=-30, azim=-45, roll=-180)
-
+        ax.set_proj_type("ortho")
         for i, section in enumerate(self.sections):
             for j, boom in enumerate(self.sections[i].booms):
 
@@ -151,7 +163,7 @@ class WingStructuralAnalysis:
                 z_points.append(float(-boom.z_pos))
                 y_points.append(float(section.y_pos))
 
-            shear_z_height = float(-section.shear_z) / 10
+            shear_z_height = float(-section.shear_z) / 100
             shear_z_arrow = Arrow3D(
                 [0, 0],
                 [section.y_pos, section.y_pos],
@@ -163,7 +175,7 @@ class WingStructuralAnalysis:
 
             ax.add_artist(shear_z_arrow)
 
-            shear_x_height = float(section.shear_x) / 10
+            shear_x_height = float(section.shear_x) / 100
             shear_x_arrow = Arrow3D(
                 [0, shear_x_height],
                 [section.y_pos, section.y_pos],
@@ -180,10 +192,18 @@ class WingStructuralAnalysis:
             # y_points.append(float(section.y_pos))
 
         ax.scatter(x_points, y_points, z_points, c="b")
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.set_zlabel("Z")
-        ax.set_title("Wing Structure 3D Plot")
+        ax.set_xlabel("X [m]")
+        ax.set_ylabel("Y [m]")
+        ax.set_zlabel("Z [m]")
+        plt.tight_layout()
+        root = os.path.dirname(os.path.abspath(__file__))
+
+        plt.savefig(
+            os.path.join(root, "figs", "Drag_comparaison.pdf"),
+            dpi=300,
+            bbox_inches="tight",
+            format="pdf",
+        )
         plt.show()
 
     def apply_lift(self):
@@ -253,9 +273,15 @@ class WingStructuralAnalysis:
         # print("analysis_shear_z", reaction_force_z)
         return reaction_moment_x, reaction_moment_z, reaction_force_x, reaction_force_z
 
-    def calc_analysis_forces(self):
+    def calc_analysis_forces(self, PLOT=True):
         """This is basically the internal load diagrams"""
         self.sections: list[WingSection]
+        diagram_position = []
+        diagram_shear_z = []
+        diagram_shear_x = []
+        diagram_analysis_normal_force = []
+        diagram_analysis_moment_z = []
+        diagram_analysis_moment_x = []
 
         for i, section in enumerate(self.sections):
 
@@ -267,12 +293,78 @@ class WingStructuralAnalysis:
             )
             section.analysis_shear_x = sum(sec.shear_x for sec in self.sections[i::])
 
-            section.analysis_moment_z = sum(
-                sec.moment_z + sec.shear_x * sec.y_pos for sec in self.sections[i::]
+            section.analysis_moment_z = (
+                sum(sec.moment_z + sec.analysis_shear_x for sec in self.sections[i::])
+                * self.sections[0].length
             )
-            section.analysis_moment_x = sum(
-                sec.moment_x + sec.shear_z * sec.y_pos for sec in self.sections[i::]
+            section.analysis_moment_x = (
+                sum(sec.moment_x + sec.analysis_shear_z for sec in self.sections[i::])
+                * self.sections[0].length
             )
+            diagram_position.append(section.y_pos)
+            diagram_shear_z.append(-float(section.analysis_shear_z))
+            diagram_shear_x.append(-float(section.analysis_shear_x))
+            diagram_analysis_normal_force.append(-float(section.analysis_normal_force))
+            diagram_analysis_moment_z.append(-float(section.analysis_moment_z))
+            diagram_analysis_moment_x.append(-float(section.analysis_moment_x))
+
+        if PLOT:
+            fig, axs = plt.subplots(3, 2, sharex=True, figsize=(8, 8))
+            axs[0][0].plot(
+                diagram_position,
+                diagram_analysis_normal_force,
+                label="Normal Force",
+                color="green",
+            )
+            axs[0][0].set_xlabel("Position (Y) [m]")
+            axs[0][0].set_ylabel("Normal Force [N]")
+            axs[0][0].set_title("Wing Normal Force Diagram")
+            axs[0][0].legend()
+            axs[0][0].grid(True)
+
+            # Make axs[0][1] empty
+            axs[0][1].axis("off")
+
+            axs[1][0].plot(diagram_position, diagram_shear_z, label="Shear Z")
+            axs[1][0].set_xlabel("Position (Y) [m]")
+            axs[1][0].set_ylabel("Shear Force Z [N]")
+            axs[1][0].set_title("Wing Shear Force Z Diagram")
+            axs[1][0].legend()
+            axs[1][0].grid(True)
+
+            axs[1][1].plot(diagram_position, diagram_shear_x, label="Shear X")
+            axs[1][1].set_xlabel("Position (Y) [m]")
+            axs[1][1].set_ylabel("Shear Force X [N]")
+            axs[1][1].set_title("Wing Shear Force X Diagram")
+            axs[1][1].legend()
+            axs[1][1].grid(True)
+
+            axs[2][0].plot(
+                diagram_position,
+                diagram_analysis_moment_x,
+                label="Moment X",
+                color="orange",
+            )
+            axs[2][0].set_xlabel("Position (Y) [m]")
+            axs[2][0].set_ylabel("Moment X [Nm]")
+            axs[2][0].set_title("Wing Moment X Diagram")
+            axs[2][0].legend()
+            axs[2][0].grid(True)
+
+            axs[2][1].plot(
+                diagram_position,
+                diagram_analysis_moment_z,
+                label="Moment Z",
+                color="orange",
+            )
+            axs[2][1].set_xlabel("Position (Y) [m]")
+            axs[2][1].set_ylabel("Moment Z [Nm]")
+            axs[2][1].set_title("Wing Moment Z Diagram")
+            axs[2][1].legend()
+            axs[2][1].grid(True)
+
+            plt.tight_layout()
+            plt.show()
 
         print("analysis_shear_z", self.sections[0].analysis_shear_z)
 
@@ -431,10 +523,10 @@ if __name__ == "__main__":
     wing_structural_analysis.make_wing_structure()
     wing_structural_analysis.apply_lift()
     wing_structural_analysis.apply_drag()
+    wing_structural_analysis.plot_wing_structure()
     wing_structural_analysis.perform_iterations()
 
     # wing_structural_analysis.add_point_load(1, 1, 1, Fx=-50)
     # wing_structural_analysis.reaction_forces()
 
-    wing_structural_analysis.plot_wing_structure()
     wing_structural_analysis.weight

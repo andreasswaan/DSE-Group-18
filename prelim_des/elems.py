@@ -239,7 +239,7 @@ class Wing:
             f"Aspect Ratio: {float(AR):.2f}\n"
             f"Taper Ratio: {taper:.2f}\n"
             f"Sweep (Λ_LE): {np.degrees(sweep_LE):.1f}°\n"
-            f"Weight: {self.weight:.1f} kg"
+            # f"Weight: {self.weight:.1f} kg"
         )
         props = dict(boxstyle="round", facecolor="white", edgecolor="black", alpha=0.95)
         ax.text(
