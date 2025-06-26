@@ -32,8 +32,8 @@ class MissionPlanning:
 
     def solve_mission_planning(self, conversion_meters=10, weight = -0.1):
         drones, depots, orders, order_clusters = self.setup_problem()
-        print(len(orders), "orders to deliver")
-        print(f"Number of drones: {len(drones)}")
+        #print(len(orders), "orders to deliver")
+        #print(f"Number of drones: {len(drones)}")
         for cluster in order_clusters:
             if len(cluster) > 0:
                 # Split cluster into chunks of size max_orders_per_mission
@@ -200,7 +200,7 @@ class MissionPlanning:
                         )
 
         # order arrival time constraints
-        for o in range(n_orders):
+        """for o in range(n_orders):
             cust = n_depots + n_restaurants + o
             for k in range(n_drones):
                 model.addConstr(
@@ -210,7 +210,7 @@ class MissionPlanning:
                 model.addConstr(
                     order_arrival[o] <= t_arr[cust, k] + M * (1 - gp.quicksum(x[i, cust, k] for i in range(n_nodes) if i != cust)),
                     name=f"arrival_ub_{o}_{k}"
-                )
+                )"""
 
         # 6. Capacity constraints
         for k, drone in enumerate(drones):

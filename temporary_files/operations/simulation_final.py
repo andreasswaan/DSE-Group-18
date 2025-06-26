@@ -8,6 +8,7 @@ import copy
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import requests
+from pyproj import Transformer
 
 from temporary_files.operations.mission_planning_2 import MissionPlanning
 
@@ -19,7 +20,7 @@ import constants
 np.random.seed(42)
 pizza_guide = {'s': 0.3, 'm': 0.4, 'l': 0.5}
 n_drones = constants.n_drones
-ORDERS_URL = "http://127.0.0.1:5000/get_orders"
+ORDERS_URL = "http://192.168.56.1:5000/get_orders"
 seen_order_ids = set()
 
 class Point():
@@ -419,41 +420,81 @@ class Simulation:
                         del logorder['time']
                         self.logger.order_log[order['time']] = logorder
 
-    def take_step(self):        
+    def take_step(self):
         self.take_orders()
 
-        if self.timestamp % self.mp_interval == 0:
-            # run mission planning
+        if self.timestamp % self.mp_interval == 0 and self.timestamp > 0:
+        # run mission planning
             self.mp.solve_mission_planning(weight=self.weight)
-            #self.mp.basic_heuristic()
-        if self.timestamp % self.orders_interval == 0:
-            orders = [self.order_book[order_id] for order_id in self.order_book if self.order_book[order_id].status]
-            orders = [order for order in orders if order.delivered_at - order.arrival_time <= constants.deliver_time_window]
-            self.orders_per_time.append(len(orders))
-
-        if self.timestamp % 30 == 0:
+        # self.mp.basic_heuristic()
+        if self.timestamp % 50 == 0:
             response = requests.get(ORDERS_URL)
             orders = response.json()
-            for order in orders:
-                # Use a unique identifier for each order, e.g., a combination of xpos, ypos, time, pizzas
-                order_id = (order['xpos'], order['ypos'], order['time'], order['pizzas'], order['restaurant_id'])
-                if order_id not in seen_order_ids:
-                    # Add the order to your simulation
-                    new_order = Order(
-                        xpos=float(order['xpos']),
-                        ypos=float(order['ypos']),
-                        m=int(order['pizzas']),
-                        arrival_time=int(order['time']),
-                        restaurant_id=order['restaurant_id'],
-                        restaurant=next((r for r in self.city.restaurants if r.restaurant_id == order['restaurant_id']), None)
+            if len(orders) < 30:  # placeholder
+                for order in orders:
+                    transformer = Transformer.from_crs(
+                        "EPSG:4326", "EPSG:28992", always_xy=True
                     )
-                    self.order_book[new_order.id] = new_order
-                    seen_order_ids.add(order_id)
-                    print(f"Added order from web: {order}")
-
-        for drone in self.drones:
-            drone.update_drone(self.dt)
-        self.timestamp += self.dt
+                    order["xpos"], order["ypos"] = transformer.transform(
+                        order["xpos"], order["ypos"]
+                    )
+                    order["xpos"] = int((order["xpos"] - 81743.0) / 10)
+                    order["ypos"] = int((order["ypos"] - 442446.208000008) / 10)
+                    # Use a unique identifier for each order, e.g., a combination of xpos, ypos, time, pizzas
+                    order_id = (
+                        order["xpos"],
+                        order["ypos"],
+                        order["initials"],
+                        order["restaurant"],
+                    )
+                    # print(f"Received order from web: {order}")
+                    if order_id not in seen_order_ids:
+                        if (
+                            order["xpos"] < 0
+                            or order["xpos"] > legal_order_grid.shape[0] - 1
+                            or order["ypos"] < 0
+                            or order["ypos"] > legal_order_grid.shape[1] - 1
+                        ):
+                            print(
+                                f"Order at ({order['xpos']}, {order['ypos']}) is not in a the map, skipping."
+                            )
+                            seen_order_ids.add(order_id)
+                            continue
+                        if not legal_order_grid[order["ypos"], order["xpos"]]:
+                            print(
+                                f"Order at ({order['xpos']}, {order['ypos']}) is not in a legal order zone, skipping."
+                            )
+                            seen_order_ids.add(order_id)
+                            continue
+                        order_dict = {
+                            "order_id": len(self.logger.order_log),
+                            "restaurant_id": order["restaurant"],
+                            "time": self.timestamp,
+                            "s": int(0),
+                            "m": int(3),
+                            "l": int(0),
+                            "arrival_time": 200 + self.timestamp,
+                            "restaurant": next(
+                                (
+                                    r
+                                    for r in self.city.restaurants
+                                    if r.name == order["restaurant"]
+                                ),
+                                None,
+                            ),
+                            "status": False,  # not delivered
+                            "x_delivery_loc": float(order["xpos"]),
+                            "y_delivery_loc": float(order["ypos"]),
+                        }
+                        self.order_book[order_id] = Order(order_dict)
+                        self.order_book[order_id].initials = order["initials"]
+                        print(f"Added order from web: {order}")
+                        seen_order_ids.add(order_id)
+        #if running:
+        if len (self.order_book) > 10:
+            for drone in self.drones:
+                drone.update_drone(self.dt)
+            self.timestamp += self.dt
     
     def reset(self):
         # reset the simulation
@@ -509,15 +550,20 @@ restaurants = [Restaurant(r) for r in restaurant_dict]
 silent_zones = [Point(s['xpos'], s['ypos']) for s in silent_zones_dict if s.get('value')]
 
 # Setup Path Planning Grid
-def load_delft_grid(path="pathplanning/data/delft_grid_data_70_border.npz"):
+def load_delft_grid(path="pathplanning/data/delft_grid_data_70_symposium.npz"):
     data = np.load(path, allow_pickle=True)
     return {
-        'weight_grid': data["weight_grid"],
-        'obstacle_grid': data["obstacle_grid"],
+        "weight_grid": data["weight_grid"],
+        "obstacle_grid": data["obstacle_grid"],
+        "legal_grid": data["legal_order_grid"],
     }
-    
+
+
 grid = load_delft_grid()
-walkable = ~grid['obstacle_grid']
+grid_fine = load_delft_grid(path="pathplanning/data/delft_grid_data_10_symposium.npz")
+# grid_fine = load_delft_grid()
+legal_order_grid = grid_fine["legal_grid"]
+walkable = ~grid["obstacle_grid"]
 
 scale_factor = 7
 obstacle_grid = grid['obstacle_grid']
@@ -675,7 +721,7 @@ if __name__ == "__main__":
     logger=Logger()
 )
     n_steps = int(constants.time_window / my_sim.dt)
-    my_sim.change_order_volume(1/45)
+    my_sim.change_order_volume(0)
     my_sim.weight = args.weight
     #for i in range(n_steps):
     #    my_sim.take_step()
