@@ -953,7 +953,7 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
     )
     # Uncomment the next line to save the animation as an MP4
     # ani.save("simulation_animation.mp4", writer='ffmpeg', fps=1000//interval)
-
+    plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
     plt.show()
 
 
