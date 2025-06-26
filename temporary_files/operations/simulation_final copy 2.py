@@ -10,7 +10,10 @@ import matplotlib.animation as animation
 import requests
 from pyproj import Transformer
 from matplotlib.widgets import Button
+import threading
+from temporary_files.operations.db import db
 
+callback_done = threading.Event()
 from temporary_files.operations.mission_planning_2 import MissionPlanning
 
 from pathplanning.path_planning_final import calculate_smooth_path
@@ -24,6 +27,19 @@ n_drones = constants.n_drones
 ORDERS_URL = "http://192.168.56.1:5000/get_orders"
 seen_order_ids = set()
 running = False
+
+database_orders = []
+
+
+def on_snapshot(col_snapshot, changes, read_time):
+    print(f"Received {len(changes)} documents")
+    print(changes)
+    for change in changes:
+        print(f"{change.document.to_dict()}")
+        order = change.document.to_dict()
+        order["id"] = change.document.id  # Add document ID to the order
+        database_orders.append(order)
+    callback_done.set()
 
 
 def start_delivery(event):
@@ -596,11 +612,15 @@ class Simulation:
         # run mission planning
         # self.mp.solve_mission_planning(weight=self.weight)
         # self.mp.basic_heuristic()
-        response = requests.get(ORDERS_URL)
-        orders = response.json()
-        print("Orders", orders)
+        # response = requests.get(ORDERS_URL)
+        # orders = response.json()
+        orders = database_orders
+        print(len(orders))
         if len(orders) < 30:  # placeholder
             for order in orders:
+
+                order["ypos"] = order["location"]["lat"]
+                order["xpos"] = order["location"]["lng"]
                 transformer = Transformer.from_crs(
                     "EPSG:4326", "EPSG:28992", always_xy=True
                 )
@@ -616,6 +636,7 @@ class Simulation:
                     order["initials"],
                     order["restaurant"],
                 )
+
                 # print(f"Received order from web: {order}")
                 if order_id not in seen_order_ids:
                     if (
@@ -906,6 +927,15 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
     plt.show()
 
 
+def delete_collection():
+    coll_ref = db.collection("requests")
+    docs = coll_ref.list_documents(page_size=1000)
+    deleted = 0
+    for doc in docs:
+        doc.delete()
+        deleted = deleted + 1
+
+
 # animate_simulation(my_sim, n_steps, interval=10)
 # for i in range(n_steps):
 #   my_sim.take_step()
@@ -920,7 +950,12 @@ depot_dict = [
     }
 ]
 if __name__ == "__main__":
+    delete_collection()
     parser = argparse.ArgumentParser()
+    col_query = db.collection("requests")
+    # Watch the collection query
+    query_watch = col_query.on_snapshot(on_snapshot)
+
     parser.add_argument("--weight", type=float, default=-0.1)
     parser.add_argument("--output", type=str, default="result_weight.txt")
     parser.add_argument("--seed", type=int, required=False, default=1)
