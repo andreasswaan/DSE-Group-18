@@ -319,10 +319,11 @@ class Drone(Point):
                 self.simulation.timestamp + self.target.waiting_time
             )
             self.target.delivered_at = self.simulation.timestamp
-            if (
-                self.simulation.timestamp
-                > self.target.arrival_time + constants.deliver_time_window
-            ):
+            #if (
+            #    self.simulation.timestamp
+            #    > self.target.arrival_time + constants.deliver_time_window
+            #):
+            if False:
                 print(
                     f"Warning: Drone {self.drone_id} delivered order {self.target.order_id} late at {self.simulation.timestamp}. \
                       Expected delivery time was {self.target.arrival_time}."
@@ -353,14 +354,14 @@ class Drone(Point):
         if np.linalg.norm(direction_vector) <= np.linalg.norm(step_vector):
             self.xpos, self.ypos = self.target.xpos, self.target.ypos
             self.arrive()
-            self.distance_travelled[int(self.load)] += (
-                np.linalg.norm(direction_vector) * 10
-            )
+            #self.distance_travelled[int(self.load)] += (
+            #    np.linalg.norm(direction_vector) * 10
+            #)
             return
         else:
             self.xpos += step_vector[0]
             self.ypos += step_vector[1]
-            self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 10
+            #self.distance_travelled[int(self.load)] += np.linalg.norm(step_vector) * 10
 
     def move_to_target_along_path(self, dt):
         if self.target is None:
@@ -376,13 +377,13 @@ class Drone(Point):
         if len(self.movement_path) == 1:
             self.xpos, self.ypos = self.target.xpos, self.target.ypos
             self.arrive()
-            self.distance_travelled[int(self.load)] += (
+            """self.distance_travelled[int(self.load)] += (
                 np.linalg.norm(
                     np.array([self.target.xpos, self.target.ypos])
                     - np.array([self.xpos, self.ypos])
                 )
                 * 10
-            )
+            )"""
             self.movement_path = []
             return
 
@@ -415,7 +416,7 @@ class Drone(Point):
             self.xpos, self.ypos = end
         # Remove all waypoints up to temp
         self.movement_path = self.movement_path[temp:]
-        self.distance_travelled[int(self.load)] += distance_per_frame * 10
+        #self.distance_travelled[int(self.load)] += distance_per_frame * 10
         return
 
     def calculate_path(self):
@@ -596,70 +597,71 @@ class Simulation:
         # run mission planning
         # self.mp.solve_mission_planning(weight=self.weight)
         # self.mp.basic_heuristic()
-        response = requests.get(ORDERS_URL)
-        orders = response.json()
-        print("Orders", orders)
-        if len(orders) < 30:  # placeholder
-            for order in orders:
-                transformer = Transformer.from_crs(
-                    "EPSG:4326", "EPSG:28992", always_xy=True
-                )
-                order["xpos"], order["ypos"] = transformer.transform(
-                    order["xpos"], order["ypos"]
-                )
-                order["xpos"] = int((order["xpos"] - 81743.0) / 10)
-                order["ypos"] = int((order["ypos"] - 442446.208000008) / 10)
-                # Use a unique identifier for each order, e.g., a combination of xpos, ypos, time, pizzas
-                order_id = (
-                    order["xpos"],
-                    order["ypos"],
-                    order["initials"],
-                    order["restaurant"],
-                )
-                # print(f"Received order from web: {order}")
-                if order_id not in seen_order_ids:
-                    if (
-                        order["xpos"] < 0
-                        or order["xpos"] > legal_order_grid.shape[0] - 1
-                        or order["ypos"] < 0
-                        or order["ypos"] > legal_order_grid.shape[1] - 1
-                    ):
-                        print(
-                            f"Order at ({order['xpos']}, {order['ypos']}) is not in a the map, skipping."
-                        )
-                        seen_order_ids.add(order_id)
-                        continue
-                    if not legal_order_grid[order["ypos"], order["xpos"]]:
-                        print(
-                            f"Order at ({order['xpos']}, {order['ypos']}) is not in a legal order zone, skipping."
-                        )
-                        seen_order_ids.add(order_id)
-                        continue
-                    order_dict = {
-                        "order_id": len(self.logger.order_log),
-                        "restaurant_id": order["restaurant"],
-                        "time": self.timestamp,
-                        "s": int(0),
-                        "m": int(3),
-                        "l": int(0),
-                        "arrival_time": 200 + self.timestamp,
-                        "restaurant": next(
-                            (
-                                r
-                                for r in self.city.restaurants
-                                if r.name == order["restaurant"]
+        if self.timestamp % 50 == 0:
+            response = requests.get(ORDERS_URL)
+            orders = response.json()
+            if len(orders) < 30:  # placeholder
+                for order in orders:
+                    transformer = Transformer.from_crs(
+                        "EPSG:4326", "EPSG:28992", always_xy=True
+                    )
+                    order["xpos"], order["ypos"] = transformer.transform(
+                        order["xpos"], order["ypos"]
+                    )
+                    order["xpos"] = int((order["xpos"] - 81743.0) / 10)
+                    order["ypos"] = int((order["ypos"] - 442446.208000008) / 10)
+                    # Use a unique identifier for each order, e.g., a combination of xpos, ypos, time, pizzas
+                    order_id = (
+                        order["xpos"],
+                        order["ypos"],
+                        order["initials"],
+                        order["restaurant"],
+                    )
+                    # print(f"Received order from web: {order}")
+                    if order_id not in seen_order_ids:
+                        if (
+                            order["xpos"] < 0
+                            or order["xpos"] > legal_order_grid.shape[0] - 1
+                            or order["ypos"] < 0
+                            or order["ypos"] > legal_order_grid.shape[1] - 1
+                        ):
+                            print(
+                                f"Order at ({order['xpos']}, {order['ypos']}) is not in a the map, skipping."
+                            )
+                            seen_order_ids.add(order_id)
+                            continue
+                        if not legal_order_grid[order["ypos"], order["xpos"]]:
+                            print(
+                                f"Order at ({order['xpos']}, {order['ypos']}) is not in a legal order zone, skipping."
+                            )
+                            seen_order_ids.add(order_id)
+                            continue
+                        order_dict = {
+                            "order_id": len(self.logger.order_log),
+                            "restaurant_id": order["restaurant"],
+                            "time": self.timestamp,
+                            "s": int(0),
+                            "m": int(3),
+                            "l": int(0),
+                            "arrival_time": 200 + self.timestamp,
+                            "restaurant": next(
+                                (
+                                    r
+                                    for r in self.city.restaurants
+                                    if r.name == order["restaurant"]
+                                ),
+                                None,
                             ),
-                            None,
-                        ),
-                        "status": False,  # not delivered
-                        "x_delivery_loc": float(order["xpos"]),
-                        "y_delivery_loc": float(order["ypos"]),
-                    }
-                    self.order_book[order_id] = Order(order_dict)
-                    self.order_book[order_id].initials = order["initials"]
-                    print(f"Added order from web: {order}")
-                    seen_order_ids.add(order_id)
-        if running:
+                            "status": False,  # not delivered
+                            "x_delivery_loc": float(order["xpos"]),
+                            "y_delivery_loc": float(order["ypos"]),
+                        }
+                        self.order_book[order_id] = Order(order_dict)
+                        self.order_book[order_id].initials = order["initials"]
+                        print(f"Added order from web: {order}")
+                        seen_order_ids.add(order_id)
+        #if running:
+        if len (self.order_book) > 0:
             for drone in self.drones:
                 drone.update_drone(self.dt)
             self.timestamp += self.dt
@@ -752,7 +754,7 @@ obstacle_grid_7x = np.kron(obstacle_grid, np.ones((scale_factor, scale_factor)))
 def animate_simulation(sim, steps=100, interval=200, save_path=None):
     city = sim.city
     fig, ax = plt.subplots(figsize=(7, 7))
-    fig.canvas.mpl_connect("button_press_event", start_delivery)
+    #fig.canvas.mpl_connect("button_press_event", start_delivery)
     # Plot the population density as a static background
     im = ax.imshow(
         city.map[:, :, 0].T,
@@ -955,12 +957,12 @@ if __name__ == "__main__":
 
     my_sim = Simulation(city=City(city_dict), logger=Logger())
     n_steps = int(constants.time_window / my_sim.dt)
-    my_sim.change_order_volume(0)
+    my_sim.change_order_volume(1/45)
     my_sim.weight = args.weight
     # for i in range(n_steps):
     #    my_sim.take_step()
     # Plot the legal order grid in blue with alpha=0.5
-    animate_simulation(my_sim, n_steps, interval=20)
+    animate_simulation(my_sim, n_steps*3, interval=40)
     # plt.plot(np.linspace(0, constants.time_window, len(my_sim.orders_per_time)), my_sim.orders_per_time, label='Orders per time step')
     # plt.xlabel('Time step')
     # plt.ylabel('Number of orders')
