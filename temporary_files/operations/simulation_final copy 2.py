@@ -14,6 +14,7 @@ import threading
 from temporary_files.operations.db import db
 import matplotlib.image as mpimg
 from matplotlib.lines import Line2D
+import matplotlib.colors as mcolors
 
 callback_done = threading.Event()
 from temporary_files.operations.mission_planning_2 import MissionPlanning
@@ -619,7 +620,12 @@ class Simulation:
         # orders = response.json()
         orders = database_orders
         print(len(orders))
-        if len(orders) < 30:  # placeholder
+        active_orders = [
+            self.order_book[order_id]
+            for order_id in self.order_book
+            if not self.order_book[order_id].status
+        ]
+        if len(active_orders) < 10:  # placeholder
             for order in orders:
 
                 order["ypos"] = order["location"]["lat"]
@@ -683,7 +689,7 @@ class Simulation:
                     self.order_book[order_id].initials = order["initials"]
                     print(f"Added order from web: {order}")
                     seen_order_ids.add(order_id)
-        if len(self.order_book) > 2:
+        if running:
             for drone in self.drones:
                 drone.update_drone(self.dt)
             self.timestamp += self.dt
@@ -757,11 +763,24 @@ def load_delft_grid(path="pathplanning/data/delft_grid_data_70_symposium.npz"):
     }
 
 
+def load_no_fly_zones(path="pathplanning/data/delft_grid_data_70_symposium.npz"):
+    data = np.load(path, allow_pickle=True)
+    return {
+        "weight_grid": data["weight_grid"],
+        "obstacle_grid": data["obstacle_grid"],
+    }
+
+
 grid = load_delft_grid()
 grid_fine = load_delft_grid(path="pathplanning/data/delft_grid_data_10_symposium.npz")
 # grid_fine = load_delft_grid()
 legal_order_grid = grid_fine["legal_grid"]
 walkable = ~grid["obstacle_grid"]
+
+no_fly_grid = load_no_fly_zones(
+    path="pathplanning/data/delft_grid_data_10_no_border.npz"
+)
+no_fly_zones = no_fly_grid["obstacle_grid"]
 
 scale_factor = 7
 obstacle_grid = grid["obstacle_grid"]
@@ -776,6 +795,12 @@ obstacle_grid_7x = np.kron(obstacle_grid, np.ones((scale_factor, scale_factor)))
 def animate_simulation(sim, steps=100, interval=200, save_path=None):
     city = sim.city
     fig, ax = plt.subplots(figsize=(7, 7))
+    qr_img = mpimg.imread("temporary_files/operations/qr-code.png")
+    fig = plt.figure(figsize=(60, 60))  # Wider figure to fit QR code
+    ax = fig.add_axes([0.05, 0.05, 0.7, 0.9])  # Main animation axes
+    qr_ax = fig.add_axes([0.75, 0.5, 0.23, 0.48])  # QR code axes (bigger)
+    qr_ax.imshow(qr_img)
+    qr_ax.axis("off")
 
     img = mpimg.imread("temporary_files/operations/map_delft_for_sim.jpg")
     im = ax.imshow(
@@ -783,7 +808,7 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
         extent=[-400, city.map.shape[0] * 10 + 100, -50, city.map.shape[1] * 10 + 120],
         zorder=0,
     )
-    # fig.canvas.mpl_connect("button_press_event", start_delivery)
+    fig.canvas.mpl_connect("button_press_event", start_delivery)
     # Plot the population density as a static background
     """im = ax.imshow(
         city.map[:, :, 0].T,
@@ -809,17 +834,33 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
     #     ]
     # )
     # Show silent zones as dark gray where silent zone is true
-    silent_zone_mask = city.map[:, :, 3].T > 0
-    silent_zone_overlay = np.zeros((city.map.shape[1], city.map.shape[0], 4))
-    silent_zone_overlay[silent_zone_mask] = [0.2, 0.2, 0.2, 1]
+    # silent_zone_mask = city.map[:, :, 3].T > 0
+    # silent_zone_overlay = np.zeros((city.map.shape[1], city.map.shape[0], 4))
+    # silent_zone_overlay[silent_zone_mask] = [0.2, 0.2, 0.2, 0.5]
     # ax.imshow(
     #     silent_zone_overlay,
     #     origin="lower",
     #     extent=[0, city.map.shape[0] * 10, 0, city.map.shape[1] * 10],
     # )
 
+    # Create a colormap: 0 (False) -> transparent, 1 (True) -> black
+
+    cmap = mcolors.ListedColormap(
+        [(50, 50, 50, 0), (0, 0, 0, 1)]
+    )  # RGBA: transparent, black
+
+    ax.imshow(
+        no_fly_zones,
+        cmap=cmap,
+        alpha=1,  # alpha is handled by the colormap
+        origin="lower",
+        zorder=100,
+        interpolation="none",
+        extent=[0, city.map.shape[0] * 10, 0, city.map.shape[1] * 10],
+    )
+
     # Scale all coordinates by 10
-    scat_orders = ax.scatter([], [], c="cyan", label="Orders", s=20)
+    scat_orders = ax.scatter([], [], c="red", label="Orders", s=50)
     scat_restaurants = ax.scatter(
         [r.xpos * 10 for r in city.restaurants],
         [r.ypos * 10 for r in city.restaurants],
@@ -856,7 +897,7 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
         [0],
         marker="o",
         color="w",
-        markerfacecolor="black",
+        markerfacecolor="grey",
         markersize=8,
         label="no-fly zones",
     )
@@ -904,10 +945,10 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
                 if hasattr(order, "initials"):
                     txt = ax.text(
                         order.xpos * 10,
-                        order.ypos * 10 + 5,
+                        order.ypos * 10 + 15,
                         order.initials,
                         color="black",
-                        fontsize=10,
+                        fontsize=15,
                         ha="center",
                         zorder=20,
                     )
@@ -952,7 +993,7 @@ def animate_simulation(sim, steps=100, interval=200, save_path=None):
         fig, update, frames=steps, interval=interval, blit=True, repeat=False
     )
     # Uncomment the next line to save the animation as an MP4
-    # ani.save("simulation_animation.mp4", writer='ffmpeg', fps=1000//interval)
+    # ani.save("simulation_animation_1.mp4", writer="ffmpeg", fps=1000 // interval)
     plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
     plt.show()
 
@@ -974,8 +1015,8 @@ def delete_collection():
 depot_dict = [
     {
         "depot_id": 0,
-        "xpos": 264,
-        "ypos": 472,
+        "xpos": 220,
+        "ypos": 340,
         "capacity": 10,
     }
 ]
