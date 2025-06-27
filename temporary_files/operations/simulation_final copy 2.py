@@ -620,13 +620,13 @@ class Simulation:
         # orders = response.json()
         orders = database_orders
         print(len(orders))
-        active_orders = [
-            self.order_book[order_id]
-            for order_id in self.order_book
-            if not self.order_book[order_id].status
-        ]
-        if len(active_orders) < 10:  # placeholder
-            for order in orders:
+        for order in orders:
+            active_orders = [
+                self.order_book[order_id]
+                for order_id in self.order_book
+                if not self.order_book[order_id].status
+            ]
+            if len(active_orders) < 10:  # placeholder
 
                 order["ypos"] = order["location"]["lat"]
                 order["xpos"] = order["location"]["lng"]
@@ -1021,7 +1021,7 @@ depot_dict = [
     }
 ]
 if __name__ == "__main__":
-    delete_collection()
+    # delete_collection()
     parser = argparse.ArgumentParser()
     col_query = db.collection("requests")
     # Watch the collection query
